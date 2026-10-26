@@ -27,9 +27,18 @@ Current phase: **Phase 0 — done** (pending first green CI run on GitHub) → n
 
 ### Verified locally
 - `pnpm exec turbo run typecheck lint test` — green (contracts 53 tests, api 13 unit, ui 5).
-- `pnpm --filter @forest/api test:integration` — 14 tests green (Testcontainers Postgres + Redis, migrations + seed applied).
+- `pnpm --filter @forest/api test:integration` — 16 tests green (Testcontainers Postgres + Redis, migrations + seed applied).
 - `pnpm build` — green; prod-mode stack + `pnpm e2e` — 10/10 smoke tests green; dev outbox returns 404 in production.
 - `pnpm dev` from scratch — infra up, migrations, seed, three apps serving.
+
+### Independent review (subagent) — fixed
+Critical: web build no longer needs a live API (CI e2e/docker). High: gift promos all-or-nothing and
+never stacked with kits; DB constraints/triggers for invariants 1, 2, 3, 5; dev outbox gated by
+`DEV_ENDPOINTS`, fake providers refused in production, no silent fake fallback. Medium: unaccent,
+daily partition job + UTC bounds + DEFAULT-partition alert, `onSale=false`, `Vary: Accept-Language`,
+SMS bodies/URL tokens/phones redacted in logs, BTS work-day roll, e2e now runs on compose images,
+pinned infra images. Low: rounding, compact format, refused-delivery transition, ZodPipe codes,
+parametrized DB password.
 
 ### Mocked / not yet real
 - Every integration runs on its fake adapter (no external calls). Real adapters arrive in Phase 2 (Payme, Click, Yandex, BTS, Eskiz, fiscal) and Phase 3+ (MoySklad, Telegram, ads, SEO tools).

@@ -49,7 +49,8 @@ pnpm lint && pnpm typecheck && pnpm format:check
 pnpm build             # production build of everything
 docker compose -f infra/compose.yml --profile apps up -d --build   # prod-like stack (migrate → api, web, admin, caddy)
 ```
-Dev-only: `GET /v1/dev/outbox` lists SMS/Telegram captured by fake providers (OTP codes); 404 in production or when PROVIDERS_MODE≠fake.
+Dev-only: `GET /v1/dev/outbox` lists SMS/Telegram captured by fake providers (OTP codes); 404 unless `DEV_ENDPOINTS=true` and `PROVIDERS_MODE=fake`.
+Jobs: BullMQ queue `maintenance` → `events.partitions.ensure` daily 03:10 Tashkent (+ on boot).
 (Keep this list true — update when scripts change.)
 
 ## 6. Architecture decisions (rationale in `docs/03-architecture.md`)
@@ -68,6 +69,11 @@ Monorepo · separate admin app/domain · NestJS modules per domain · Postgres-f
 - 2026-10-26 — Montserrat self-hosted via `@fontsource-variable/montserrat` (latin+cyrillic unicode-range) instead of next/font/google: builds don't depend on Google, no third-party font request.
 - 2026-10-26 — Catalog listing filters/facets in memory over active products (catalog is hundreds of SKUs). Revisit if > few thousand products.
 - 2026-10-26 — CMS/legal body = structured blocks (`contentBlockSchema`) with `{store.*}` variables; blocks whose variables are missing are hidden, so legal drafts never render `[placeholder]` text.
+- 2026-10-26 — Providers: fakes only when `PROVIDERS_MODE=fake`; in sandbox/live an unconnected/unimplemented provider throws INTEGRATION_NOT_CONFIGURED (never silently fake). Production refuses fake mode unless `ALLOW_FAKE_PROVIDERS=true` (demos/CI). `/v1/dev/outbox` needs `DEV_ENDPOINTS=true` + fake mode.
+- 2026-10-26 — DB-level invariants (raw SQL migration): CHECKs on stock/qty/totals/rating, triggers for one PAID payment per order and IKPU-before-ACTIVE (triggers, not partial indexes, so Prisma sees no drift).
+- 2026-10-26 — Storefront pages are never prerendered at build (`generateStaticParams` returns []): they render on first request and are cached by fetch revalidation, so builds don't need a live API.
+- 2026-10-26 — Catalog keeps `?page=n` pagination (crawlable, docs/01) instead of cursors; cursors are for admin/API lists.
+- 2026-10-26 — Legal draft pages are published (Payme/Click onboarding needs a public offer) but show a "draft, lawyer review pending" notice and hide rows with missing company data until `store.legal` is complete.
 - 2026-10-26 — Integration credentials: AES-256-GCM envelope `[v1][keyId:4][iv:12][tag:16][ct]`, AAD = integration key; key rotation via previous keys. Blank secret inputs keep the stored value.
 
 ## 7. Coding standards
