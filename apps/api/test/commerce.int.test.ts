@@ -279,11 +279,11 @@ describe('commerce: cart → checkout → payment → tracking (integration)', (
       .send(checkoutBody('+998901110006', { region: 'samarkand' }))
       .expect(400);
     expect(zone.body.error.code).toBe('DELIVERY_UNAVAILABLE');
-    const kit = await agent
+    const soldOut = await agent
       .post('/v1/cart/items')
-      .send({ variantId: ids['FR-KIT-S'], qty: 1 })
+      .send({ variantId: ids['FR-FS-GRY'], qty: 1 })
       .expect(409);
-    expect(kit.body.error.code).toBe('OUT_OF_STOCK');
+    expect(soldOut.body.error.code).toBe('OUT_OF_STOCK');
     const empty = await request
       .agent(app.getHttpServer())
       .post('/v1/checkout/orders')

@@ -262,7 +262,7 @@ export const products: SeedProduct[] = [
         sku: 'FR-FS-GRY',
         label: { uz: 'Kulrang', ru: 'Серый' },
         priceSoum: 249_000,
-        stock: 19,
+        stock: 0, // sold-out colour: exercises waitlist + in-stock alternatives
         volumeMl: 400,
         colorHex: '#8D918C',
         weightGrams: 450,
@@ -493,7 +493,7 @@ export const products: SeedProduct[] = [
         label: { uz: "To'plam", ru: 'Набор' },
         priceSoum: 799_000,
         compareAtSoum: 896_000,
-        stock: 0,
+        stock: 12,
         weightGrams: 1950,
       },
     ],

@@ -113,7 +113,7 @@ describe('search, content, SEO feeds (integration)', () => {
       { variantId: spray.id, productSlug: 'mato-boyogi-spreyi', qty: 2 },
     ]);
     // The sofa kit has no stock in the seed → flagged, not hidden.
-    expect(res.body.selector.find((s: { key: string }) => s.key === 'divan').inStock).toBe(false);
+    expect(res.body.selector.find((s: { key: string }) => s.key === 'divan').inStock).toBe(true);
   });
 
   it('home: reviews summary is the real aggregate of approved reviews only', async () => {

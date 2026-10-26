@@ -32,15 +32,15 @@ describe('catalog + settings API (integration)', () => {
     );
   });
 
-  it('lists products with money in whole so’m and out-of-stock last', async () => {
+  it('lists products with money in whole so’m, in-stock first', async () => {
     const res = await request(app.getHttpServer()).get('/v1/catalog/products').expect(200);
     expect(res.body.total).toBe(8);
-    const last = res.body.items.at(-1);
-    expect(last.slug).toBe('divan-yangilash-toplami');
-    expect(last.inStock).toBe(false);
-    expect(last.priceFromSoum).toBe(799000);
-    expect(last.compareAtSoum).toBe(896000);
-    expect(last.discountPct).toBe(11);
+    const flags = res.body.items.map((p: { inStock: boolean }) => p.inStock);
+    expect(flags).toEqual([...flags].sort((a, b) => Number(b) - Number(a)));
+    const kit = res.body.items.find((p: { slug: string }) => p.slug === 'divan-yangilash-toplami');
+    expect(kit.priceFromSoum).toBe(799000);
+    expect(kit.compareAtSoum).toBe(896000);
+    expect(kit.discountPct).toBe(11);
   });
 
   it('filters by colour, volume and price with disjunctive facets', async () => {
