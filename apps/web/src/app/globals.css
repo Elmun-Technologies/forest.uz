@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@forest/ui/theme.css';
+
+/* Tailwind v4 only scans this app by default; include shared components. */
+@source '../../../../packages/ui/src';

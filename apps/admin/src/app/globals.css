@@ -1,0 +1,4 @@
+@import 'tailwindcss';
+@import '@forest/ui/theme.css';
+
+@source '../../../../packages/ui/src';
