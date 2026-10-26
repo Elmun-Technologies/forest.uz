@@ -12,6 +12,12 @@ const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@forest/ui'],
+  // Browser → API goes through the shop origin so session/cart cookies are first-party and
+  // readable by SSR. Server components call API_INTERNAL_URL directly, forwarding cookies.
+  async rewrites() {
+    const api = process.env.API_INTERNAL_URL ?? process.env.API_URL ?? 'http://localhost:4000';
+    return [{ source: '/api/:path*', destination: `${api}/v1/:path*` }];
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [

@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { CatalogModule } from './catalog/catalog.module';
+import { CommerceModule } from './commerce/commerce.module';
+import { CustomerModule } from './customer/customer.module';
 import { PINO_REDACT_PATHS } from './common/redact';
+import { SessionModule } from './common/session';
 import { ConfigModule, ENV } from './config/config.module';
 import type { Env } from './config/env';
 import { FilesModule } from './files/files.service';
@@ -42,11 +45,14 @@ import { SettingsModule } from './settings/settings.module';
     }),
     PrismaModule,
     RedisModule,
+    SessionModule,
     FilesModule,
     SettingsModule,
     IntegrationsModule,
     HealthModule,
     CatalogModule,
+    CommerceModule,
+    CustomerModule,
     JobsModule,
   ],
 })
