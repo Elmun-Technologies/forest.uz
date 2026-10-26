@@ -9,6 +9,10 @@ ARG APP
 # Baked into next.config (image remotePatterns) at build time.
 ARG S3_PUBLIC_URL=https://cdn.forest.uz/forest-public
 ENV S3_PUBLIC_URL=${S3_PUBLIC_URL}
+# Baked into the /api rewrite (routes manifest) and the edge middleware at build time; the
+# runtime env alone is not enough. Must be the API address as seen from the web container.
+ARG API_INTERNAL_URL=http://api:4000
+ENV API_INTERNAL_URL=${API_INTERNAL_URL}
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store pnpm install --frozen-lockfile
 ENV NEXT_TELEMETRY_DISABLED=1
