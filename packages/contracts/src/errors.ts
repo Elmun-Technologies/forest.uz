@@ -141,6 +141,26 @@ export const ERROR_MESSAGES = {
     uz: "So'rovlar ko'p. Bir daqiqadan keyin urinib ko'ring.",
     ru: 'Слишком много запросов. Попробуйте через минуту.',
   },
+  IDEMPOTENCY_CONFLICT: {
+    http: 409,
+    uz: 'Bu buyurtma allaqachon yuborilmoqda. Bir necha soniya kuting.',
+    ru: 'Этот заказ уже отправляется. Подождите несколько секунд.',
+  },
+  IKPU_MISSING: {
+    http: 409,
+    uz: "Mahsulot hozircha sotuvga tayyor emas. Operator bilan bog'laning.",
+    ru: 'Товар пока не готов к продаже. Свяжитесь с оператором.',
+  },
+  PAYMENT_NOT_RETRYABLE: {
+    http: 409,
+    uz: "Bu buyurtma uchun to'lovni qayta boshlab bo'lmaydi.",
+    ru: 'Оплату этого заказа нельзя начать заново.',
+  },
+  COD_DISABLED: {
+    http: 400,
+    uz: "Hozircha faqat onlayn to'lov mavjud.",
+    ru: 'Сейчас доступна только онлайн-оплата.',
+  },
   IDEMPOTENCY_KEY_REQUIRED: {
     http: 400,
     uz: "So'rov kaliti yo'q.",
