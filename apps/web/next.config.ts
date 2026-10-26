@@ -36,7 +36,9 @@ const config: NextConfig = {
     return [{ source: '/api/:path*', destination: `${api}/v1/:path*` }];
   },
   images: {
-    formats: ['image/avif', 'image/webp'],
+    // WebP only: sharp's AVIF encoder is ~5× slower and hung (>20 s) on some PNG logos, which
+    // stalled cold image requests in production.
+    formats: ['image/webp'],
     remotePatterns: [
       {
         protocol: publicFiles.protocol.replace(':', '') as 'http' | 'https',
