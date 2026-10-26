@@ -40,6 +40,8 @@ export interface CategoryDto {
   name: string;
   productCount: number;
   image: ImageDto | null;
+  /** Admin-edited SEO text shown under the catalog grid. */
+  seoText: string | null;
 }
 
 export interface VariantDto {

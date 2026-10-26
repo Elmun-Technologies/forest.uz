@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { deliveryZoneSchema } from '../delivery';
+import { type DeliveryRule, deliveryZoneSchema } from '../delivery';
 
 const hm = z.string().regex(/^\d{2}:\d{2}$/);
 const loc = z.object({ uz: z.string(), ru: z.string() });
@@ -91,9 +91,13 @@ export interface PublicSettingsDto {
       freeFromSoum: number | null;
       promiseHours: number;
       cutoff: string | null;
+      /** Full promise rule for `computeDeliveryPromise` (storefront countdown line). */
+      rule: DeliveryRule;
     }[];
     codMaxSoum: number;
   };
   seo: { google: string | null; yandex: string | null; bing: string | null };
+  /** From `returns.rules` (hero trust row "14 kun qaytarish"). */
+  returns: { returnDays: number };
   flags: { marketplace: boolean; cod: boolean; bnpl: boolean };
 }

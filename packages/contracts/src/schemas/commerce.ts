@@ -221,6 +221,8 @@ export const LEAD_SOURCES = ['popup', 'selector', 'footer', 'home', 'bot', 'chec
 export const leadSchema = z.object({
   phone: uzPhoneSchema,
   source: z.enum(LEAD_SOURCES),
+  /** Explicit SMS-marketing opt-in checkbox; absent/false records no consent. */
+  marketingConsent: z.boolean().optional(),
 });
 
 export const waitlistSchema = z.object({

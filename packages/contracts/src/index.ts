@@ -14,3 +14,5 @@ export * from './schemas/settings';
 export * from './schemas/catalog';
 export * from './schemas/content';
 export * from './schemas/commerce';
+export * from './schemas/storefront';
+export * from './schemas/customer';
