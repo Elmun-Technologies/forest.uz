@@ -48,6 +48,12 @@
       "sharp",
       "@nestjs/core",
       "@swc/core"
+    ],
+    "ignoredBuiltDependencies": [
+      "cpu-features",
+      "msgpackr-extract",
+      "protobufjs",
+      "ssh2"
     ]
   }
 }
