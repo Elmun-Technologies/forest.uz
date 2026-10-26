@@ -10,3 +10,8 @@ coverage
 .DS_Store
 playwright-report
 test-results
+*.tsbuildinfo
+.turbo
+next-env.d.ts
+/data/
+e2e/.auth

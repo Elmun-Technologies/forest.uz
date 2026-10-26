@@ -1,0 +1,7 @@
+design/
+pnpm-lock.yaml
+**/dist
+**/.next
+**/coverage
+**/migrations/**/*.sql
+docs/handoff/
