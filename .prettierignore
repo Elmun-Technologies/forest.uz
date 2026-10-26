@@ -5,3 +5,5 @@ pnpm-lock.yaml
 **/coverage
 **/migrations/**/*.sql
 docs/handoff/
+*.md
+.github/

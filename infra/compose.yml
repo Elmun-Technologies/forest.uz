@@ -65,32 +65,49 @@ services:
       timeout: 3s
       retries: 10
 
+  migrate:
+    env_file: ../.env
+    profiles: [apps]
+    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: migrate }
+    environment:
+      DATABASE_URL: postgresql://forest:forest@postgres:5432/forest
+    depends_on:
+      postgres: { condition: service_healthy }
+
   api:
     <<: *app-env
     profiles: [apps]
-    build: { context: .., dockerfile: infra/docker/api.Dockerfile }
+    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: runtime }
     environment:
       DATABASE_URL: postgresql://forest:forest@postgres:5432/forest
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://storage:8333
     depends_on:
-      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
       storage: { condition: service_healthy }
 
   web:
     <<: *app-env
     profiles: [apps]
-    build: { context: .., dockerfile: infra/docker/next.Dockerfile, args: { APP: web } }
+    build:
+      context: ..
+      dockerfile: infra/docker/next.Dockerfile
+      args: { APP: web, S3_PUBLIC_URL: '${S3_PUBLIC_URL:-http://localhost:9000/forest-public}' }
     environment:
+      PORT: 3000
       API_INTERNAL_URL: http://api:4000
     depends_on: [api]
 
   admin:
     <<: *app-env
     profiles: [apps]
-    build: { context: .., dockerfile: infra/docker/next.Dockerfile, args: { APP: admin } }
+    build:
+      context: ..
+      dockerfile: infra/docker/next.Dockerfile
+      args: { APP: admin }
     environment:
+      PORT: 3001
       API_INTERNAL_URL: http://api:4000
     depends_on: [api]
 

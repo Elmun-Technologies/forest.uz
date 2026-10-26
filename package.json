@@ -15,7 +15,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:integration": "turbo run test:integration",
-    "e2e": "pnpm --filter @forest/e2e test",
+    "e2e": "pnpm --filter @forest/e2e e2e",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "db:generate": "pnpm --filter @forest/db generate",
@@ -36,7 +36,7 @@
     "typescript": "5.9.3"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs,json,md,css,yml,yaml}": "prettier --write"
+    "*.{ts,tsx,js,mjs,cjs,json,css,yml,yaml}": "prettier --write"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
