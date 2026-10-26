@@ -15,6 +15,7 @@ export async function createTestApp(): Promise<NestExpressApplication> {
     APP_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
     SESSION_SECRET: randomBytes(32).toString('hex'),
     PROVIDERS_MODE: 'fake',
+    DEV_ENDPOINTS: 'true',
     S3_PUBLIC_URL: 'http://cdn.test/forest-public',
   });
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();

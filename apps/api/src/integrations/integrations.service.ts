@@ -64,49 +64,65 @@ export class IntegrationsService {
     };
   }
 
-  /** True when this provider must use its fake (not connected, not implemented, or fake mode). */
-  async usesFake(key: string): Promise<boolean> {
-    if (this.env.PROVIDERS_MODE === 'fake') return true;
+  /**
+   * Fakes are used only in PROVIDERS_MODE=fake. In sandbox/live a provider must be connected and
+   * implemented — otherwise we fail loudly (INTEGRATION_NOT_CONFIGURED) rather than silently faking
+   * payments or SMS in a real store.
+   */
+  get fakeMode(): boolean {
+    return this.env.PROVIDERS_MODE === 'fake';
+  }
+
+  private async real<T>(key: string, resolve: () => T | null): Promise<T> {
     const def = getDefinition(key);
-    if (!def?.implemented) return true;
     const row = await this.prisma.integration.findUnique({
       where: { key },
       select: { status: true },
     });
-    return row?.status !== 'CONNECTED';
+    const adapter = def?.implemented && row?.status === 'CONNECTED' ? resolve() : null;
+    if (!adapter) throw new DomainError('INTEGRATION_NOT_CONFIGURED', { integration: key });
+    return adapter;
   }
 
-  // Real adapters are wired in here as they land (Phase 2+); until then every port resolves to its fake.
+  // Real adapters plug into the resolvers below as they land (Phase 2+).
   async payment(key: 'payme' | 'click'): Promise<PaymentProvider> {
-    return this.fakes[key];
+    return this.fakeMode ? this.fakes[key] : this.real<PaymentProvider>(key, () => null);
   }
 
   async delivery(key: 'yandex_delivery' | 'bts'): Promise<DeliveryProvider> {
-    return key === 'yandex_delivery' ? this.fakes.yandex : this.fakes.bts;
+    if (this.fakeMode) return key === 'yandex_delivery' ? this.fakes.yandex : this.fakes.bts;
+    return this.real<DeliveryProvider>(key, () => null);
   }
 
   async sms(): Promise<SmsProvider> {
-    return this.fakes.sms;
+    return this.fakeMode ? this.fakes.sms : this.real<SmsProvider>('eskiz', () => null);
   }
 
   async messenger(): Promise<MessengerProvider> {
-    return this.fakes.messenger;
+    return this.fakeMode
+      ? this.fakes.messenger
+      : this.real<MessengerProvider>('telegram', () => null);
   }
 
+  /** COD receipts fall back to the manual provider (operator enters the receipt) when no OFD is connected. */
   async fiscal(): Promise<FiscalProvider> {
     return this.fakes.fiscal;
   }
 
   async inventory(): Promise<InventoryProvider> {
-    return this.fakes.inventory;
+    return this.fakeMode
+      ? this.fakes.inventory
+      : this.real<InventoryProvider>('moysklad', () => null);
   }
 
   async ai(): Promise<AiProvider> {
-    return this.fakes.ai;
+    return this.fakeMode ? this.fakes.ai : this.real<AiProvider>('claude', () => null);
   }
 
   async adSignal(key: AdSignalProvider['key']): Promise<AdSignalProvider> {
-    return new FakeAdSignalProvider(key);
+    return this.fakeMode
+      ? new FakeAdSignalProvider(key)
+      : this.real<AdSignalProvider>(key, () => null);
   }
 
   async list(): Promise<IntegrationView[]> {
@@ -125,7 +141,7 @@ export class IntegrationsService {
           fields: this.maskFields(definition, creds),
           lastCheckAt: row?.lastCheckAt ?? null,
           lastError: row?.lastError ?? null,
-          usingFake: await this.usesFake(definition.key),
+          usingFake: this.fakeMode,
         };
       }),
     );
@@ -206,7 +222,7 @@ export class IntegrationsService {
   async test(key: string): Promise<HealthResult> {
     const def = getDefinition(key);
     if (!def) return { ok: false, message: 'unknown integration' };
-    if (!def.implemented || this.env.PROVIDERS_MODE === 'fake') {
+    if (this.fakeMode) {
       return { ok: true, message: 'fake mode: credentials saved, no external call made' };
     }
     return { ok: false, message: 'adapter not implemented yet' };

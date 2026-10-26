@@ -3,11 +3,30 @@
  * case-insensitively, recursively. Phones inside free text are masked too.
  */
 const SENSITIVE_KEY =
-  /(authorization|password|passwd|secret|token|api[-_]?key|phone|mobile|card|pan|cvv|address|contact_?phone|otp|code_?hash|cookie|set-cookie|credentials|totp)/i;
+  /(authorization|password|passwd|secret|token|api[-_]?key|phone|mobile|card|pan|cvv|address|contact_?phone|otp|code_?hash|cookie|set-cookie|credentials|totp|^text$|^body$|^message$|^caption$)/i;
 
 const PHONE_IN_TEXT = /(\+?998)[\s-]?\(?(\d{2})\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?(\d{2})/g;
 
 export const REDACTED = '[redacted]';
+
+/**
+ * URL safe for logs: drops the query string and masks path segments that look like credentials
+ * (Telegram puts the bot token in the path: /bot<token>/sendMessage).
+ */
+export function safeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const path = u.pathname
+      .split('/')
+      .map((seg) =>
+        /^bot\d+:/.test(seg) ? 'bot***' : seg.length >= 24 && /^[\w:-]+$/.test(seg) ? '***' : seg,
+      )
+      .join('/');
+    return `${u.origin}${path}`;
+  } catch {
+    return '[invalid-url]';
+  }
+}
 
 export function maskPhonesInText(text: string): string {
   return text.replace(PHONE_IN_TEXT, '+998 $2 *** ** $3');

@@ -28,3 +28,26 @@ describe('redact', () => {
     expect(JSON.stringify(redact(root))).toContain(REDACTED);
   });
 });
+
+describe('safeUrl', () => {
+  it('drops query strings and masks credential-like path segments', async () => {
+    const { safeUrl } = await import('./redact');
+    expect(safeUrl('https://api.telegram.org/bot123456:AAbbCCdd/sendMessage?chat_id=1')).toBe(
+      'https://api.telegram.org/bot***/sendMessage',
+    );
+    expect(safeUrl('https://x.uz/hooks/abcdefghijklmnopqrstuvwxyz012345/ok')).toBe(
+      'https://x.uz/hooks/***/ok',
+    );
+    expect(safeUrl('https://notify.eskiz.uz/api/message/sms/send')).toBe(
+      'https://notify.eskiz.uz/api/message/sms/send',
+    );
+    expect(safeUrl('not a url')).toBe('[invalid-url]');
+  });
+
+  it('redacts SMS bodies', () => {
+    expect(redact({ mobile_phone: '998901234567', message: 'kod 4711' })).toEqual({
+      mobile_phone: REDACTED,
+      message: REDACTED,
+    });
+  });
+});

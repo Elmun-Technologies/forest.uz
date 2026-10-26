@@ -7,6 +7,7 @@ import type { Env } from './config/env';
 import { FilesModule } from './files/files.service';
 import { HealthModule } from './health/health.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { JobsModule } from './jobs/jobs.module';
 import { PrismaModule } from './prisma/prisma.service';
 import { RedisModule } from './redis/redis.module';
 import { SettingsModule } from './settings/settings.module';
@@ -46,6 +47,7 @@ import { SettingsModule } from './settings/settings.module';
     IntegrationsModule,
     HealthModule,
     CatalogModule,
+    JobsModule,
   ],
 })
 export class AppModule {}

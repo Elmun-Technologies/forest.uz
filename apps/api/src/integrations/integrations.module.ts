@@ -15,7 +15,7 @@ import type { OutboxMessage } from './providers/fake';
 
 /**
  * Dev-only: messages captured by fake SMS/Telegram providers (OTP codes for local login and
- * e2e tests). Returns 404 unless PROVIDERS_MODE=fake and NODE_ENV != production.
+ * e2e tests). Returns 404 unless DEV_ENDPOINTS=true and PROVIDERS_MODE=fake.
  */
 @Controller('dev/outbox')
 export class DevOutboxController {
@@ -25,7 +25,8 @@ export class DevOutboxController {
   ) {}
 
   private guard(): void {
-    if (this.env.NODE_ENV === 'production' || this.env.PROVIDERS_MODE !== 'fake')
+    // Double guard: the flag must be set explicitly AND providers must be fake (no real SMS exists).
+    if (!this.env.DEV_ENDPOINTS || this.env.PROVIDERS_MODE !== 'fake')
       throw new NotFoundException();
   }
 

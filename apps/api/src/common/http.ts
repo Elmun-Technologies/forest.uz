@@ -13,6 +13,7 @@ import {
 import {
   type ApiErrorBody,
   DomainError,
+  ERROR_MESSAGES,
   type ErrorCode,
   type Locale,
   errorMessage,
@@ -21,6 +22,7 @@ import {
 } from '@forest/contracts';
 import type { Request, Response } from 'express';
 import { z, type ZodType } from 'zod';
+import { maskPhonesInText } from './redact';
 
 export function requestLocale(req: Request): Locale {
   const q = req.query?.locale;
@@ -44,9 +46,11 @@ export class ZodPipe<T extends ZodType> implements PipeTransform<unknown, z.infe
     const first = r.error.issues[0];
     const field = first?.path.join('.') || undefined;
     // Custom issues carry a stable ErrorCode as message (e.g. PHONE_INCOMPLETE from uzPhoneSchema).
-    const code = (first?.code === 'custom' && first.message) || 'VALIDATION_FAILED';
+    const custom = first?.code === 'custom' ? first.message : undefined;
+    const code: ErrorCode =
+      custom && custom in ERROR_MESSAGES ? (custom as ErrorCode) : 'VALIDATION_FAILED';
     throw new DomainError(
-      code as ErrorCode,
+      code,
       { issues: r.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) },
       field,
     );
@@ -91,7 +95,12 @@ export class ApiExceptionFilter implements ExceptionFilter {
                   : 'INTERNAL';
       body = { error: { code, message: errorMessage(code, locale) } };
     } else {
-      this.logger.error(exception instanceof Error ? exception.stack : String(exception));
+      // Prisma/validation errors can echo argument values (phones, addresses): mask before logging.
+      this.logger.error(
+        maskPhonesInText(
+          exception instanceof Error ? (exception.stack ?? exception.message) : String(exception),
+        ),
+      );
       body = { error: { code: 'INTERNAL', message: errorMessage('INTERNAL', locale) } };
     }
     res.status(status).json(body);

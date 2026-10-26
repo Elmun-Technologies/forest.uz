@@ -1,3 +1,5 @@
+import { safeUrl } from '../common/redact';
+
 /**
  * Outbound HTTP for integrations: per-attempt timeout, retries only for idempotent requests
  * (GET/HEAD/PUT/DELETE or explicitly marked), exponential backoff with jitter, honours
@@ -86,7 +88,7 @@ export class HttpClient {
         });
         const text = await res.text();
         this.o.onAttempt?.({
-          url: req.url,
+          url: safeUrl(req.url),
           method: req.method,
           status: res.status,
           attempt,
@@ -103,7 +105,7 @@ export class HttpClient {
       } catch (e) {
         lastError = e;
         this.o.onAttempt?.({
-          url: req.url,
+          url: safeUrl(req.url),
           method: req.method,
           status: null,
           attempt,

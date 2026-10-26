@@ -30,6 +30,10 @@ export const envSchema = z.object({
   TELEGRAM_WEBHOOK_SECRET: z.string().optional().default(''),
   TELEGRAM_ADMIN_CHAT_ID: z.string().optional().default(''),
   PROVIDERS_MODE: z.enum(['fake', 'sandbox', 'live']).default('fake'),
+  /** Fake providers in production only for demos/CI (otherwise checkout would hand out fake-pay links). */
+  ALLOW_FAKE_PROVIDERS: z.stringbool().default(false),
+  /** Dev-only endpoints (fake SMS/Telegram outbox with OTP codes). Requires PROVIDERS_MODE=fake. */
+  DEV_ENDPOINTS: z.stringbool().default(false),
   SENTRY_DSN: z.string().optional().default(''),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   GEOIP_DB_PATH: z.string().optional().default(''),
@@ -45,5 +49,11 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new Error(`Invalid environment:\n${issues}`);
   }
-  return parsed.data;
+  const env = parsed.data;
+  if (env.NODE_ENV === 'production' && env.PROVIDERS_MODE === 'fake' && !env.ALLOW_FAKE_PROVIDERS) {
+    throw new Error(
+      'PROVIDERS_MODE=fake is not allowed in production (set ALLOW_FAKE_PROVIDERS=true only for demos/CI)',
+    );
+  }
+  return env;
 }

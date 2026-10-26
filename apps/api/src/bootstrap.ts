@@ -25,6 +25,11 @@ export function configureApp(app: NestExpressApplication): INestApplication {
       { path: 'ready', method: RequestMethod.GET },
     ],
   });
+  // Responses are localized from Accept-Language and cached publicly → caches must key on it.
+  app.use((_req: unknown, res: { vary: (field: string) => void }, next: () => void) => {
+    res.vary('Accept-Language');
+    next();
+  });
   app.useGlobalFilters(new ApiExceptionFilter());
   app.enableShutdownHooks();
   return app;
