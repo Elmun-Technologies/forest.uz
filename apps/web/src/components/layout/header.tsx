@@ -23,7 +23,7 @@ export interface HeaderProps {
 export async function Header({ locale, phone, hours }: HeaderProps) {
   const t = await getTranslations('header');
   return (
-    <header className="sticky top-0 z-40 bg-canvas lg:static">
+    <header data-chrome-mobile className="sticky top-0 z-40 bg-canvas lg:static">
       {/* Desktop */}
       <div className="mx-auto hidden max-w-[1440px] items-center gap-4 px-6 py-4 lg:flex">
         <Link href={routes.home} aria-label={t('homeLabel')} className="block w-[120px] shrink-0">

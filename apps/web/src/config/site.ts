@@ -21,7 +21,10 @@ export const routes = {
   deliveryPayment: '/yetkazish-tolov',
 } as const;
 
-/** Pages that exist (or are being built in Phase 1). Ilhom/Brend are v1.1. */
+/**
+ * Pages that exist. Cart, checkout, order, tracking, login, cabinet and the four legal pages
+ * shipped in Phase 1 and are always linked; Ilhom/Brend are v1.1.
+ */
 export const pageReady = {
   inspiration: false,
   brand: false,
@@ -31,7 +34,15 @@ export const pageReady = {
 export const navCategories = { furniture: 'mebel-uchun', fabric: 'mato-uchun' } as const;
 
 /** Routes where global marketing overlays (lead popup, cart bar) stay hidden. */
-export const quietRoutes = ['/savat', '/checkout', '/buyurtma', '/kirish', '/kabinet', '/t/'];
+export const quietRoutes = [
+  '/savat',
+  '/checkout',
+  '/buyurtma',
+  '/kirish',
+  '/kabinet',
+  '/t/',
+  '/fake-pay',
+];
 
 export function telegramUrl(bot: string, start?: string): string {
   return `https://t.me/${bot}${start ? `?start=${encodeURIComponent(start)}` : ''}`;

@@ -3,12 +3,23 @@
 Next.js 15 App Router + next-intl 4 (`/uz`, `/ru`), Tailwind v4 tokens from `@forest/ui`.
 Server components by default; client code only in interactive islands.
 
-## Layout (`src/app/[locale]/layout.tsx`)
+## Layout
 
-Every page gets: delivery top bar → `Header` → `<main id="main">` → `Footer`, plus global
-islands: `FloatingActions` (desktop "Savol bormi?" Telegram button, mobile Telegram + cart bar),
-`ConsentBanner`, `LeadPopup` (exit intent). Providers: `NextIntlClientProvider` (all namespaces
-except `meta`/`errors`), `ToastProvider`, `CartProvider`.
+- `src/app/[locale]/layout.tsx` — `<html>`, providers (`NextIntlClientProvider` with all
+  namespaces except `meta`/`errors`, `ToastProvider`, `CartProvider`), skip link, `ConsentBanner`,
+  `OfflineBanner`.
+- `(shop)/layout.tsx` → `ShopChrome` (`src/components/layout/shop-chrome.tsx`): delivery top bar →
+  `Header` → `<main id="main">` → `Footer`, plus `FloatingActions` (desktop "Savol bormi?"
+  Telegram button, mobile Telegram + cart bar) and `LeadPopup` (exit intent). All storefront pages.
+- `(flow)/layout.tsx` — bare `<main>` for checkout, login and `/fake-pay` (design: Checkout,
+  Kirish draw their own minimal headers).
+- Pages with their own compact **mobile** header inside the shop frame (cart) render
+  `<MobileFlowMarker />`; CSS (`globals.css`, `:has()`) then hides `[data-chrome-mobile]` below `lg`.
+- `/t/<token>` (SMS tracking link) is locale-less: the middleware rewrites it to
+  `/{locale}/t/<token>` (cookie `fr_locale` → the order's language → Accept-Language → uz).
+- 404: `notFoundWithRedirect(path)` (`src/lib/not-found.ts`) looks up `/seo/redirect` first and
+  logs misses to `/seo/not-found`; `(shop)/[...rest]` catches unknown URLs. Error boundaries:
+  `error.tsx` → `ErrorPanel`.
 
 New pages just render their content; use the container
 `mx-auto max-w-[1440px] px-3 lg:px-6` like the existing pages.
@@ -31,6 +42,21 @@ New pages just render their content; use the container
   `fr_session`/`fr_cart` stay first-party. Sends the page locale as `Accept-Language`.
   Throws `ClientApiError { status, code, message, field }` (`code === 'NETWORK'` offline).
   Add new endpoints there, typed with `@forest/contracts` DTOs.
+
+## Customer & flow helpers
+
+- `getMe(locale)` / `getMyAddresses(locale)` (`src/lib/customer.ts`): signed-in customer or null.
+- Favourites: `useFavourite(productId)` (`src/lib/favourites.ts`) — localStorage for guests,
+  `/me/favorites` for identified visitors; `mergeLocalFavourites()` runs after OTP login.
+- Delivery quote: `useDeliveryQuote(region, district, revision)` + `optionEta` (`components/cart/use-quote.ts`);
+  the cart's region is kept in `sessionStorage` (`fr_region`) and preselected on checkout.
+- Checkout sends `Idempotency-Key` (uuid kept while the payload is unchanged, so retries reuse it).
+- Money inside translated sentences: `soum(amount, locale)` from `src/lib/format.ts` (NBSP); in
+  JSX use `<Price />`. Dates: `formatWhen(tc, iso)` → "Bugun, 18:15" (Asia/Tashkent).
+- Server-rendered action buttons use `useHydrated()` (`src/lib/use-hydrated.ts`) and stay disabled
+  until hydration, so early taps (and e2e clicks) are never lost.
+- `/fake-pay` exists only while the API runs fake providers: it probes `POST /dev/fake-pay` with an
+  unknown order (ORDER_NOT_FOUND = fake mode, NOT_FOUND = off → 404) and ignores the `return` query.
 
 ## Cart
 

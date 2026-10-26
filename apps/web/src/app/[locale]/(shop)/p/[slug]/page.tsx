@@ -1,9 +1,9 @@
-import type { Locale, ProductDetailDto } from '@forest/contracts';
+import type { Locale, ProductDetailDto, ProductReviewsDto } from '@forest/contracts';
 import { Price } from '@forest/ui';
 import type { Metadata } from 'next';
 import Image from 'next/image';
-import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { cache } from 'react';
 import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
@@ -22,25 +22,30 @@ import {
   StickyBuyBar,
   VariantPicker,
 } from '@/components/product/purchase';
+import { MoreReviews } from '@/components/product/more-reviews';
+import { ReviewCard } from '@/components/product/review-card';
 import { Tabs } from '@/components/product/tabs';
 import { Rating } from '@forest/ui';
-import { ApiError, apiGet } from '@/lib/api';
+import { ApiError, apiGet, apiGetOptional } from '@/lib/api';
+import { notFoundWithRedirect } from '@/lib/not-found';
 import { getSettings } from '@/lib/data';
 import { expressZone, regionsZone } from '@/lib/delivery';
 import { absoluteUrl, alternates, metaDescription } from '@/lib/seo';
 
 type Props = { params: Promise<{ locale: Locale; slug: string }> };
 
-async function loadProduct(slug: string, locale: Locale): Promise<ProductDetailDto> {
+// Cached per request: metadata and page share one fetch (and one 404 report/redirect lookup).
+const loadProduct = cache(async (slug: string, locale: Locale): Promise<ProductDetailDto> => {
   try {
     return await apiGet<ProductDetailDto>(`/catalog/products/${encodeURIComponent(slug)}`, locale, {
       tags: [`product:${slug}`],
     });
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) notFound();
+    if (e instanceof ApiError && e.status === 404)
+      return notFoundWithRedirect(`/${locale}${routes.product(slug)}`);
     throw e;
   }
-}
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
@@ -74,7 +79,19 @@ const dryLabel = (t: (k: string, v: Record<string, number>) => string, minutes: 
 export default async function ProductPage({ params }: Props) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
-  const [p, settings] = await Promise.all([loadProduct(slug, locale), getSettings(locale)]);
+  const [p, settings, reviews] = await Promise.all([
+    loadProduct(slug, locale),
+    getSettings(locale),
+    // Verified, approved reviews only; the section stays hidden until there is at least one.
+    apiGetOptional<ProductReviewsDto>(
+      `/catalog/products/${encodeURIComponent(slug)}/reviews`,
+      locale,
+      {
+        revalidate: 60,
+        tags: [`product:${slug}`],
+      },
+    ),
+  ]);
   const t = await getTranslations('product');
   const tc = await getTranslations('common');
   const tcard = await getTranslations('card');
@@ -453,29 +470,48 @@ export default async function ProductPage({ params }: Props) {
             ) : null}
           </section>
 
-          {p.rating ? (
+          {reviews && reviews.total > 0 ? (
             <section
               id="sharhlar"
+              aria-labelledby="reviews-title"
               className="flex scroll-mt-6 flex-col gap-3 rounded-lg bg-panel p-5 lg:gap-7 lg:rounded-xl lg:p-12"
             >
               <div className="flex flex-wrap items-end justify-between gap-4 lg:border-b lg:border-line lg:pb-6">
-                <h2 className="text-xl font-semibold lg:text-[56px] lg:leading-none lg:font-medium lg:tracking-[-0.045em]">
+                <h2
+                  id="reviews-title"
+                  className="text-xl font-semibold lg:text-[56px] lg:leading-none lg:font-medium lg:tracking-[-0.045em]"
+                >
                   {t('reviews.title')}
                 </h2>
-                <span className="flex items-center gap-3 text-sm text-muted">
-                  <Rating
-                    value={p.rating.average}
-                    label={t('ratingLabel', { value: formatRating(p.rating.average) })}
+                {p.rating ? (
+                  <span className="flex items-center gap-3 text-sm text-muted">
+                    <Rating
+                      value={p.rating.average}
+                      label={t('ratingLabel', { value: formatRating(p.rating.average) })}
+                    />
+                    {formatRating(p.rating.average)} ·{' '}
+                    {t('reviews.summary', { count: p.rating.count })}
+                  </span>
+                ) : null}
+              </div>
+              <div className="grid gap-2.5 lg:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] lg:gap-4">
+                {reviews.items.map((r) => (
+                  <ReviewCard
+                    key={r.id}
+                    review={r}
+                    labels={{
+                      verified: t('reviews.verified'),
+                      reply: t('reviews.reply'),
+                      rating: t('ratingLabel', { value: formatRating(r.rating) }),
+                      photo: t('reviews.photo', { author: r.author }),
+                    }}
                   />
-                  {formatRating(p.rating.average)} ·{' '}
-                  {t('reviews.summary', { count: p.rating.count })}
-                </span>
-                <Link
-                  href={routes.account}
-                  className="hidden rounded-pill border-[1.5px] border-ink px-[22px] py-3 text-sm font-medium lg:inline-block"
-                >
-                  {t('reviews.write')}
-                </Link>
+                ))}
+                {reviews.pageCount > 1 ? (
+                  <ClientMessages namespaces={['product']}>
+                    <MoreReviews slug={p.slug} pageCount={reviews.pageCount} />
+                  </ClientMessages>
+                ) : null}
               </div>
             </section>
           ) : null}

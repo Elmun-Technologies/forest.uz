@@ -76,3 +76,8 @@ export function toQuery(params: Record<string, string | number | boolean | strin
   const s = sp.toString();
   return s ? `?${s}` : '';
 }
+
+/** Raw server-side call for non-GET probes (never cached, no visitor cookies). */
+export function apiRequest(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${API}/v1${path}`, { cache: 'no-store', ...init });
+}

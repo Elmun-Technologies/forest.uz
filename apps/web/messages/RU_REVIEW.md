@@ -17,3 +17,23 @@ popup, consent). Please confirm or correct:
 | `footer.copyright` | «Цены указаны с НДС.» | Confirm VAT status of the legal entity. |
 | `card.soon` / `product.soon` | «Скоро в продаже» | UZ «Tez orada» (literally «Скоро»). OK for out-of-stock items? |
 | `consent.*` | banner text | Lawyer review together with the privacy policy. |
+
+## Phase 1 flow pages (cart, checkout, order, tracking, login, cabinet, legal)
+
+| Key | RU | Question |
+|---|---|---|
+| `cartPage.official` | «Forest · официально» (overline above the cart line) | UZ «Forest · rasmiy». Prefer «официальный продавец»? (too long for the overline) |
+| `cartPage.freeLeft` | «До бесплатной доставки ещё 54 000 сум» | OK? |
+| `checkout.title` / `checkout.metaTitle` | «Оформление» / «Оформление заказа» | H1 shortened to fit the design width. |
+| `checkout.consentMarketing` | «Согласен(на) получать акции и новости по SMS» | Gendered «(на)» acceptable, or rephrase «Хочу получать…»? |
+| `checkout.methods.COD.*` | «При получении», «Курьеру наличными или картой» | Confirm card-on-delivery is really available (fiscal/COD provider TBD). |
+| `checkout.codLimit` | «Для заказа больше 3 000 000 сум нужна онлайн-оплата» | Wording of the COD limit. |
+| `order.leadCod` | «Оператор позвонит в течение 15 минут для подтверждения» | 15 minutes is a promise — confirm operator SLA (also in UZ). |
+| `order.failedText` | «…забронирован до сегодня, 13:26» | Time comes from the reservation; reads a bit mechanical. |
+| `track.linkNote` | «Открывается без входа · ссылка в SMS и в боте» | OK? |
+| `account.since` | «Клиент с 26.10.2026» | OK? |
+| `account.consents.*` | «SMS: акции и новости», «Персонализация рекламы» + hints | Lawyer review together with the privacy policy (consent wording). |
+| `account.deleteConfirm` | «…История заказов хранится столько, сколько требует закон» | Lawyer: retention wording. |
+| `legal.title` / `legal.draft` | «Условия и политики» / «Черновик. Перед публикацией текст проверит юрист…» | OK? |
+| `login.terms` | «условия использования» (links to the offer) | We have no separate «terms of use» page — the link opens the public offer. Rename to «публичную оферту»? Same question for UZ «foydalanish shartlari». |
+| `common.carrier.*` | «Яндекс Экспресс», «BTS Почта», «Самовывоз» | Same question as `header.topTashkent`. |

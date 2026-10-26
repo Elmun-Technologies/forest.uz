@@ -45,3 +45,10 @@
 html[data-buybar] .fr-fab {
   display: none;
 }
+
+/* Cart (and other flow pages inside the shop frame) draw their own compact mobile header. */
+@media (width < 64rem) {
+  body:has([data-mobile-flow]) [data-chrome-mobile] {
+    display: none;
+  }
+}

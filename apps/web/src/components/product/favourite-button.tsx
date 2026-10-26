@@ -3,22 +3,11 @@
 import { cn } from '@forest/ui';
 import { Heart } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useEffect, useState } from 'react';
-
-const KEY = 'fr_favs';
-
-function readFavs(): string[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? '[]') as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
-}
+import { useFavourite } from '@/lib/favourites';
 
 /**
- * Favourite heart. Stored per browser until the account favourites API (`/me/favorites`)
- * is wired — then this component syncs to it for identified customers.
+ * Favourite heart. Guests: stored in this browser; signed-in customers: `/me/favorites`
+ * (see `lib/favourites.ts`, which also merges the guest list on login).
  */
 export function FavouriteButton({
   productId,
@@ -30,21 +19,7 @@ export function FavouriteButton({
   size?: number;
 }) {
   const t = useTranslations('card');
-  const [on, setOn] = useState(false);
-  useEffect(() => setOn(readFavs().includes(productId)), [productId]);
-
-  function toggle() {
-    const favs = readFavs();
-    const next = favs.includes(productId)
-      ? favs.filter((x) => x !== productId)
-      : [...favs, productId];
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next.slice(-100)));
-    } catch {
-      /* storage disabled */
-    }
-    setOn(next.includes(productId));
-  }
+  const [on, toggle] = useFavourite(productId);
 
   return (
     <button

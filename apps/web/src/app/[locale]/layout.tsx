@@ -8,13 +8,9 @@ import { routing } from '@/i18n/routing';
 import { ClientMessages } from '@/components/client-messages';
 import { CartProvider } from '@/components/cart/cart-provider';
 import { ConsentBanner } from '@/components/layout/consent-banner';
-import { FloatingActions } from '@/components/layout/floating-actions';
-import { Footer } from '@/components/layout/footer';
-import { Header } from '@/components/layout/header';
-import { TopBar } from '@/components/layout/top-bar';
-import { LeadPopup } from '@/components/lead/lead-popup';
+import { OfflineBanner } from '@/components/layout/offline-banner';
 import { ToastProvider } from '@/components/ui/toast';
-import { getCategories, getHomeContent, getSettings } from '@/lib/data';
+import { getSettings } from '@/lib/data';
 import { alternates } from '@/lib/seo';
 import '../globals.css';
 
@@ -55,15 +51,11 @@ export default async function LocaleLayout({
   children: ReactNode;
   params: Promise<{ locale: string }>;
 }) {
+  // Frames live in route groups: `(shop)` = header/footer, `(flow)` = checkout/login.
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
-  const [settings, categories, home, tc] = await Promise.all([
-    getSettings(locale),
-    getCategories(locale),
-    getHomeContent(locale),
-    getTranslations('common'),
-  ]);
+  const tc = await getTranslations('common');
 
   return (
     <html lang={locale}>
@@ -77,23 +69,9 @@ export default async function LocaleLayout({
               >
                 {tc('skipToContent')}
               </a>
-              {settings ? <TopBar settings={settings} locale={locale} /> : null}
-              <Header
-                locale={locale}
-                phone={settings?.store.phone ?? null}
-                hours={settings?.store.hours[locale] ?? null}
-              />
-              <main id="main">{children}</main>
-              <Footer settings={settings} categories={categories} locale={locale} />
-              <div aria-hidden className="h-20 lg:hidden" />
-              <FloatingActions telegramBot={settings?.store.telegramBot ?? null} />
+              {children}
+              <OfflineBanner />
               <ConsentBanner />
-              <LeadPopup
-                telegramBot={settings?.store.telegramBot ?? null}
-                before={home?.hero?.before ?? null}
-                after={home?.hero?.after ?? null}
-                fallback={home?.selector.find((s) => s.image)?.image ?? null}
-              />
             </CartProvider>
           </ToastProvider>
         </ClientMessages>

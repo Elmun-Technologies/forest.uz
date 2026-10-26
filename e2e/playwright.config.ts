@@ -9,6 +9,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
+  // Locally the stack runs as dev servers (on-demand route compiles): more workers only time out.
+  workers: process.env.CI ? undefined : 2,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: process.env.WEB_URL ?? 'http://localhost:3000',

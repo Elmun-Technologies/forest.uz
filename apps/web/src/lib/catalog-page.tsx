@@ -1,7 +1,6 @@
 import 'server-only';
 import type { Locale, ProductCardDto, ProductListDto } from '@forest/contracts';
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
 import { CatalogView } from '@/components/catalog/catalog-view';
@@ -9,6 +8,7 @@ import { routes } from '@/config/site';
 import { apiGet, apiGetOptional } from './api';
 import { catalogApiQuery, catalogSearch, isRefined, parseCatalogParams } from './catalog-params';
 import { getCategories, getSettings } from './data';
+import { notFoundWithRedirect } from './not-found';
 import { alternates, metaDescription } from './seo';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -59,7 +59,7 @@ export async function CatalogPage({
   const filters = parseCatalogParams(await searchParams);
   const [categories, settings] = await Promise.all([getCategories(locale), getSettings(locale)]);
   const category = slug ? (categories.find((c) => c.slug === slug) ?? null) : null;
-  if (slug && !category) notFound();
+  if (slug && !category) return notFoundWithRedirect(`/${locale}${routes.category(slug)}`);
 
   const [list, promoList] = await Promise.all([
     apiGet<ProductListDto>(

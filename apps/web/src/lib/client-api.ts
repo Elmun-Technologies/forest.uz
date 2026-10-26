@@ -8,10 +8,20 @@
  * (the API localizes by the `Accept-Language` we send = the page locale, not the browser's).
  */
 import type {
+  AddressDto,
+  AddressUpdateInput,
   ApiErrorBody,
   CartDto,
+  CheckoutResultDto,
+  ConsentsDto,
+  DataDeleteRequestDto,
+  DeliveryOptionDto,
   LeadResultDto,
+  MeDto,
+  MeUpdateInput,
+  ProductCardDto,
   ProductListDto,
+  ProductReviewsDto,
   SearchResultDto,
 } from '@forest/contracts';
 
@@ -34,6 +44,7 @@ async function request<T>(
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
+  extraHeaders: Record<string, string> = {},
 ) {
   let res: Response;
   try {
@@ -44,6 +55,7 @@ async function request<T>(
         Accept: 'application/json',
         'Accept-Language': pageLocale(),
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...extraHeaders,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -63,15 +75,92 @@ async function request<T>(
   return (await res.json()) as T;
 }
 
+/** Body of POST /checkout/orders (the API normalizes the phone to E.164). */
+export interface CheckoutRequest {
+  name: string;
+  phone: string;
+  region: string;
+  district: string | null;
+  addressLine: string;
+  lat: number | null;
+  lng: number | null;
+  zoneKey: string;
+  paymentMethod: 'PAYME' | 'CLICK' | 'COD';
+  comment: string | null;
+  offerVersion: string;
+  consents: { smsMarketing: boolean; telegram: boolean };
+}
+
+export interface AddressInput {
+  label: string | null;
+  region: string;
+  district: string | null;
+  line: string;
+  isDefault: boolean;
+}
+
+const enc = encodeURIComponent;
+
 export const clientApi = {
   cart: {
-    get: () => request<CartDto>('GET', '/cart'),
+    /** `zone` prices shipping for that delivery zone (checkout); default = the express zone. */
+    get: (zone?: string) => request<CartDto>('GET', zone ? `/cart?zone=${enc(zone)}` : '/cart'),
     addItem: (input: { variantId: string; qty: number }) =>
       request<CartDto>('POST', '/cart/items', input),
     setQty: (variantId: string, qty: number) =>
       request<CartDto>('PATCH', `/cart/items/${encodeURIComponent(variantId)}`, { qty }),
     remove: (variantId: string) =>
       request<CartDto>('DELETE', `/cart/items/${encodeURIComponent(variantId)}`),
+    applyPromo: (code: string) => request<CartDto>('POST', '/cart/promo', { code }),
+    removePromo: () => request<CartDto>('DELETE', '/cart/promo'),
+    quote: (region: string, district?: string | null) =>
+      request<DeliveryOptionDto[]>(
+        'GET',
+        `/cart/quote?region=${enc(region)}${district ? `&district=${enc(district)}` : ''}`,
+      ),
+  },
+  checkout: {
+    /** One Idempotency-Key per submit attempt; resend the same key when retrying that attempt. */
+    place: (input: CheckoutRequest, idempotencyKey: string) =>
+      request<CheckoutResultDto>('POST', '/checkout/orders', input, {
+        'Idempotency-Key': idempotencyKey,
+      }),
+  },
+  orders: {
+    pay: (publicId: string, method: 'PAYME' | 'CLICK') =>
+      request<{ url: string }>('POST', `/orders/${enc(publicId)}/pay`, { method }),
+  },
+  track: {
+    changeAddress: (token: string, input: { addressLine: string; district: string | null }) =>
+      request<{ ok: true }>('PATCH', `/track/${enc(token)}/address`, input),
+  },
+  auth: {
+    sendOtp: (phone: string) =>
+      request<{ resendInSec: number; expiresInSec: number }>('POST', '/auth/otp/send', { phone }),
+    verifyOtp: (phone: string, code: string) =>
+      request<MeDto>('POST', '/auth/otp/verify', { phone, code }),
+    logout: () => request<void>('POST', '/auth/logout'),
+  },
+  me: {
+    get: () => request<MeDto>('GET', '/me'),
+    update: (input: MeUpdateInput) => request<MeDto>('PATCH', '/me', input),
+    addresses: () => request<AddressDto[]>('GET', '/me/addresses'),
+    addAddress: (input: AddressInput) => request<AddressDto>('POST', '/me/addresses', input),
+    updateAddress: (id: string, input: AddressUpdateInput) =>
+      request<AddressDto>('PATCH', `/me/addresses/${enc(id)}`, input),
+    deleteAddress: (id: string) => request<void>('DELETE', `/me/addresses/${enc(id)}`),
+    favorites: () => request<ProductCardDto[]>('GET', '/me/favorites'),
+    addFavorite: (productId: string) => request<void>('POST', '/me/favorites', { productId }),
+    removeFavorite: (productId: string) =>
+      request<void>('DELETE', `/me/favorites/${enc(productId)}`),
+    consents: (input: Partial<ConsentsDto>) => request<ConsentsDto>('PATCH', '/me/consents', input),
+    exportData: () => request<Record<string, unknown>>('POST', '/me/data-export'),
+    requestDeletion: () => request<DataDeleteRequestDto>('POST', '/me/data-delete'),
+  },
+  dev: {
+    /** Fake Payme/Click callback (PROVIDERS_MODE=fake only). */
+    fakePay: (order: string, result: 'success' | 'fail') =>
+      request<{ ok: true; publicId: string }>('POST', '/dev/fake-pay', { order, result }),
   },
   leads: {
     /** `phone` in any format; the API normalizes to E.164. */
@@ -84,5 +173,7 @@ export const clientApi = {
       request<SearchResultDto>('GET', `/catalog/search?q=${encodeURIComponent(q)}`),
     waitlist: (input: { variantId: string; phone: string }) =>
       request<void>('POST', '/catalog/waitlist', input),
+    reviews: (slug: string, page: number) =>
+      request<ProductReviewsDto>('GET', `/catalog/products/${enc(slug)}/reviews?page=${page}`),
   },
 };
