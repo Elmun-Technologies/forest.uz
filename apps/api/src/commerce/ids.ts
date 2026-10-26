@@ -18,3 +18,8 @@ export function randomToken(length: number): string {
 export const trackingToken = () => randomToken(10);
 /** `/buyurtma/{publicId}` order-received links. */
 export const orderPublicId = () => randomToken(16);
+
+/** Storefront order page: order details and "pay again" while the reservation holds. */
+export function orderPageUrl(appUrl: string, locale: string, publicId: string): string {
+  return `${appUrl}/${locale}/buyurtma/${publicId}`;
+}

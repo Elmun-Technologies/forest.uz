@@ -38,6 +38,9 @@ const orderInclude = {
 
 type OrderRow = Prisma.OrderGetPayload<{ include: typeof orderInclude }>;
 
+/** Payment states that settle what the customer sees, whatever later attempts did. */
+const SETTLED = ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'];
+
 const LABELS = {
   uz: {
     ACCEPTED: 'Qabul qilindi',
@@ -135,7 +138,8 @@ export class OrdersService {
 
   private async toDto(o: OrderRow, locale: Locale, isOwner: boolean): Promise<OrderPublicDto> {
     const store = await this.settings.get('store.info');
-    const payment = o.payments[0];
+    // Newest first; a paid attempt wins over a newer open/expired sibling ("pay again" rows).
+    const payment = o.payments.find((p) => SETTLED.includes(p.status)) ?? o.payments[0];
     const shipment = o.shipments[0];
     const address = o.address as { region: string; district: string | null; line: string };
     const reservationExpiresAt =

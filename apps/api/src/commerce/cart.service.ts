@@ -82,8 +82,15 @@ export class CartService {
     }
     const id = cartIdFromCookie(req);
     if (!id) return null;
+    // A shared browser may still carry another customer's cart cookie: never show or use it.
     return this.prisma.cart.findFirst({
-      where: { id, status: 'ACTIVE', ...(session ? {} : { customerId: null }) },
+      where: {
+        id,
+        status: 'ACTIVE',
+        ...(session
+          ? { OR: [{ customerId: null }, { customerId: session.customerId }] }
+          : { customerId: null }),
+      },
       include: cartInclude,
     });
   }

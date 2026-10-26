@@ -120,8 +120,13 @@ export function priceCart(input: PricingInput): PricingResult {
     if (subtotal < p.minCartTiyin) {
       promo = { status: 'rejected', code: p.code, reason: 'PROMO_MIN_CART' };
     } else if (p.type === 'FREE_SHIPPING') {
-      freeShipping = true;
-      promo = { status: 'applied', code: p.code, type: p.type, discountTiyin: 0n, capped: false };
+      // Not combinable with kit savings either (docs/02): the kit price is the deal.
+      if (bundleSavings > 0n) {
+        promo = { status: 'rejected', code: p.code, reason: 'PROMO_NO_BENEFIT' };
+      } else {
+        freeShipping = true;
+        promo = { status: 'applied', code: p.code, type: p.type, discountTiyin: 0n, capped: false };
+      }
     } else if (p.type === 'GIFT') {
       // A gift is all-or-nothing: never stacked with kit savings and never partially charged
       // when it would break the margin guard.

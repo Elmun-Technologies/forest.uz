@@ -130,6 +130,26 @@ export const ERROR_MESSAGES = {
     uz: "Urinishlar ko'p bo'ldi. Yangi kod oling.",
     ru: 'Слишком много попыток. Получите новый код.',
   },
+  OTP_LOCKED: {
+    http: 429,
+    uz: "Xavfsizlik uchun bu raqamga kirish vaqtincha yopildi. Keyinroq urinib ko'ring yoki operatorga yozing.",
+    ru: 'В целях безопасности вход по этому номеру временно закрыт. Попробуйте позже или напишите оператору.',
+  },
+  CHECKOUT_LIMITED: {
+    http: 429,
+    uz: "Buyurtmalar juda ko'p yuborildi. Birozdan keyin urinib ko'ring yoki operatorga qo'ng'iroq qiling.",
+    ru: 'Слишком много заказов подряд. Попробуйте чуть позже или позвоните оператору.',
+  },
+  COD_OPEN_ORDERS_LIMIT: {
+    http: 409,
+    uz: "Bu raqamda tasdiqlanmagan buyurtmalar bor. Operator qo'ng'irog'ini kuting yoki onlayn to'lang.",
+    ru: 'На этот номер уже есть неподтверждённые заказы. Дождитесь звонка оператора или оплатите онлайн.',
+  },
+  PAYMENT_METHOD_UNAVAILABLE: {
+    http: 400,
+    uz: "Bu to'lov usuli hozircha ishlamayapti. Boshqa usulni tanlang.",
+    ru: 'Этот способ оплаты сейчас недоступен. Выберите другой.',
+  },
   UNAUTHORIZED: { http: 401, uz: 'Iltimos, tizimga kiring.', ru: 'Пожалуйста, войдите в систему.' },
   FORBIDDEN: {
     http: 403,

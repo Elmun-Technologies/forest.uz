@@ -1,7 +1,8 @@
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { BullModule } from '@nestjs/bullmq';
 import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
-import type { Queue } from 'bullmq';
+import type { Job, Queue } from 'bullmq';
+import { CustomerCommonModule } from '../customer/common/customer-common.module';
 import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
 import { CheckoutService } from './checkout.service';
@@ -14,16 +15,20 @@ import { ReservationsService } from './reservations.service';
 
 const ORDERS_QUEUE = 'orders';
 const EXPIRE = 'orders.reservations.expire';
+const REMIND = 'orders.payment.remind';
 
-/** Releases unpaid online reservations (30 min) and unconfirmed COD holds (24 h) every minute. */
+/**
+ * Every minute: releases unpaid online reservations (30 min) and unconfirmed COD holds (24 h);
+ * reminds unpaid online orders once (`paymentReminderMinutes`).
+ */
 @Processor(ORDERS_QUEUE)
 export class OrdersProcessor extends WorkerHost {
   constructor(private readonly lifecycle: OrderLifecycleService) {
     super();
   }
 
-  async process(): Promise<number> {
-    return this.lifecycle.expireStale();
+  async process(job: Job): Promise<number> {
+    return job.name === REMIND ? this.lifecycle.remindUnpaid() : this.lifecycle.expireStale();
   }
 }
 
@@ -33,12 +38,13 @@ export class OrdersScheduler implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     await this.queue.upsertJobScheduler(EXPIRE, { every: 60_000 }, { name: EXPIRE });
+    await this.queue.upsertJobScheduler(REMIND, { every: 60_000 }, { name: REMIND });
   }
 }
 
 /** Cart, delivery quote, checkout, orders, tracking, reservations. */
 @Module({
-  imports: [BullModule.registerQueue({ name: ORDERS_QUEUE })],
+  imports: [BullModule.registerQueue({ name: ORDERS_QUEUE }), CustomerCommonModule],
   controllers: [CartController, OrdersController, FakePayController],
   providers: [
     CartService,

@@ -4,6 +4,7 @@ import { CART_MERGER, type CartMerger } from '../src/customer/cart-merger';
 import { verifyDeepLink } from '../src/customer/deeplink';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { RedisService } from '../src/redis/redis.module';
 import { createTestApp } from './app';
 
 let seq = 0;
@@ -182,6 +183,62 @@ describe('customer auth, /me, leads, waitlist (integration)', () => {
       .send({ phone: phone2, code: lastCode(phone2) })
       .expect(400);
     expect(expired.body.error.code).toBe('OTP_EXPIRED');
+  });
+
+  /** Closes the 60 s resend windows (and optionally the hourly ones) so caps behind them are reachable. */
+  async function openWindows(scopes: string[] = ['otp:phone']) {
+    const redis = app.get(RedisService);
+    for (const scope of scopes) {
+      const keys = await redis.keys(`rl:${scope}:*`);
+      if (keys.length) await redis.del(...keys);
+    }
+  }
+  const send = (phone: string) =>
+    http().post('/v1/auth/otp/send').set('X-Forwarded-For', nextIp()).send({ phone });
+
+  it('caps sends per phone: 5 per hour and 10 per day, whatever the IP', async () => {
+    const phone = nextPhone();
+    for (let i = 0; i < 5; i++) {
+      await openWindows();
+      await send(phone).expect(200);
+    }
+    await openWindows();
+    const hourly = await send(phone).expect(429);
+    expect(hourly.body.error.code).toBe('OTP_RATE_LIMITED');
+
+    const daily = nextPhone();
+    for (let i = 0; i < 10; i++) {
+      await openWindows(['otp:phone', 'otp:phone-hour']);
+      await send(daily).expect(200);
+    }
+    await openWindows(['otp:phone', 'otp:phone-hour']);
+    const blocked = await send(daily).expect(429);
+    expect(blocked.body.error.code).toBe('OTP_RATE_LIMITED');
+    expect(blocked.body.error.details.retryAfterSec).toBeGreaterThan(3600);
+  });
+
+  it('locks a phone for the day after 15 failed verifies (across codes)', async () => {
+    const phone = nextPhone();
+    for (let round = 0; round < 3; round++) {
+      await openWindows();
+      await send(phone).expect(200);
+      const code = lastCode(phone);
+      for (let i = 0; i < 5; i++)
+        await http()
+          .post('/v1/auth/otp/verify')
+          .send({ phone, code: wrong(code) });
+    }
+    await openWindows();
+    const resend = await send(phone).expect(429);
+    expect(resend.body.error.code).toBe('OTP_LOCKED');
+    const verify = await http()
+      .post('/v1/auth/otp/verify')
+      .send({ phone, code: '0000' })
+      .expect(429);
+    expect(verify.body.error.code).toBe('OTP_LOCKED');
+    expect(verify.body.error.details.retryAfterSec).toBeGreaterThan(3600);
+    // Another phone is unaffected.
+    await login();
   });
 
   it('validates phone input with stable codes', async () => {

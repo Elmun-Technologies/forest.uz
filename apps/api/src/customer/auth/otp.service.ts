@@ -7,6 +7,9 @@ import { TemplateSms } from '../common/messaging';
 import { RateLimiter } from '../common/rate-limit';
 import { OTP_POLICY, generateOtpCode, hashOtp, otpMatches } from './otp-code';
 
+const DAY_SEC = 24 * 3600;
+const FAILS_SCOPE = 'otp:fails';
+
 export interface OtpSendResult {
   resendInSec: number;
   expiresInSec: number;
@@ -22,12 +25,28 @@ export class OtpService {
   ) {}
 
   async send(phone: string, ip: string | null, locale: Locale): Promise<OtpSendResult> {
+    // A locked phone gets no new codes either (each one is another SMS and 5 more guesses).
+    await this.assertNotLocked(phone);
     await this.limiter.consume('otp:phone', phone, 1, OTP_POLICY.resendSec, 'OTP_RATE_LIMITED');
     await this.limiter.consume(
       'otp:ip',
       ip ?? 'unknown',
       OTP_POLICY.sendsPerIpPerHour,
       3600,
+      'OTP_RATE_LIMITED',
+    );
+    await this.limiter.consume(
+      'otp:phone-hour',
+      phone,
+      OTP_POLICY.sendsPerPhonePerHour,
+      3600,
+      'OTP_RATE_LIMITED',
+    );
+    await this.limiter.consume(
+      'otp:phone-day',
+      phone,
+      OTP_POLICY.sendsPerPhonePerDay,
+      DAY_SEC,
       'OTP_RATE_LIMITED',
     );
 
@@ -52,8 +71,9 @@ export class OtpService {
     return { resendInSec: OTP_POLICY.resendSec, expiresInSec: OTP_POLICY.ttlSec };
   }
 
-  /** Consumes the code or throws OTP_INVALID / OTP_EXPIRED / OTP_TOO_MANY_ATTEMPTS. */
+  /** Consumes the code or throws OTP_INVALID / OTP_EXPIRED / OTP_TOO_MANY_ATTEMPTS / OTP_LOCKED. */
   async verify(phone: string, code: string): Promise<void> {
+    await this.assertNotLocked(phone);
     const otp = await this.prisma.otpCode.findFirst({
       where: { phone, usedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -70,6 +90,8 @@ export class OtpService {
     if (counted.count === 0) throw new DomainError('OTP_TOO_MANY_ATTEMPTS', undefined, 'code');
 
     if (!otpMatches(phone, code, otp.codeHash, this.env.SESSION_SECRET)) {
+      // Per-code attempts reset with every new code; this daily counter does not.
+      await this.limiter.hit(FAILS_SCOPE, phone, OTP_POLICY.failedVerifiesPerPhonePerDay, DAY_SEC);
       const attemptsLeft = OTP_POLICY.maxAttempts - (otp.attempts + 1);
       if (attemptsLeft <= 0) throw new DomainError('OTP_TOO_MANY_ATTEMPTS', undefined, 'code');
       throw new DomainError('OTP_INVALID', { attemptsLeft }, 'code');
@@ -80,5 +102,11 @@ export class OtpService {
       data: { usedAt: new Date() },
     });
     if (used.count === 0) throw new DomainError('OTP_INVALID', undefined, 'code');
+  }
+
+  private async assertNotLocked(phone: string): Promise<void> {
+    const fails = await this.limiter.peek(FAILS_SCOPE, phone);
+    if (fails.count >= OTP_POLICY.failedVerifiesPerPhonePerDay)
+      throw new DomainError('OTP_LOCKED', { retryAfterSec: fails.retryAfterSec });
   }
 }

@@ -121,6 +121,8 @@ export class ClickShopService {
     order: OrderRow,
     req: ClickRequest,
   ): Promise<{ entry: ClickErrorEntry; paidOrderId?: string }> {
+    // Re-checked under the order lock: "pay again" may have switched the order to Payme meanwhile.
+    if (order.paymentMethod !== 'CLICK') throw new ClickFailure(ClickError.USER_NOT_FOUND);
     this.checkPayable(order, req, null);
     const existing = await findTxn(tx, req.click_trans_id);
     // A repeated Prepare for the same Click transaction is answered again without a new row.

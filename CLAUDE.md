@@ -50,7 +50,7 @@ pnpm build             # production build of everything
 docker compose -f infra/compose.yml --profile apps up -d --build   # prod-like stack (migrate → api, web, admin, caddy)
 ```
 Dev-only: `GET /v1/dev/outbox` lists SMS/Telegram captured by fake providers (OTP codes); 404 unless `DEV_ENDPOINTS=true` and `PROVIDERS_MODE=fake`.
-Jobs: BullMQ queue `maintenance` → `events.partitions.ensure` daily 03:10 Tashkent (+ on boot).
+Jobs: BullMQ queue `maintenance` → `events.partitions.ensure` daily 03:10 Tashkent (+ on boot); queue `orders` → `orders.reservations.expire` and `orders.payment.remind` every minute.
 (Keep this list true — update when scripts change.)
 
 ## 6. Architecture decisions (rationale in `docs/03-architecture.md`)
@@ -87,6 +87,16 @@ Monorepo · separate admin app/domain · NestJS modules per domain · Postgres-f
 - 2026-10-26 — One `Payment` row per provider transaction (`providerTxnId` unique per method). The checkout's PENDING row is bound to the first Payme/Click transaction; a later attempt after a cancelled/failed one gets a new row, so `CheckTransaction`/`GetStatement` still report old transactions exactly. Payme state lives in `providerState` (1/2/-1/-2), Click in `providerState` 0 prepared / 1 completed / -1 cancelled; Payme times in `providerData` (ms).
 - 2026-10-26 — Webhooks authenticate only against the encrypted credentials of a CONNECTED integration (Payme Basic `Paycom:<key>` — test key in `mode=test`; Click md5 `sign_string`), independent of `PROVIDERS_MODE`. Payme `ChangePassword` rewrites the stored key (audited).
 - 2026-10-26 — Payme cancel of a created transaction (-1) marks the payment FAILED but keeps the order NEW (customer may retry until the reservation expires) — unlike the template, which cancels the order. Cancel of a performed transaction (-2) = refund: payment REFUNDED + `Refund` row; the order is cancelled and stock released if not yet handed to a courier, refused (-31007) once handed over/delivered. Payme refunds are provider-initiated (cabinet → CancelTransaction); Click/COD refunds are recorded manually (`OrderLifecycleService.recordManualRefund`).
+- 2026-10-26 — Checkout resolves the online payment provider **before** the order transaction (unavailable → `PAYMENT_METHOD_UNAVAILABLE`, nothing written). If only the checkout link fails after commit, the order is still returned (idempotent response stored) with the order page as `next` → "pay again". Why: an orphaned order would hold stock and burn the promo with no way back for the customer.
+- 2026-10-26 — Promo usage counts (usage limit, per customer, per device) ignore redemptions whose order is CANCELLED; the redemption rows stay as history. Why: an abandoned unpaid order must not burn SALOM10 forever.
+- 2026-10-26 — Checkout abuse limits (`CHECKOUT_POLICY` in `commerce/checkout.service.ts`, like `OTP_POLICY`): 10/min per IP (docs/05), 5/h per phone, ≤ 2 open NEW COD orders per phone (`CHECKOUT_LIMITED` / `COD_OPEN_ORDERS_LIMIT`). Why: COD holds stock 24 h on an unverified phone.
+- 2026-10-26 — Device fingerprint for first-order promos = sha256 of `fr_aid`, a random httpOnly 400-day visitor cookie the API sets on any cart write when missing (`SessionService.ensureVisitorId`).
+- 2026-10-26 — OTP per-phone caps on top of 1/60 s and 5/h per IP: 5 sends/h, 10 sends/day; 15 failed verifies/day → `OTP_LOCKED` (verify and send) until the window ends. Codes stay 4 digits (design has 4 cells).
+- 2026-10-26 — Order SMS carry `{link}` (tracking) in the body, not only in Telegram buttons; COD operator confirmation sends `order_confirmed` (not `order_paid`). Unpaid online orders get one `payment_reminder` (orders queue job `orders.payment.remind`, `delivery.rules.paymentReminderMinutes`) with the order page link; idempotent via an `OrderEvent` `PAYMENT_REMINDER` written before sending.
+- 2026-10-26 — Lock order everywhere is Order row → Payment row: `transition()` locks the order row itself; "pay again" runs in one transaction under the order lock and never modifies a payment row that already has a `providerTxnId`. When a payment becomes PAID, sibling PENDING rows of the order become EXPIRED; the displayed payment status prefers PAID/REFUNDED/PARTIALLY_REFUNDED rows.
+- 2026-10-26 — A cart is converted by exactly one checkout (conditional `ACTIVE → CONVERTED` inside the order transaction, else `CART_EMPTY`). A cookie cart is used with a session only if it is anonymous or the session customer's.
+- 2026-10-26 — FREE_SHIPPING codes don't apply to carts with kit savings (`PROMO_NO_BENEFIT`), like GIFT — docs/02 "no stacking with kit discount".
+- 2026-10-26 — `DEV_ENDPOINTS=true` with `NODE_ENV=production` requires `ALLOW_FAKE_PROVIDERS=true` (CI/demos) and logs a startup warning: the dev outbox exposes OTP codes.
 
 ## 7. Coding standards
 - TypeScript strict, no `any` (use `unknown` + zod). Small modules, SOLID, DRY, KISS; no premature abstraction except the integration adapters.

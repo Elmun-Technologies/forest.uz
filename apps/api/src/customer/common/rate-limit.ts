@@ -28,6 +28,13 @@ export class RateLimiter {
     return { ok: count <= limit, count, retryAfterSec: ttl > 0 ? ttl : windowSec };
   }
 
+  /** Current count of a window without counting a hit (0 when the window isn't open). */
+  async peek(scope: string, id: string): Promise<{ count: number; retryAfterSec: number }> {
+    const key = this.key(scope, id);
+    const [count, ttl] = await Promise.all([this.redis.get(key), this.redis.ttl(key)]);
+    return { count: Number(count ?? 0), retryAfterSec: ttl > 0 ? ttl : 0 };
+  }
+
   /** Throws `code` (429) when the window is exhausted. */
   async consume(
     scope: string,

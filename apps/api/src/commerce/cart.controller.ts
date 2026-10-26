@@ -24,19 +24,30 @@ import { createHash } from 'node:crypto';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { ReqLocale, ZodPipe } from '../common/http';
+import { SessionService, visitorId } from '../common/session';
 import { CartService } from './cart.service';
 
-/** Device fingerprint for "one code per device": hash of the first-party visitor cookie. */
+function hashVisitor(aid: string): string {
+  return createHash('sha256').update(aid).digest('hex').slice(0, 32);
+}
+
+/** Device fingerprint for "one code per device": hash of the first-party visitor cookie `fr_aid`. */
 export function deviceHash(req: Request): string | null {
-  const aid = (req.cookies as Record<string, unknown> | undefined)?.fr_aid;
-  return typeof aid === 'string' && aid.length <= 64
-    ? createHash('sha256').update(aid).digest('hex').slice(0, 32)
-    : null;
+  const aid = visitorId(req);
+  return aid ? hashVisitor(aid) : null;
 }
 
 @Controller('cart')
 export class CartController {
-  constructor(private readonly carts: CartService) {}
+  constructor(
+    private readonly carts: CartService,
+    private readonly sessions: SessionService,
+  ) {}
+
+  /** Every cart write makes sure the browser carries a visitor id (device rule for promo codes). */
+  private device(req: Request, res: Response): string {
+    return hashVisitor(this.sessions.ensureVisitorId(req, res));
+  }
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -58,6 +69,7 @@ export class CartController {
     @Body(new ZodPipe(addCartItemSchema)) body: z.infer<typeof addCartItemSchema>,
     @ReqLocale() locale: Locale,
   ): Promise<CartDto> {
+    this.device(req, res);
     return this.carts.toDto(await this.carts.addItem(req, res, body.variantId, body.qty), locale);
   }
 
@@ -65,10 +77,12 @@ export class CartController {
   @Header('Cache-Control', 'no-store')
   async setQty(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Param('variantId') variantId: string,
     @Body(new ZodPipe(setCartQtySchema)) body: z.infer<typeof setCartQtySchema>,
     @ReqLocale() locale: Locale,
   ): Promise<CartDto> {
+    this.device(req, res);
     return this.carts.toDto(await this.carts.setQty(req, variantId, body.qty), locale);
   }
 
@@ -76,9 +90,11 @@ export class CartController {
   @Header('Cache-Control', 'no-store')
   async remove(
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
     @Param('variantId') variantId: string,
     @ReqLocale() locale: Locale,
   ): Promise<CartDto> {
+    this.device(req, res);
     return this.carts.toDto(await this.carts.setQty(req, variantId, 0), locale);
   }
 
@@ -91,7 +107,7 @@ export class CartController {
     @ReqLocale() locale: Locale,
   ): Promise<CartDto> {
     return this.carts.toDto(
-      await this.carts.setPromo(req, res, body.code, deviceHash(req)),
+      await this.carts.setPromo(req, res, body.code, this.device(req, res)),
       locale,
     );
   }
@@ -103,7 +119,10 @@ export class CartController {
     @Res({ passthrough: true }) res: Response,
     @ReqLocale() locale: Locale,
   ): Promise<CartDto> {
-    return this.carts.toDto(await this.carts.setPromo(req, res, null, deviceHash(req)), locale);
+    return this.carts.toDto(
+      await this.carts.setPromo(req, res, null, this.device(req, res)),
+      locale,
+    );
   }
 
   @Get('quote')

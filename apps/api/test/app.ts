@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { Test } from '@nestjs/testing';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import request from 'supertest';
 import { inject } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
@@ -32,4 +33,18 @@ export async function createTestApp(
   configureApp(app);
   await app.init();
   return app;
+}
+
+let ipSeq = 0;
+const ipBase = Math.floor(Math.random() * 200);
+
+/** A distinct client IP per call: per-IP rate limits live in a Redis shared by all test files. */
+export function nextTestIp(): string {
+  ipSeq++;
+  return `10.${ipBase}.${Math.floor(ipSeq / 250) % 250}.${ipSeq % 250}`;
+}
+
+/** A cookie-keeping browser with its own client IP (checkout is limited per IP). */
+export function shopper(app: NestExpressApplication): ReturnType<typeof request.agent> {
+  return request.agent(app.getHttpServer()).set('X-Forwarded-For', nextTestIp());
 }

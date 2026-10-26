@@ -375,17 +375,50 @@ async function seedIntegrations() {
 
 /**
  * `--force` (dev reset): release every open reservation so repeated e2e runs don't drain the
- * seeded stock (COD orders hold stock for 24 h). Orders themselves are kept.
+ * seeded stock (COD orders hold stock for 24 h). Unpaid/unconfirmed (NEW) orders whose hold is
+ * released are cancelled like the expiry job does it (payments EXPIRED, OrderEvent), so no order
+ * stays "waiting" without stock; orders past NEW are kept as they are.
  */
 async function releaseReservations() {
   if (!force) return;
   const now = new Date();
-  const released = await prisma.reservation.updateMany({
+  const held = await prisma.reservation.findMany({
     where: { releasedAt: null },
-    data: { releasedAt: now },
+    select: { orderId: true },
+    distinct: ['orderId'],
   });
-  await prisma.variant.updateMany({ where: { reserved: { gt: 0 } }, data: { reserved: 0 } });
-  console.log(`✓ reservations released: ${released.count}`);
+  const zombies = (
+    await prisma.order.findMany({
+      where: { id: { in: held.map((r) => r.orderId) }, status: 'NEW' },
+      select: { id: true },
+    })
+  ).map((o) => o.id);
+  const reason = 'dev_seed_reset';
+  const [released] = await prisma.$transaction([
+    prisma.reservation.updateMany({ where: { releasedAt: null }, data: { releasedAt: now } }),
+    prisma.variant.updateMany({ where: { reserved: { gt: 0 } }, data: { reserved: 0 } }),
+    prisma.payment.updateMany({
+      where: { orderId: { in: zombies }, status: { in: ['PENDING', 'FAILED', 'COD_PENDING'] } },
+      data: { status: 'EXPIRED' },
+    }),
+    prisma.order.updateMany({
+      where: { id: { in: zombies }, status: 'NEW' },
+      data: { status: 'CANCELLED', cancelReason: reason },
+    }),
+    prisma.orderEvent.createMany({
+      data: zombies.map((orderId) => ({
+        orderId,
+        type: 'STATUS_CHANGED',
+        from: 'NEW',
+        to: 'CANCELLED',
+        actorType: 'SYSTEM' as const,
+        data: { reason },
+      })),
+    }),
+  ]);
+  console.log(
+    `✓ reservations released: ${released.count}, unconfirmed orders cancelled: ${zombies.length}`,
+  );
 }
 
 async function main() {

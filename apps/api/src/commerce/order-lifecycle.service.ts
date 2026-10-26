@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   assertOrderTransition,
   assertPaymentTransition,
@@ -9,8 +9,11 @@ import {
   type PaymentStatus,
 } from '@forest/contracts';
 import type { ActorType, Prisma } from '@forest/db';
+import { ENV } from '../config/config.module';
+import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { orderPageUrl } from './ids';
 import { NotificationsService } from './notifications.service';
 import { ReservationsService } from './reservations.service';
 
@@ -59,8 +62,14 @@ export class OrderLifecycleService {
     private readonly settings: SettingsService,
     private readonly reservations: ReservationsService,
     private readonly notifications: NotificationsService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
+  /**
+   * Locks the order row before reading its status, so two writers (operator confirm vs. the
+   * expiry job) can't both see NEW and overwrite each other. Re-locking a row this transaction
+   * already holds is a no-op; callers that also lock payments lock the order first.
+   */
   async transition(
     tx: Tx,
     orderId: string,
@@ -68,6 +77,7 @@ export class OrderLifecycleService {
     actor: Actor,
     data?: Record<string, unknown>,
   ): Promise<void> {
+    await this.lockOrder(tx, orderId);
     const order = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: { status: true },
@@ -188,6 +198,16 @@ export class OrderLifecycleService {
       ...(opts.providerState !== undefined ? { providerState: opts.providerState } : {}),
       ...(opts.providerData !== undefined ? { providerData: opts.providerData } : {}),
     });
+    // Other open attempts of this order (e.g. the Click row after "pay again" while Payme paid)
+    // can never be paid now; their provider history fields stay untouched.
+    const siblings = await tx.payment.findMany({
+      where: { orderId: p.orderId, id: { not: paymentId }, status: 'PENDING' },
+      select: { id: true },
+    });
+    for (const s of siblings) {
+      await this.lockPayment(tx, s.id);
+      await this.setPaymentStatus(tx, s.id, 'EXPIRED', { type: 'SYSTEM' });
+    }
     if (p.order.status === 'NEW') {
       await this.transition(tx, p.orderId, 'CONFIRMED', actor);
       await this.reservations.confirm(tx, p.orderId);
@@ -348,6 +368,12 @@ export class OrderLifecycleService {
     input: { amountTiyin: bigint; reason: string; staffId: string },
   ): Promise<{ refundId: string; full: boolean }> {
     return this.prisma.$transaction(async (tx) => {
+      const { orderId } = await tx.payment.findUniqueOrThrow({
+        where: { id: paymentId },
+        select: { orderId: true },
+      });
+      // Order → payment, like the webhooks (refundInTx may cancel the order).
+      await this.lockOrder(tx, orderId);
       await this.lockPayment(tx, paymentId);
       const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
       if (p.method === 'PAYME') throw new DomainError('REFUND_VIA_PROVIDER_CABINET');
@@ -370,7 +396,74 @@ export class OrderLifecycleService {
         data: { slaDueAt: await this.slaDueAt(tx, orderId, now) },
       });
     });
-    await this.notifications.orderStatus(orderId, 'order_paid');
+    // COD: nothing is paid yet — "confirmed, pay the courier" (not the order_paid text).
+    await this.notifications.orderStatus(orderId, 'order_confirmed');
+  }
+
+  /**
+   * One payment reminder per unpaid online order, `paymentReminderMinutes` after it was placed and
+   * while its reservation still holds (docs/02), linking to the order page ("pay again"). The
+   * PAYMENT_REMINDER event is committed under the order lock before sending, so overlapping job
+   * runs never send twice (a failed send is not retried: one reminder at most).
+   */
+  async remindUnpaid(now = new Date()): Promise<number> {
+    const { paymentReminderMinutes } = await this.settings.get('delivery.rules');
+    const due = await this.prisma.order.findMany({
+      where: {
+        status: 'NEW',
+        paymentMethod: { not: 'COD' },
+        createdAt: { lte: new Date(now.getTime() - paymentReminderMinutes * 60_000) },
+        reservations: { some: { releasedAt: null, expiresAt: { gt: now } } },
+        events: { none: { type: 'PAYMENT_REMINDER' } },
+      },
+      select: { id: true },
+      take: 200,
+    });
+    let n = 0;
+    for (const { id } of due) {
+      try {
+        const claim = await this.prisma.$transaction(async (tx) => {
+          await this.lockOrder(tx, id);
+          const order = await tx.order.findUniqueOrThrow({
+            where: { id },
+            include: {
+              payments: { select: { status: true } },
+              reservations: { where: { releasedAt: null } },
+              events: { where: { type: 'PAYMENT_REMINDER' }, take: 1 },
+            },
+          });
+          const expiresAt = order.reservations
+            .map((r) => r.expiresAt?.getTime() ?? 0)
+            .filter((t) => t > now.getTime())
+            .sort((a, b) => a - b)[0];
+          if (
+            order.status !== 'NEW' ||
+            order.paymentMethod === 'COD' ||
+            order.events.length > 0 ||
+            order.payments.some((p) => p.status === 'PAID') ||
+            !expiresAt
+          )
+            return null;
+          await tx.orderEvent.create({
+            data: { orderId: id, type: 'PAYMENT_REMINDER', actorType: 'SYSTEM' },
+          });
+          return {
+            order,
+            minutesLeft: Math.max(1, Math.ceil((expiresAt - now.getTime()) / 60_000)),
+          };
+        });
+        if (!claim) continue;
+        const { order, minutesLeft } = claim;
+        await this.notifications.orderStatus(id, 'payment_reminder', {
+          vaqt: order.locale === 'ru' ? `${minutesLeft} мин` : `${minutesLeft} daqiqa`,
+          link: orderPageUrl(this.env.APP_URL, order.locale, order.publicId),
+        });
+        n++;
+      } catch (e) {
+        this.logger.error(`payment reminder ${id} failed: ${String(e)}`);
+      }
+    }
+    return n;
   }
 
   /**

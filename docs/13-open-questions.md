@@ -29,7 +29,7 @@ Build with configurable defaults and clearly marked placeholders; list any new q
 
 ## Domains & accounts
 18. Domain (`forest.uz`?) and DNS access; Cloudflare account.
-19. Telegram bot username/token, admin group; Eskiz account + approved SMS templates.
+19. Telegram bot username/token, admin group; Eskiz account + approved SMS templates. The final texts of every SMS template (`MessageTemplate` rows: `otp`, `order_created`, `order_paid`, `order_confirmed`, `order_courier`, `payment_reminder`, `lead_promo_sms`, … — seeded in `packages/db/src/seed/data/content.ts`, UZ+RU) must be submitted to Eskiz for approval before launch; `{raqam}`, `{link}`, `{vaqt}`, `{kod}` are the dynamic slots. Change a text only together with a new Eskiz approval.
 20. Brandbook PDF → add to `design/brandbook/`.
 
 ## Found during Phase 0 (design ↔ docs contradictions; defaults chosen, please confirm)

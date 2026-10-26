@@ -9,12 +9,17 @@ import { RedisService } from '../redis/redis.module';
  * Customer sessions and first-party cookies (docs/05).
  * - `fr_session`: opaque id → Redis `sess:<id>` {customerId}; 90 days sliding; rotated on login.
  * - `fr_cart`:    anonymous cart id (cookie only; the cart row lives in Postgres).
+ * - `fr_aid`:     random visitor id (400 days), set on cart writes; its hash is the device
+ *                 fingerprint for "one first-order code per device" (docs/02). Carries no identity.
  * Browsers reach the API through the storefront's `/api/*` rewrite, so cookies are first-party
  * on the shop domain and SSR can forward them.
  */
 export const SESSION_COOKIE = 'fr_session';
 export const CART_COOKIE = 'fr_cart';
+export const VISITOR_COOKIE = 'fr_aid';
 const SESSION_TTL_SEC = 90 * 24 * 3600;
+/** Browsers cap cookie lifetime at 400 days. */
+const VISITOR_TTL_SEC = 400 * 24 * 3600;
 
 export interface SessionData {
   customerId: string;
@@ -66,6 +71,15 @@ export class SessionService {
   setCartCookie(res: Response, cartId: string): void {
     res.cookie(CART_COOKIE, cartId, this.cookieOptions());
   }
+
+  /** The visitor id from `fr_aid`, issuing a new one (and its cookie) when missing or malformed. */
+  ensureVisitorId(req: Request, res: Response): string {
+    const existing = visitorId(req);
+    if (existing) return existing;
+    const id = randomBytes(18).toString('base64url');
+    res.cookie(VISITOR_COOKIE, id, this.cookieOptions(VISITOR_TTL_SEC));
+    return id;
+  }
 }
 
 function cookieValue(req: Request, name: string): string | null {
@@ -79,6 +93,10 @@ export function sessionId(req: Request): string | null {
 
 export function cartIdFromCookie(req: Request): string | null {
   return cookieValue(req, CART_COOKIE);
+}
+
+export function visitorId(req: Request): string | null {
+  return cookieValue(req, VISITOR_COOKIE);
 }
 
 @Global()

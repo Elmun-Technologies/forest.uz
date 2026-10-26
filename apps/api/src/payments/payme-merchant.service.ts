@@ -240,6 +240,9 @@ export class PaymeMerchantService {
       const located = await this.findOrder(tx, p);
       await this.lifecycle.lockOrder(tx, located.id);
       const order = await this.reloadOrder(tx, located.id);
+      // Re-checked under the lock: "pay again" may have switched the order to Click meanwhile.
+      if (order.paymentMethod !== 'PAYME')
+        throw new PaymeRpcError(PaymeError.INVALID_ACCOUNT, M.orderCode, PAYME_ACCOUNT_FIELD);
       this.validateOrder(order, amount);
       if (order.payments.some((x) => isPaymeActive(x) && x.providerTxnId !== txnId))
         throw new PaymeRpcError(PaymeError.INVALID_ACCOUNT, M.otherTxn);

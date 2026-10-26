@@ -6,6 +6,10 @@ export const OTP_POLICY = {
   maxAttempts: 5,
   resendSec: 60,
   sendsPerIpPerHour: 5,
+  sendsPerPhonePerHour: 5,
+  sendsPerPhonePerDay: 10,
+  /** 4-digit codes: 15 wrong guesses a day per phone, then the phone is locked for the day. */
+  failedVerifiesPerPhonePerDay: 15,
 } as const;
 
 export function generateOtpCode(): string {

@@ -4,7 +4,7 @@ import request from 'supertest';
 import { OrderLifecycleService } from '../src/commerce/order-lifecycle.service';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp } from './app';
+import { createTestApp, shopper } from './app';
 
 /**
  * Contract tests for the Payme Merchant API and the Click SHOP API against the real HTTP
@@ -52,7 +52,7 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
 
   async function placeOrder(method: 'PAYME' | 'CLICK' | 'COD', sku = 'FR-RL-10') {
     const variantId = (await prisma.variant.findUniqueOrThrow({ where: { sku } })).id;
-    const agent = request.agent(app.getHttpServer());
+    const agent = shopper(app);
     await agent.post('/v1/cart/items').send({ variantId, qty: 1 }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
@@ -528,6 +528,37 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       expect(p.order.events.filter((e) => e.type === 'PAYMENT_PAID')).toHaveLength(1);
       expect(p.order.events.filter((e) => e.to === 'CONFIRMED')).toHaveLength(1);
       expect(await prisma.payment.count({ where: { orderId: o.id, status: 'PAID' } })).toBe(1);
+    });
+
+    it('"pay again" racing CreateTransaction never rebinds a row Payme holds', async () => {
+      for (let i = 0; i < 5; i++) {
+        const o = await placeOrder('PAYME');
+        const id = txnId();
+        const [create, retry] = await Promise.all([
+          rpc('CreateTransaction', {
+            id,
+            time: Date.now(),
+            amount: amount(o),
+            account: account(o),
+          }),
+          request(app.getHttpServer())
+            .post(`/v1/orders/${o.publicId}/pay`)
+            .send({ method: 'CLICK' }),
+        ]);
+        expect(retry.status).toBe(201);
+        const payments = await prisma.payment.findMany({ where: { orderId: o.id } });
+        const bound = payments.find((p) => p.providerTxnId === id);
+        if (create.error === null) {
+          // Payme won the lock: its row stays a Payme row, the retry got a fresh Click row.
+          expect(bound).toMatchObject({ method: 'PAYME', status: 'PENDING' });
+          expect(payments.filter((p) => p.method === 'CLICK' && !p.providerTxnId)).toHaveLength(1);
+        } else {
+          // The retry won: the order is a Click order now, Payme was refused.
+          expect(bound).toBeUndefined();
+          expect(create.error.code).toBe(-31050);
+          expect(payments).toEqual([expect.objectContaining({ method: 'CLICK' })]);
+        }
+      }
     });
 
     it('GetStatement lists transactions by Payme time (boundaries included) and validates the period', async () => {

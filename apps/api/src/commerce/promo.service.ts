@@ -12,6 +12,12 @@ export interface PromoContext {
 type Db = PrismaService | Prisma.TransactionClient;
 
 /**
+ * A cancelled order (e.g. unpaid and expired) gives the code back: its redemption row stays as
+ * history but no longer counts toward any limit.
+ */
+const LIVE_REDEMPTION = { order: { status: { not: 'CANCELLED' } } } as const;
+
+/**
  * Promo eligibility (docs/02 A14). Pricing (stacking, margin guard) is done by `priceCart`;
  * this service answers "may this customer use this code now?". Anonymous carts get a provisional
  * check; checkout re-validates inside the order transaction once the phone is known.
@@ -38,7 +44,9 @@ export class PromoService {
       throw new DomainError('PROMO_EXPIRED', undefined, 'promoCode');
 
     if (promo.usageLimit !== null) {
-      const used = await db.promoRedemption.count({ where: { promoId: promo.id } });
+      const used = await db.promoRedemption.count({
+        where: { promoId: promo.id, ...LIVE_REDEMPTION },
+      });
       if (used >= promo.usageLimit)
         throw new DomainError('PROMO_LIMIT_REACHED', undefined, 'promoCode');
     }
@@ -53,14 +61,14 @@ export class PromoService {
       }
       if (ctx.deviceHash) {
         const byDevice = await db.promoRedemption.count({
-          where: { promoId: promo.id, deviceHash: ctx.deviceHash },
+          where: { promoId: promo.id, deviceHash: ctx.deviceHash, ...LIVE_REDEMPTION },
         });
         if (byDevice > 0) throw new DomainError('PROMO_ALREADY_USED', undefined, 'promoCode');
       }
     }
     if (ctx.customerId) {
       const byCustomer = await db.promoRedemption.count({
-        where: { promoId: promo.id, customerId: ctx.customerId },
+        where: { promoId: promo.id, customerId: ctx.customerId, ...LIVE_REDEMPTION },
       });
       if (byCustomer >= promo.perCustomerLimit)
         throw new DomainError('PROMO_ALREADY_USED', undefined, 'promoCode');

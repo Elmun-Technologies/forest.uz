@@ -32,7 +32,10 @@ export const envSchema = z.object({
   PROVIDERS_MODE: z.enum(['fake', 'sandbox', 'live']).default('fake'),
   /** Fake providers in production only for demos/CI (otherwise checkout would hand out fake-pay links). */
   ALLOW_FAKE_PROVIDERS: z.stringbool().default(false),
-  /** Dev-only endpoints (fake SMS/Telegram outbox with OTP codes). Requires PROVIDERS_MODE=fake. */
+  /**
+   * Dev-only endpoints (fake SMS/Telegram outbox with OTP codes). Requires PROVIDERS_MODE=fake;
+   * in production also ALLOW_FAKE_PROVIDERS=true (CI/demos).
+   */
   DEV_ENDPOINTS: z.stringbool().default(false),
   SENTRY_DSN: z.string().optional().default(''),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -53,6 +56,12 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (env.NODE_ENV === 'production' && env.PROVIDERS_MODE === 'fake' && !env.ALLOW_FAKE_PROVIDERS) {
     throw new Error(
       'PROVIDERS_MODE=fake is not allowed in production (set ALLOW_FAKE_PROVIDERS=true only for demos/CI)',
+    );
+  }
+  // A leftover DEV_ENDPOINTS=true from .env.example would publish every OTP code in production.
+  if (env.NODE_ENV === 'production' && env.DEV_ENDPOINTS && !env.ALLOW_FAKE_PROVIDERS) {
+    throw new Error(
+      'DEV_ENDPOINTS=true is not allowed in production (it exposes OTP codes; only with ALLOW_FAKE_PROVIDERS=true for demos/CI)',
     );
   }
   return env;

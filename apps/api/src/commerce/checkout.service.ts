@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   assertPaymentTransition,
   type CheckoutInput,
@@ -15,17 +15,33 @@ import { createHash } from 'node:crypto';
 import type { Request } from 'express';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
+import { ConsentsService } from '../customer/common/consents';
+import { RateLimiter } from '../customer/common/rate-limit';
 import { IntegrationsService } from '../integrations/integrations.service';
+import type { PaymentProvider } from '../integrations/providers/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { CartService } from './cart.service';
-import { orderPublicId, trackingToken } from './ids';
+import { orderPageUrl, orderPublicId, trackingToken } from './ids';
 import { NotificationsService } from './notifications.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { PromoService } from './promo.service';
 import { ReservationsService } from './reservations.service';
 
+/**
+ * Abuse limits for POST /checkout/orders (docs/05: 10/min per IP). COD orders hold stock for
+ * 24 h on a phone nobody verified yet, so open unconfirmed COD orders per phone are capped too.
+ */
+export const CHECKOUT_POLICY = {
+  perIpPerMinute: 10,
+  perPhonePerHour: 5,
+  openCodOrdersPerPhone: 2,
+} as const;
+
 @Injectable()
 export class CheckoutService {
+  private readonly logger = new Logger('Checkout');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly carts: CartService,
@@ -34,6 +50,9 @@ export class CheckoutService {
     private readonly settings: SettingsService,
     private readonly integrations: IntegrationsService,
     private readonly notifications: NotificationsService,
+    private readonly lifecycle: OrderLifecycleService,
+    private readonly limiter: RateLimiter,
+    private readonly consents: ConsentsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -47,6 +66,7 @@ export class CheckoutService {
     input: CheckoutInput,
     locale: Locale,
     deviceHash: string | null,
+    ip: string | null,
   ): Promise<CheckoutResultDto> {
     const cart = await this.carts.current(req);
     const requestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
@@ -62,6 +82,21 @@ export class CheckoutService {
       throw new DomainError('IDEMPOTENCY_CONFLICT');
     }
     try {
+      // After the replay check: a retried request with the same key must not burn the limits.
+      await this.limiter.consume(
+        'checkout:ip',
+        ip ?? 'unknown',
+        CHECKOUT_POLICY.perIpPerMinute,
+        60,
+        'CHECKOUT_LIMITED',
+      );
+      await this.limiter.consume(
+        'checkout:phone',
+        input.phone,
+        CHECKOUT_POLICY.perPhonePerHour,
+        3600,
+        'CHECKOUT_LIMITED',
+      );
       const result = await this.place(cart, input, locale, deviceHash);
       await this.prisma.idempotencyKey.update({
         where: { key },
@@ -92,6 +127,10 @@ export class CheckoutService {
     if (!zone) throw new DomainError('DELIVERY_UNAVAILABLE', undefined, 'zoneKey');
     if (input.paymentMethod === 'COD' && !flags.cod)
       throw new DomainError('COD_DISABLED', undefined, 'paymentMethod');
+    // Before anything is written: an order we can't take payment for would hold stock and burn
+    // the promo with no way for the customer to pay it.
+    const provider =
+      input.paymentMethod === 'COD' ? null : await this.paymentProvider(input.paymentMethod);
 
     const now = new Date();
     const order = await this.prisma.$transaction(
@@ -106,6 +145,20 @@ export class CheckoutService {
         // Serialize checkouts of one customer: promo per-customer/first-order counts are only
         // race-free if two simultaneous orders from the same phone can't interleave.
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${customer.id}))`;
+        // Claim the cart first: of two concurrent checkouts of one cart only one may convert it
+        // (the second waits on the row lock, then matches no ACTIVE row).
+        const claimed = await tx.cart.updateMany({
+          where: { id: cart.id, status: 'ACTIVE' },
+          data: { status: 'CONVERTED', customerId: customer.id },
+        });
+        if (claimed.count !== 1) throw new DomainError('CART_EMPTY');
+        if (input.paymentMethod === 'COD') {
+          const open = await tx.order.count({
+            where: { customerId: customer.id, status: 'NEW', paymentMethod: 'COD' },
+          });
+          if (open >= CHECKOUT_POLICY.openCodOrdersPerPhone)
+            throw new DomainError('COD_OPEN_ORDERS_LIMIT', undefined, 'paymentMethod');
+        }
 
         const promo = cart.promoCode
           ? await this.promos.validate(
@@ -224,33 +277,16 @@ export class CheckoutService {
             },
           });
         }
-        const consents = [
-          ...(input.consents.smsMarketing
-            ? [
-                {
-                  customerId: customer.id,
-                  channel: 'SMS_MARKETING' as const,
-                  granted: true,
-                  source: 'checkout',
-                },
-              ]
-            : []),
-          ...(input.consents.telegram
-            ? [
-                {
-                  customerId: customer.id,
-                  channel: 'TELEGRAM' as const,
-                  granted: true,
-                  source: 'checkout',
-                },
-              ]
-            : []),
-        ];
-        if (consents.length) await tx.consent.createMany({ data: consents });
-        await tx.cart.update({
-          where: { id: cart.id },
-          data: { status: 'CONVERTED', customerId: customer.id },
-        });
+        // Ticked boxes grant; an unticked box is no withdrawal (that happens in the cabinet).
+        await this.consents.record(
+          tx,
+          customer.id,
+          {
+            ...(input.consents.smsMarketing ? { smsMarketing: true } : {}),
+            ...(input.consents.telegram ? { telegram: true } : {}),
+          },
+          'checkout',
+        );
         await tx.customer.update({
           where: { id: customer.id },
           data: { leadSource: customer.leadSource ?? 'checkout', leadAt: customer.leadAt ?? now },
@@ -262,50 +298,78 @@ export class CheckoutService {
 
     await this.notifications.orderStatus(order.id, 'order_created');
 
-    if (input.paymentMethod === 'COD') {
+    if (!provider) {
       return { orderNumber: order.number, publicId: order.publicId, next: { type: 'cod' } };
     }
-    const provider = await this.integrations.payment(
-      input.paymentMethod === 'PAYME' ? 'payme' : 'click',
-    );
-    const url = await provider.createCheckoutUrl({
-      orderId: order.publicId,
-      orderNumber: order.number,
-      amountTiyin: order.totalTiyin,
-      returnUrl: `${this.env.APP_URL}/${locale}/buyurtma/${order.publicId}`,
-      locale,
-    });
+    const orderPage = this.orderPageUrl(order.publicId, locale);
+    let url = orderPage;
+    try {
+      url = await provider.createCheckoutUrl({
+        orderId: order.publicId,
+        orderNumber: order.number,
+        amountTiyin: order.totalTiyin,
+        returnUrl: orderPage,
+        locale,
+      });
+    } catch (e) {
+      // The order exists (stock held): send the customer to its page, where "pay again" works.
+      this.logger.error(`checkout link for ${order.number} failed: ${String(e)}`);
+    }
     return { orderNumber: order.number, publicId: order.publicId, next: { type: 'redirect', url } };
   }
 
-  /** "Pay again" from the payment-failed screen while the reservation is still alive. */
+  private orderPageUrl(publicId: string, locale: Locale): string {
+    return orderPageUrl(this.env.APP_URL, locale, publicId);
+  }
+
+  /** The online provider for a method, or PAYMENT_METHOD_UNAVAILABLE when it isn't connected. */
+  private async paymentProvider(method: 'PAYME' | 'CLICK'): Promise<PaymentProvider> {
+    try {
+      return await this.integrations.payment(method === 'PAYME' ? 'payme' : 'click');
+    } catch (e) {
+      if (e instanceof DomainError && e.code === 'INTEGRATION_NOT_CONFIGURED')
+        throw new DomainError('PAYMENT_METHOD_UNAVAILABLE', { method }, 'paymentMethod');
+      throw e;
+    }
+  }
+
+  /**
+   * "Pay again" from the payment-failed screen while the reservation is still alive. One
+   * transaction under the order lock (the lock every payment webhook takes first), so a Payme
+   * CreateTransaction racing this call either binds its row before we look or sees our method.
+   */
   async retryPayment(
     publicId: string,
     method: 'PAYME' | 'CLICK',
     locale: Locale,
   ): Promise<{ url: string }> {
-    const order = await this.prisma.order.findUnique({
-      where: { publicId },
-      include: {
-        payments: { orderBy: { createdAt: 'desc' } },
-        reservations: { where: { releasedAt: null } },
-      },
-    });
-    if (!order) throw new DomainError('ORDER_NOT_FOUND');
-    const payment = order.payments.find((p) => p.status === 'PENDING' || p.status === 'FAILED');
-    const alive = order.reservations.some((r) => r.expiresAt && r.expiresAt > new Date());
-    if (order.status !== 'NEW' || !payment || payment.method === 'COD' || !alive)
-      throw new DomainError('PAYMENT_NOT_RETRYABLE');
-    if (payment.status !== 'PENDING') assertPaymentTransition(payment.status, 'PENDING');
-    await this.prisma.$transaction(async (tx) => {
-      // A row already bound to a provider transaction keeps its history (Payme CheckTransaction /
+    const found = await this.prisma.order.findUnique({ where: { publicId }, select: { id: true } });
+    if (!found) throw new DomainError('ORDER_NOT_FOUND');
+    const provider = await this.paymentProvider(method);
+    const order = await this.prisma.$transaction(async (tx) => {
+      await this.lifecycle.lockOrder(tx, found.id);
+      const order = await tx.order.findUniqueOrThrow({
+        where: { id: found.id },
+        include: {
+          payments: { orderBy: { createdAt: 'desc' } },
+          reservations: { where: { releasedAt: null } },
+        },
+      });
+      const payment = order.payments.find((p) => p.status === 'PENDING' || p.status === 'FAILED');
+      const alive = order.reservations.some((r) => r.expiresAt && r.expiresAt > new Date());
+      const paid = order.payments.some((p) => !['PENDING', 'FAILED', 'EXPIRED'].includes(p.status));
+      if (order.status !== 'NEW' || order.paymentMethod === 'COD' || !payment || !alive || paid)
+        throw new DomainError('PAYMENT_NOT_RETRYABLE');
+      // A row already bound to a provider transaction is never modified (Payme CheckTransaction /
       // GetStatement must still find it by method + id): the retry starts a fresh row instead.
       if (payment.providerTxnId)
         await tx.payment.create({
           data: { orderId: order.id, method, status: 'PENDING', amountTiyin: payment.amountTiyin },
         });
-      else
+      else {
+        if (payment.status !== 'PENDING') assertPaymentTransition(payment.status, 'PENDING');
         await tx.payment.update({ where: { id: payment.id }, data: { method, status: 'PENDING' } });
+      }
       await tx.order.update({ where: { id: order.id }, data: { paymentMethod: method } });
       await tx.orderEvent.create({
         data: {
@@ -317,13 +381,13 @@ export class CheckoutService {
           data: { method },
         },
       });
+      return order;
     });
-    const provider = await this.integrations.payment(method === 'PAYME' ? 'payme' : 'click');
     const url = await provider.createCheckoutUrl({
       orderId: order.publicId,
       orderNumber: order.number,
       amountTiyin: order.totalTiyin,
-      returnUrl: `${this.env.APP_URL}/${locale}/buyurtma/${order.publicId}`,
+      returnUrl: this.orderPageUrl(order.publicId, locale),
       locale,
     });
     return { url };

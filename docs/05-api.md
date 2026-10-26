@@ -9,7 +9,7 @@
   - Customer: httpOnly secure cookie `fr_session` (opaque session id in Redis, 90 days sliding). No JWT in localStorage.
   - Admin: separate cookie `fr_admin` on admin domain, 12 h, TOTP step-up; RBAC guard `@Roles()` + permission map.
 - Idempotency: `Idempotency-Key` header required on `POST /checkout/orders` and refunds.
-- Rate limits (Redis): OTP send 1/60 s per phone, 5/h per IP; checkout 10/min per IP; tracker ingest 300 events/min per session.
+- Rate limits (Redis): OTP send 1/60 s, 5/h and 10/day per phone, 5/h per IP; 15 failed OTP verifies/day per phone → `OTP_LOCKED` until the window ends; checkout 10/min per IP and 5/h per phone (`CHECKOUT_LIMITED`), at most 2 open unconfirmed COD orders per phone (`COD_OPEN_ORDERS_LIMIT`); tracker ingest 300 events/min per session.
 - Pagination: cursor-based `?cursor=&limit=` → `{ items, nextCursor }`.
 - Webhooks in: dedicated controllers, raw body, signature/auth verified **before** parsing, respond fast, process async via queue, idempotent.
 - Webhooks out: HMAC-SHA256 `X-Forest-Signature: t=<ts>,v1=<hex>`, retries with exponential backoff (8 attempts), log in `IntegrationLog`.

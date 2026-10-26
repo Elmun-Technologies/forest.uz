@@ -66,7 +66,14 @@ export class OrdersController {
   ): Promise<CheckoutResultDto> {
     const key = req.header('idempotency-key');
     if (!key || !IDEMPOTENCY_KEY.test(key)) throw new DomainError('IDEMPOTENCY_KEY_REQUIRED');
-    const result = await this.checkout.placeIdempotent(req, key, body, locale, deviceHash(req));
+    const result = await this.checkout.placeIdempotent(
+      req,
+      key,
+      body,
+      locale,
+      deviceHash(req),
+      req.ip ?? null,
+    );
     res.cookie(ORDER_COOKIE, result.publicId, {
       ...this.sessions.cookieOptions(24 * 3600),
       signed: true,

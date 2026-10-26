@@ -150,6 +150,27 @@ describe('priceCart', () => {
     expect(ship.totalTiyin).toBe(s(119_000));
   });
 
+  it('free shipping code does not stack with kit savings', () => {
+    const r = priceCart({
+      lines: [{ ...kit, unitPriceTiyin: s(349_000), compareAtTiyin: s(390_000) }],
+      promo: { code: 'SHIP', type: 'FREE_SHIPPING', value: 0, minCartTiyin: 0n },
+      shipping: yandex,
+      maxDiscountPct: 15,
+    });
+    expect(r.promo).toEqual({ status: 'rejected', code: 'SHIP', reason: 'PROMO_NO_BENEFIT' });
+    expect(r.shippingTiyin).toBe(s(30_000));
+    expect(r.totalTiyin).toBe(s(379_000));
+    // The automatic free-delivery threshold still applies to kits.
+    const over = priceCart({
+      lines: [kit],
+      promo: { code: 'SHIP', type: 'FREE_SHIPPING', value: 0, minCartTiyin: 0n },
+      shipping: yandex,
+      maxDiscountPct: 15,
+    });
+    expect(over.promo).toMatchObject({ status: 'rejected', reason: 'PROMO_NO_BENEFIT' });
+    expect(over.shippingTiyin).toBe(0n);
+  });
+
   it('gift product adds a zero-priced line', () => {
     const r = priceCart({
       lines: [chalk, spray],

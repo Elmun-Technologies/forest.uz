@@ -470,8 +470,8 @@ export const messageTemplates: {
   {
     key: 'order_created',
     body: {
-      uz: 'Buyurtma {raqam} qabul qilindi. Holatini shu yerda kuzatasiz.',
-      ru: 'Заказ {raqam} принят. Статус можно отслеживать здесь.',
+      uz: 'Forest: buyurtma {raqam} qabul qilindi. Kuzatish: {link}',
+      ru: 'Forest: заказ {raqam} принят. Отслеживание: {link}',
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
@@ -479,16 +479,27 @@ export const messageTemplates: {
   {
     key: 'order_paid',
     body: {
-      uz: "To'lov qabul qilindi. Buyurtma {raqam} yig'ilmoqda.",
-      ru: 'Оплата получена. Заказ {raqam} собирается.',
+      uz: "Forest: to'lov qabul qilindi, buyurtma {raqam} yig'ilmoqda. Kuzatish: {link}",
+      ru: 'Forest: оплата получена, заказ {raqam} собирается. Отслеживание: {link}',
     },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
+    smsFallback: true,
+  },
+  {
+    // COD: the operator confirmed the order by phone (no payment yet — docs/02).
+    key: 'order_confirmed',
+    body: {
+      uz: "Forest: buyurtma {raqam} tasdiqlandi, to'lov kuryerga. Kuzatish: {link}",
+      ru: 'Forest: заказ {raqam} подтверждён, оплата курьеру. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
   },
   {
     key: 'order_courier',
     body: {
-      uz: "Kuryer yo'lda: taxminan {vaqt} da yetib boradi.",
-      ru: 'Курьер в пути: прибудет примерно в {vaqt}.',
+      uz: "Forest: kuryer yo'lda, taxminan {vaqt} da yetib boradi. Kuzatish: {link}",
+      ru: 'Forest: курьер в пути, прибудет примерно в {vaqt}. Отслеживание: {link}',
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
@@ -505,8 +516,8 @@ export const messageTemplates: {
   {
     key: 'payment_reminder',
     body: {
-      uz: "Buyurtma {raqam} to'lovi yakunlanmadi. Mahsulot siz uchun yana {vaqt} band turadi.",
-      ru: 'Оплата заказа {raqam} не завершена. Товар зарезервирован за вами ещё на {vaqt}.',
+      uz: "Forest: buyurtma {raqam} to'lovi yakunlanmadi. Mahsulot yana {vaqt} band turadi. To'lash: {link}",
+      ru: 'Forest: оплата заказа {raqam} не завершена. Товар зарезервирован ещё на {vaqt}. Оплатить: {link}',
     },
     buttons: [{ text: { uz: "To'lash ↗", ru: 'Оплатить ↗' }, url: '{link}' }],
     smsFallback: true,
