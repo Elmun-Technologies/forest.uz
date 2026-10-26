@@ -12,41 +12,63 @@ Forest — premium European furniture & fabric paints e-commerce for Uzbekistan 
 Capture every visitor (lead or purchase), deliver 12 h Tashkent / 24 h Uzbekistan, own all data (no GA/Metrika dependency), admin controls everything (SEO codes, integrations, content), Lighthouse mobile ≥ 90.
 
 ## 3. Tech stack
-pnpm + Turborepo · Next.js 15 App Router (web, admin) · NestJS (api) · PostgreSQL 16 + Prisma · Redis 7 + BullMQ · MinIO/S3 · Tailwind v4 + Radix · next-intl · zod (`packages/contracts`) · grammY (Telegram) · rrweb · Vitest, Playwright, Testcontainers · Docker Compose + Caddy · Sentry/GlitchTip · pino.
+pnpm 10 + Turborepo · Node 22 · TypeScript 5.9 strict · Next.js 15.5 App Router (web, admin) · React 19 · NestJS 11 (api, Express) · PostgreSQL 16 + Prisma 6.19 · Redis 7 + BullMQ · S3-compatible storage (dev: SeaweedFS) · Tailwind v4 + Radix · next-intl 4 · zod 4 (`packages/contracts`) · grammY (Telegram) · rrweb · Vitest 3, Playwright 1.63, Testcontainers 11 · Docker Compose + Caddy · Sentry/GlitchTip · pino.
+Versions are pinned to proven majors on purpose (see decisions); upgrade deliberately, not opportunistically.
 
 ## 4. Folder structure
 ```
 apps/web        storefront          :3000
 apps/admin      admin panel         :3001
 apps/api        NestJS api/webhooks/jobs/bot :4000
-packages/db     prisma schema, migrations, seed
-packages/contracts  zod schemas, enums, DTO types
-packages/ui     tokens, tailwind preset, components
-packages/tracker    first-party analytics script
-packages/config     eslint/tsconfig/prettier
-infra/          compose.yml, Dockerfiles, Caddyfile
+packages/db     prisma schema, migrations, seed; client generated into packages/db/generated (gitignored)
+packages/contracts  zod schemas, DTO types + pure domain core (money, phone, SLA, state machine, pricing, calculator)
+packages/ui     tokens (theme.css), components (source, transpiled by Next)
+packages/tracker    first-party analytics script (Phase 4, not created yet)
+packages/config     eslint/tsconfig presets
+e2e/            Playwright (desktop 1440 + mobile 390 projects)
+infra/          compose.yml, docker/*.Dockerfile, Caddyfile, seaweedfs/s3.json (dev-only creds)
+scripts/        dev.mjs (one-command local stack)
 design/         design reference (read-only)
-docs/           specs, progress.md, runbooks/
+docs/           specs, progress.md, runbooks/, handoff/ (original prompt + Uzbek readme)
 ```
 
 ## 5. Commands
 ```
 pnpm i
-cp .env.example .env
-pnpm dev            # docker compose infra + all apps in watch mode
-pnpm db:migrate     # prisma migrate dev + raw SQL
-pnpm db:seed
-pnpm test           # unit + integration
-pnpm e2e            # playwright (needs pnpm dev)
-pnpm lint && pnpm typecheck
-pnpm build
+cp .env.example .env   # optional: pnpm dev creates it and generates local secrets
+pnpm dev               # infra (compose) → build contracts/db → migrate deploy → seed → api:4000 web:3000 admin:3001 (watch)
+pnpm infra:up | infra:down
+pnpm db:migrate        # prisma migrate dev (new migration from schema changes)
+pnpm db:deploy         # apply migrations
+pnpm db:seed           # idempotent; `pnpm --filter @forest/db seed -- --force` overwrites catalog/content
+pnpm db:reset          # drop + re-migrate (dev only)
+pnpm test              # unit tests (all packages)
+pnpm test:integration  # api integration tests (Testcontainers: needs docker)
+pnpm e2e               # Playwright smoke (needs the stack running: pnpm dev, or prod-mode as in CI)
+pnpm lint && pnpm typecheck && pnpm format:check
+pnpm build             # production build of everything
+docker compose -f infra/compose.yml --profile apps up -d --build   # prod-like stack (migrate → api, web, admin, caddy)
 ```
+Dev-only: `GET /v1/dev/outbox` lists SMS/Telegram captured by fake providers (OTP codes); 404 in production or when PROVIDERS_MODE≠fake.
 (Keep this list true — update when scripts change.)
 
 ## 6. Architecture decisions (rationale in `docs/03-architecture.md`)
 Monorepo · separate admin app/domain · NestJS modules per domain · Postgres-first analytics (partitioned events) + rrweb replays in object storage · adapter pattern + fake providers for every integration · integration credentials encrypted in DB, edited by Owner in admin · zod contracts shared · UZ hosting for PII.
 **Log new decisions here** (date — decision — why):
 - 2026-10-26 — initial architecture from handoff — see docs/03.
+- 2026-10-26 — Pin proven majors (Next 15.5, Nest 11, Prisma 6.19, TS 5.9, zod 4, Vitest 3) instead of the newest (Next 16, Nest 12, Prisma 7/8, TS 7) — docs specify Next 15/Prisma 5.x schema; newest majors change build/ORM APIs and add risk without benefit for MVP.
+- 2026-10-26 — Dev object storage = SeaweedFS S3 (MinIO no longer publishes public images). Code uses the generic S3 API, so prod can be any UZ-hosted S3 provider.
+- 2026-10-26 — Pure domain logic (money, SLA/cut-off, order/payment state machines, pricing/promo engine, calculator) lives in `packages/contracts` so web, admin and api share one tested implementation.
+- 2026-10-26 — Promo "no stacking with kit discount, best one applies" = code computed on the compare-at base minus kit savings already given; rejected with PROMO_NO_BENEFIT if kit is better. Margin guard caps kit+code at `promo.rules.maxDiscountPct` of compare-at base. Free-shipping threshold uses merchandise total after discount.
+- 2026-10-26 — Delivery promise (Tashkent express): clock start before cut-off → min(start+12 h, same-day `sameDayEnd` 23:59); at/after cut-off or non-working day → next working day `afterCutoffBy` (12:00). All values in `delivery.zones` settings.
+- 2026-10-26 — Kit (BUNDLE) availability = the kit SKU's own stock (pre-packed / MoySklad bundle stock, which MoySklad itself computes as min of components). We reserve only the kit SKU.
+- 2026-10-26 — Event table partitioned monthly; partitions live in schema `event_parts` so Prisma (managing `public`) never sees drift. `ensure_event_partitions()` / `drop_old_event_partitions()` SQL functions; default partition is a safety net.
+- 2026-10-26 — All timestamps `timestamptz(3)`; human numbers via sequences (`F-10001…`, `C-10001…`) as DB defaults.
+- 2026-10-26 — Prisma client generated into `packages/db/generated` (musl + debian engines) so `pnpm deploy`ed images need no runtime `prisma generate`.
+- 2026-10-26 — Montserrat self-hosted via `@fontsource-variable/montserrat` (latin+cyrillic unicode-range) instead of next/font/google: builds don't depend on Google, no third-party font request.
+- 2026-10-26 — Catalog listing filters/facets in memory over active products (catalog is hundreds of SKUs). Revisit if > few thousand products.
+- 2026-10-26 — CMS/legal body = structured blocks (`contentBlockSchema`) with `{store.*}` variables; blocks whose variables are missing are hidden, so legal drafts never render `[placeholder]` text.
+- 2026-10-26 — Integration credentials: AES-256-GCM envelope `[v1][keyId:4][iv:12][tag:16][ct]`, AAD = integration key; key rotation via previous keys. Blank secret inputs keep the stored value.
 
 ## 7. Coding standards
 - TypeScript strict, no `any` (use `unknown` + zod). Small modules, SOLID, DRY, KISS; no premature abstraction except the integration adapters.
@@ -124,9 +146,16 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Webhook handlers must be idempotent; return 200 quickly and process async.
 - Time zone: Asia/Tashkent for cut-offs and SLA; tests with fixed clock.
 - Don't cache personalized HTML/API at Cloudflare.
+- Never put `NODE_ENV` in `.env`: `next build` with NODE_ENV=development fails ("<Html> should not be imported…").
+- Running `pnpm install`/`turbo build` while `pnpm dev` runs can crash dev servers (packages rebuilt/relinked) — restart `pnpm dev`.
+- Don't `pkill -f <pattern>` with a pattern that appears in your own shell command (kills the shell); use `pkill -f "next-serve[r]"`.
+- Write NBSP as `'\u00A0'` in source (literal NBSP fails eslint no-irregular-whitespace). Money formatting already uses NBSP separators — tests compare with `\u00A0`.
+- Prisma: after schema edits run `pnpm db:generate` (client lives in packages/db/generated). Partition tables are in schema `event_parts` — never move them to `public`.
+- Docker Hub may rate-limit; `mirror.gcr.io/library/<image>` is a drop-in mirror.
+- Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 
 ## 18. TODO / status
-Track phases in `docs/progress.md` (create it). Current phase: **Phase 0**.
+Track phases in `docs/progress.md`. Current phase: **Phase 0 done → Phase 1 (Storefront) next**.
 
 ## 19. Known limitations
 BTS API docs unknown (manual mode fallback); COD fiscal provider TBD; real content/prices pending (see `docs/13-open-questions.md`).
