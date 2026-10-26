@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest mobil · Katalog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="width: 390px; background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; position: relative;">
+
+<header style="display: flex; flex-direction: column; gap: 10px; padding: 12px 16px 10px; background: #EEEFEA; position: sticky; top: 0; z-index: 10;">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <a href="Mobil-Bosh.dc.html" aria-label="Orqaga" style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+    <label for="mSearch" style="flex: 1; display: flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 0 14px; height: 44px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="mSearch" placeholder="Bo'yoq, sprey, cho'tka" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 14px;"></label>
+  </div>
+  <div style="display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px;">
+    <sc-for list="{{cats}}" as="c" hint-placeholder-count="5"><button type="button" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button></sc-for>
+  </div>
+</header>
+
+<main style="padding: 4px 12px 24px; display: flex; flex-direction: column; gap: 12px;">
+  <a href="Main.dc.html#quiz" style="display: flex; align-items: center; gap: 12px; background: #334229; color: #FFFFFF; border-radius: 22px; padding: 14px 16px; text-decoration: none;">
+    <span style="width: 40px; height: 40px; border-radius: 50%; background: #D5DDC8; color: #141712; display: grid; place-items: center; font-weight: 700; flex: none;">?</span>
+    <span style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><b style="font-size: 14px;">Qaysi biri kerakligini bilmayapsizmi?</b><span style="font-size: 12px; color: #C9D3BD;">3 savol · 20 soniya</span></span>
+    <span style="font-size: 18px;">→</span>
+  </a>
+
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <span style="font-size: 13px; color: #5E6459;">{{count}} ta mahsulot</span>
+    <span style="display: flex; gap: 6px;">
+      <button type="button" onClick="{{openSheet}}" style="display: inline-flex; align-items: center; gap: 6px; border: 0; background: #FFFFFF; border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtr</button>
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 600;">Ommabop ↓</span>
+    </span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <sc-for list="{{items}}" as="p" hint-placeholder-count="6">
+      <div style="background: #FFFFFF; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column;">
+        <a href="Mobil-Mahsulot.dc.html" style="position: relative; display: block; height: 170px;"><img src="{{p.img}}" alt="{{p.name}}" style="width: 100%; height: 100%; object-fit: cover; display: block;"><sc-if value="{{p.badge}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: 8px; top: 8px; background: #FFFFFF; border-radius: 999px; padding: 4px 9px; font-size: 11px; font-weight: 700;">{{p.badge}}</span></sc-if></a>
+        <div style="padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 6px; flex: 1;">
+          <a href="Mobil-Mahsulot.dc.html" style="font-size: 13px; font-weight: 600; line-height: 1.3; text-decoration: none; min-height: 34px;">{{p.name}}</a>
+          <span style="font-size: 11px; color: #5E6459;">{{p.meta}}</span>
+          <span style="display: flex; justify-content: space-between; align-items: center; margin-top: auto;"><b style="font-size: 14px; font-weight: 700;">{{p.price}}</b><button type="button" onClick="{{p.add}}" aria-label="Savatga qo'shish" style="{{p.btnStyle}}">{{p.btn}}</button></span>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="height: 64px;"></div>
+</main>
+
+<sc-if value="{{sheet}}" hint-placeholder-val="{{false}}">
+  <div style="position: absolute; inset: 0; background: rgba(20,23,18,0.45); z-index: 30; display: flex; flex-direction: column; justify-content: flex-end;">
+    <div style="position: sticky; bottom: 0; background: #FFFFFF; border-radius: 28px 28px 0 0; padding: 10px 20px 20px; display: flex; flex-direction: column; gap: 16px;">
+      <span style="align-self: center; width: 40px; height: 5px; border-radius: 999px; background: #DADDD3;"></span>
+      <span style="display: flex; justify-content: space-between; align-items: center;"><b style="font-size: 18px;">Filtr</b><button type="button" onClick="{{closeSheet}}" style="border: 0; background: transparent; font: inherit; font-size: 14px; color: #5E6459; cursor: pointer;">Tozalash</button></span>
+      <span style="font-size: 13px; font-weight: 600;">Sirt</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 6px;"><span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600;">Yog'och / MDF</span><span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600;">Velur</span><span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600;">Paxta / zig'ir</span><span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600;">Lak</span></span>
+      <span style="font-size: 13px; font-weight: 600;">Rang</span>
+      <span style="display: flex; gap: 10px;"><span style="width: 34px; height: 34px; border-radius: 50%; background: #F4F1EA; border: 2px solid #141712;"></span><span style="width: 34px; height: 34px; border-radius: 50%; background: #56603C;"></span><span style="width: 34px; height: 34px; border-radius: 50%; background: #3B3E40;"></span><span style="width: 34px; height: 34px; border-radius: 50%; background: #CDBFA6;"></span><span style="width: 34px; height: 34px; border-radius: 50%; background: #8B8F92;"></span></span>
+      <span style="font-size: 13px; font-weight: 600;">Narx</span>
+      <span style="display: flex; gap: 8px; font-size: 14px;"><span style="flex: 1; border: 1px solid #DADDD3; border-radius: 14px; padding: 12px;">79 000</span><span style="flex: 1; border: 1px solid #DADDD3; border-radius: 14px; padding: 12px;">799 000</span></span>
+      <button type="button" onClick="{{closeSheet}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 16px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;">5 ta mahsulotni ko'rsatish</button>
+    </div>
+  </div>
+</sc-if>
+
+<nav aria-label="Tezkor amallar" style="position: sticky; bottom: 0; z-index: 20; padding: 10px 12px 14px; background: linear-gradient(0deg, #EEEFEA 70%, rgba(238,239,234,0));">
+  <div style="display: flex; gap: 8px;">
+    <a href="https://t.me/" aria-label="Telegram" style="width: 56px; height: 56px; border-radius: 50%; background: #334229; color: #FFFFFF; display: grid; place-items: center; flex: none;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg></a>
+    <a href="Mobil-Savat.dc.html" style="flex: 1; display: flex; justify-content: space-between; align-items: center; background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 0 8px 0 22px; height: 56px; font-size: 15px; font-weight: 600;">Savat · {{cartN}}<span style="background: #FFFFFF; color: #141712; border-radius: 999px; padding: 10px 14px; font-size: 14px; font-variant-numeric: tabular-nums;">{{cartSum}} so'm</span></a>
+  </div>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2400}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cat: 'all', sheet: false, added: {} }; }
+  renderVals() {
+    const s = this.state;
+    const P = [
+      ['cw', 'furniture', 'Chalk White mebel bo\'yog\'i', '0,5 / 1 / 2,5 L', 189000, 'dan ', '../assets/photos/white-dresser.jpg', 'Xit'],
+      ['fs', 'fabric', 'Mato bo\'yog\'i spreyi', '4 rang · 400 ml', 249000, '', '../assets/photos/sprayer-hand.jpg', 'Yangi'],
+      ['ks', 'kit', 'Divan yangilash to\'plami', '3 sprey + tozalovchi', 799000, '', '../assets/photos/classic-green-sofa.jpg', '−11%'],
+      ['cl', 'fabric', 'Mato tozalovchi sprey', '500 ml', 149000, '', '../assets/photos/green-spray-bottle.jpg', ''],
+      ['kf', 'kit', 'Mebel yangilash to\'plami', 'Bo\'yoq + mum + cho\'tka', 549000, '', '../assets/photos/white-shelf-bedroom.jpg', '−10%'],
+      ['wx', 'furniture', 'Himoya mumi Clear', '250 / 500 ml', 159000, 'dan ', '../assets/photos/wax-varnish.jpg', ''],
+      ['br', 'tools', 'Oval 40 cho\'tka', 'Tabiiy tuk', 119000, '', '../assets/photos/brush-hand.jpg', ''],
+      ['rl', 'tools', 'Mikrofibra valik 10 sm', 'Silliq sirt uchun', 79000, '', '../assets/photos/painting-materials.jpg', '']
+    ];
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const list = P.filter(p => s.cat === 'all' || p[1] === s.cat);
+    const base = 2, baseSum = 578000;
+    const addedIds = Object.keys(s.added).filter(k => s.added[k]);
+    const extra = P.filter(p => addedIds.includes(p[0])).reduce((a, p) => a + p[4], 0);
+    return {
+      cats: [['all', 'Hammasi'], ['furniture', 'Mebel uchun'], ['fabric', 'Divan / mato'], ['kit', 'To\'plamlar'], ['tools', 'Asboblar']].map(([id, label]) => ({ label, pick: () => this.setState({ cat: id }),
+        style: 'flex: none; border: 0; border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; ' + (s.cat === id ? 'background: #141712; color: #FFFFFF;' : 'background: #FFFFFF; color: #141712;') })),
+      count: list.length,
+      items: list.map(([id, , name, meta, price, pre, img, badge]) => { const on = !!s.added[id]; return { name, meta, img, badge, price: pre + fmt(price),
+        add: () => this.setState({ added: { ...s.added, [id]: !on } }), btn: on ? '✓' : '+',
+        btnStyle: 'width: 34px; height: 34px; border-radius: 50%; border: 0; font: inherit; font-size: 18px; font-weight: 600; cursor: pointer; display: grid; place-items: center; ' + (on ? 'background: #334229; color: #FFFFFF;' : 'background: #141712; color: #FFFFFF;') }; }),
+      sheet: s.sheet, openSheet: () => this.setState({ sheet: true }), closeSheet: () => this.setState({ sheet: false }),
+      cartN: base + addedIds.length, cartSum: fmt(baseSum + extra)
+    };
+  }
+}
+</script>
+</body>
+</html>

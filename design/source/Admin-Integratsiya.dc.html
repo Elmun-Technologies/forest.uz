@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Integratsiyalar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="integrations" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Integratsiyalar markazi</h1>
+        <span style="font-size: 13px; color: #5E6459;">Hammasi bir joydan ulanadi · kalitlar serverda shifrlangan · kodga tegish shart emas · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <span style="background: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600;">{{connected}} / {{total}} ulangan</span>
+    </header>
+
+    <section style="background: #141712; color: #FFFFFF; border-radius: 28px; padding: 24px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+      <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #A9B59C;">Ishga tushirish to'plami</span>
+        <b style="font-size: 28px; font-weight: 500; letter-spacing: -0.02em;">{{kitDone}} / {{kitTotal}} tayyor</b>
+        <span style="height: 8px; border-radius: 999px; background: #2E332A; overflow: hidden;"><span style="{{kitBar}}"></span></span>
+        <span style="font-size: 12px; color: #A9B59C;">Bular ulanmaguncha sayt ochilmaydi.</span>
+      </div>
+      <div style="flex: 2 1 420px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <sc-for list="{{kit}}" as="k" hint-placeholder-count="10"><button type="button" onClick="{{k.pick}}" style="{{k.style}}">{{k.mark}} {{k.name}}</button></sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+      <label for="intSearch" style="flex: 1 1 220px; max-width: 320px; display: flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 0 16px; height: 42px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="intSearch" placeholder="Xizmat nomi" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13px;"></label>
+      <sc-for list="{{chips}}" as="c" hint-placeholder-count="12"><button type="button" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}} <span style="opacity: 0.6;">{{c.n}}</span></button></sc-for>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 1 1 100%; order: 2; min-width: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;">
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="12">
+          <button type="button" onClick="{{c.pick}}" style="{{c.style}}">
+            <span style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <sc-if value="{{c.img}}" hint-placeholder-val="{{true}}"><span style="width: 44px; height: 44px; border-radius: 12px; border: 1px solid #E4E6DF; background: #FFFFFF; display: grid; place-items: center; flex: none;"><img src="{{c.img}}" alt="" style="max-width: 28px; max-height: 24px;"></span></sc-if>
+              <sc-if value="{{c.lm}}" hint-placeholder-val="{{false}}"><span style="{{c.lmStyle}}">{{c.lm}}</span></sc-if>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left;"><b style="font-size: 14px; font-weight: 600;">{{c.name}}</b><span style="font-size: 12px; color: #5E6459;">{{c.catLabel}}</span></span>
+            </span>
+            <span style="font-size: 12px; color: #3F453B; line-height: 1.45; text-align: left;">{{c.desc}}</span>
+            <span style="{{c.stStyle}}">{{c.stLabel}}</span>
+          </button>
+        </sc-for>
+      </div>
+
+      <aside style="flex: 1 1 100%; order: 1; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+        <span style="display: flex; align-items: center; gap: 14px;">
+          <sc-if value="{{cur.img}}" hint-placeholder-val="{{true}}"><span style="width: 56px; height: 56px; border-radius: 16px; border: 1px solid #E4E6DF; display: grid; place-items: center; flex: none;"><img src="{{cur.img}}" alt="" style="max-width: 36px; max-height: 30px;"></span></sc-if>
+          <sc-if value="{{cur.lm}}" hint-placeholder-val="{{false}}"><span style="{{cur.lmBig}}">{{cur.lm}}</span></sc-if>
+          <span style="display: flex; flex-direction: column; gap: 4px;"><b style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em;">{{cur.name}}</b><span style="{{cur.stStyle}}">{{cur.stLabel}}</span></span>
+        </span>
+        <span style="font-size: 13px; line-height: 1.55; color: #3F453B;">{{cur.desc}}</span>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; font-size: 13px;">
+          <sc-for list="{{cur.fields}}" as="f" hint-placeholder-count="3">
+            <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 12px; font-weight: 600;">{{f.l}}</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 10px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{f.v}}</span></span>
+          </sc-for>
+        </div>
+        <sc-if value="{{cur.kit}}" hint-placeholder-val="{{true}}"><span style="background: #F1F5EC; border-radius: 14px; padding: 12px; font-size: 12px; line-height: 1.5; color: #1F5A30; font-weight: 600;">Ishga tushirish to'plamiga kiradi</span></sc-if>
+        <div style="display: flex; gap: 8px; margin-top: 4px;">
+          <span style="flex: 1; text-align: center; border: 1px solid #DADDD3; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 600;">Test qilish</span>
+          <button type="button" onClick="{{cur.toggle}}" style="{{cur.btnStyle}}">{{cur.btnLabel}}</button>
+        </div>
+        <a href="{{cur.link}}" style="font-size: 13px; font-weight: 600;">{{cur.linkLabel}}</a>
+      </aside>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 520px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+        <span style="display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 6px;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Webhook va REST API</h2><span style="font-size: 12px; color: #5E6459;">Istalgan tizimni o'zimiz ulaymiz</span></span>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 90px; gap: 12px; padding: 8px 4px; color: #5E6459; font-size: 12px; border-bottom: 1px solid #DADDD3;"><span>Hodisa</span><span>Manzil</span><span style="text-align: right;">24 soat</span></div>
+        <sc-for list="{{hooks}}" as="h" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) 90px; gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid #EEEFEA;"><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600;">{{h.e}}</span><span style="font-size: 12px; color: #3F453B; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{h.to}}</span><span style="text-align: right; font-variant-numeric: tabular-nums;">{{h.n}}</span></div>
+        </sc-for>
+        <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px; padding-top: 10px;"><span style="color: #5E6459;">API kalit (o'qish/yozish)</span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #EEEFEA; border-radius: 8px; padding: 4px 8px;">fr_live_•••• •••• 3c0d</span></span>
+      </div>
+      <div style="flex: 2 1 340px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; font-size: 13px;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Kalitlar xavfsizligi</h2>
+        <span style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Saqlash</span><b style="font-weight: 600;">Shifrlangan · faqat server</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Ko'rinish</span><b style="font-weight: 600;">Oxirgi 4 belgi</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Kim o'zgartira oladi</span><b style="font-weight: 600;">Faqat Egasi</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Har o'zgarish</span><b style="font-weight: 600;">Jurnalga yoziladi</b></span>
+        <span style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Webhook imzosi</span><b style="font-weight: 600;">HMAC-SHA256</b></span>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2400}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { cat: 'all', sel: 'payme', flip: {} }; }
+  renderVals() {
+    const s = this.state;
+    const B = (id) => '/_blob/' + id;
+    const CATS = [['all', 'Hammasi'], ['on', 'Ulangan'], ['pay', 'To\'lov'], ['ship', 'Yetkazish'], ['erp', 'Ombor va ERP'], ['crm', 'CRM'], ['market', 'Marketpleys va feed'], ['fiscal', 'Soliq va fiskal'], ['comm', 'Muloqot'], ['ads', 'Reklama'], ['seo', 'SEO'], ['auto', 'Avtomatlashtirish va AI']];
+    const catName = Object.fromEntries(CATS);
+    // [id, name, cat, img | null, lettermark | null, lmBg, lmFg, on, kit, desc, status override ('soon')]
+    const I = [
+      ['payme', 'Payme', 'pay', '../assets/logos/payme.png', null, '', '', true, true, 'Karta orqali onlayn to\'lov. Fiskal chek IKPU bilan avtomatik.'],
+      ['click', 'Click', 'pay', '../assets/logos/click.png', null, '', '', true, true, 'Click Up va karta orqali to\'lov, holat callback orqali keladi.'],
+      ['cod', 'Naqd / kuryerga', 'pay', null, 'so\'m', '#334229', '#FFFFFF', true, true, 'Olganda to\'lov. Kuryer tasdiqlagach buyurtma «to\'landi» bo\'ladi.'],
+      ['uzumbank', 'Uzum Bank', 'pay', null, 'U', '#7000FF', '#FFFFFF', false, false, 'Uzum karta egalari uchun qo\'shimcha to\'lov usuli.'],
+      ['paynet', 'Paynet', 'pay', null, 'P', '#00A04A', '#FFFFFF', false, false, 'Paynet ilovasi va terminallar orqali to\'lov.'],
+      ['octo', 'Octo · Visa/Mastercard', 'pay', '../assets/icons/visa.png', null, '', '', false, false, 'Xorijiy kartalar: diaspora va sayyohlar uchun.'],
+      ['uzumnasiya', 'Uzum Nasiya', 'pay', null, 'UN', '#7000FF', '#FFFFFF', false, false, 'Muddatli to\'lov: o\'rtacha chekni oshiradi.', 'soon'],
+      ['alif', 'Alif Nasiya', 'pay', null, 'a', '#00A859', '#FFFFFF', false, false, 'Muddatli to\'lov, 3–12 oy.', 'soon'],
+      ['yandex', 'Yandex Dostavka', 'ship', '../assets/logos/yandex-delivery.png', null, '', '', true, true, 'Toshkent bo\'ylab 12 soatda. Narx va kuryer API orqali.'],
+      ['bts', 'BTS Express', 'ship', '../assets/logos/bts.png', null, '', '', true, true, 'Respublika bo\'ylab 24 soatda. Trek raqam mijozga botda boradi.'],
+      ['fargo', 'Fargo', 'ship', null, 'F', '#E2231A', '#FFFFFF', false, false, 'Zaxira kuryer xizmati.'],
+      ['uzpost', 'O\'zbekiston pochtasi', 'ship', null, 'UP', '#1A4C9C', '#FFFFFF', false, false, 'Chekka hududlar uchun arzon variant.'],
+      ['gmaps', 'Google Maps', 'ship', '../assets/icons/googlemaps.png', null, '', '', true, false, 'Checkout\'da manzilni avto-to\'ldirish va xaritada nuqta.'],
+      ['moysklad', 'MoySklad', 'erp', null, 'МС', '#1F4FA0', '#FFFFFF', true, true, 'Ombor, narx, qoldiq va buyurtmalar ikki tomonlama.'],
+      ['1c', '1C', 'erp', null, '1C', '#F5C400', '#141712', false, false, 'Buxgalteriya kerak bo\'lsa MoySklad orqali yoki to\'g\'ridan.'],
+      ['billz', 'Billz', 'erp', null, 'B', '#141712', '#FFFFFF', false, false, 'Oflayn do\'kon ochilsa: POS va qoldiq.'],
+      ['amocrm', 'amoCRM', 'crm', null, 'amo', '#2C6ECB', '#FFFFFF', false, false, 'Faqat sotuv bo\'limi bo\'lsa. Asosiy CRM — Forest admin.'],
+      ['bitrix', 'Bitrix24', 'crm', null, 'B24', '#2FC6F6', '#0B2A3A', false, false, 'amoCRM o\'rniga muqobil.'],
+      ['gsheets', 'Google Sheets', 'crm', '../assets/icons/googlesheets.png', null, '', '', true, false, 'Kunlik buyurtma va lead eksporti hisobot uchun.'],
+      ['metacat', 'Meta katalog', 'market', '../assets/icons/meta.png', null, '', '', true, false, 'Instagram Shopping va dinamik retarget uchun mahsulot feed.'],
+      ['merchant', 'Google Merchant', 'market', '../assets/icons/googleads.png', null, '', '', true, false, 'Shopping va Performance Max feed.'],
+      ['uzummarket', 'Uzum Market', 'market', null, 'UM', '#7000FF', '#FFFFFF', false, false, 'Marketpleysga qoldiq va narx bir manbadan.', 'soon'],
+      ['tiktokcat', 'TikTok katalog', 'market', '../assets/icons/tiktok.png', null, '', '', false, false, 'TikTok Shop / katalog reklamasi.'],
+      ['ofd', 'Soliq · fiskal chek', 'fiscal', null, 'OFD', '#0B6E4F', '#FFFFFF', false, true, 'Naqd va kuryer to\'lovlari uchun onlayn kassa cheki.'],
+      ['ikpu', 'IKPU (MXIK) katalogi', 'fiscal', null, 'MXIK', '#5E6459', '#FFFFFF', true, true, 'Har SKU\'ga soliq kodi, chekka avtomatik qo\'shiladi.'],
+      ['telegram', 'Telegram bot', 'comm', '../assets/icons/telegram.png', null, '', '', true, true, 'Lead, buyurtma holati, savat, maslahat, sharh.'],
+      ['eskiz', 'Eskiz SMS', 'comm', null, 'SMS', '#2E7D32', '#FFFFFF', true, true, 'Telegram\'i yo\'q mijozga kod va holat SMS\'i.'],
+      ['playmobile', 'Playmobile SMS', 'comm', null, 'PM', '#E65100', '#FFFFFF', false, false, 'Zaxira SMS provayder.'],
+      ['whatsapp', 'WhatsApp', 'comm', '../assets/icons/whatsapp.png', null, '', '', false, false, 'RU-segment va diaspora uchun.'],
+      ['instagram', 'Instagram Direct', 'comm', '../assets/icons/instagram.png', null, '', '', false, false, 'Direct xabarlari operator inbox\'ga tushadi.'],
+      ['chatplace', 'Chatplace', 'comm', null, 'CP', '#5B3DF5', '#FFFFFF', false, false, 'Instagram/Telegram avtomatlashtirish va AI agent.'],
+      ['metapixel', 'Meta Pixel + CAPI', 'ads', '../assets/icons/facebook.png', null, '', '', true, false, 'Server orqali hodisalar: iOS va adblock\'da ham signal.'],
+      ['gads', 'Google Ads', 'ads', '../assets/icons/googleads.png', null, '', '', true, false, 'Konversiya va Enhanced Conversions.'],
+      ['tiktokpx', 'TikTok Pixel', 'ads', '../assets/icons/tiktok.png', null, '', '', false, false, 'Events API bilan.'],
+      ['ymetrika', 'Yandex Metrika', 'ads', '../assets/icons/yandexmetrika.png', null, '', '', true, false, 'Faqat Yandex Direct signali uchun. Analitika — o\'zimizniki.'],
+      ['gtm', 'Google Tag Manager', 'ads', '../assets/icons/googletagmanager.png', null, '', '', false, false, 'Ixtiyoriy: marketolog o\'z teglarini qo\'shishi uchun.'],
+      ['ga4', 'Google Analytics 4', 'ads', '../assets/icons/googleanalytics.png', null, '', '', false, false, 'Shart emas. Faqat Google Ads auditoriyasi uchun.'],
+      ['gsc', 'Google Search Console', 'seo', '../assets/icons/googlesearchconsole.png', null, '', '', true, true, 'Tasdiqlash kodi + sitemap. So\'rovlar SEO markazida.'],
+      ['ywm', 'Yandex Webmaster', 'seo', '../assets/icons/yandexwebmaster.png', null, '', '', true, true, 'RU-qidiruv uchun tasdiqlash va indeks.'],
+      ['bing', 'Bing Webmaster', 'seo', '../assets/icons/bing.png', null, '', '', false, false, 'Bing va ChatGPT qidiruvi uchun indeks.'],
+      ['cloudflare', 'Cloudflare', 'seo', '../assets/icons/cloudflare.png', null, '', '', true, false, 'CDN, SSL, rasm tezligi, bot himoyasi.'],
+      ['n8n', 'n8n', 'auto', '../assets/icons/n8n.png', null, '', '', false, false, 'O\'z serverimizda avtomatlashtirish oqimlari.'],
+      ['make', 'Make', 'auto', '../assets/icons/make.png', null, '', '', false, false, 'Tayyor ssenariylar, kodsiz.'],
+      ['zapier', 'Zapier', 'auto', '../assets/icons/zapier.png', null, '', '', false, false, 'Xorijiy servislar uchun.'],
+      ['claude', 'Claude', 'auto', '../assets/icons/claude.png', null, '', '', true, false, 'Mahsulot tavsifi UZ/RU, operatorga javob qoralamasi.'],
+      ['openai', 'OpenAI', 'auto', '../assets/icons/openai.png', null, '', '', false, false, 'Muqobil AI provayder.']
+    ].map(([id, name, cat, img, lm, lmBg, lmFg, on, kit, desc, soon]) => ({ id, name, cat, img, lm, lmBg, lmFg, kit, desc, soon: soon === 'soon', on: s.flip[id] ? !on : on }));
+
+    const FIELDS = {
+      pay: (i) => [['Merchant ID', '[kiritiladi]'], ['Maxfiy kalit', '•••• •••• ••••'], ['Callback URL', 'forest.uz/hooks/' + i.id], ['Rejim', 'Test → Jonli']],
+      ship: (i) => [['API token', '•••• •••• ••••'], ['Jo\'natish manzili', 'Asosiy ombor · Toshkent'], ['Narx', 'API orqali hisoblanadi']],
+      erp: (i) => [['API token', '•••• •••• a91f'], ['Webhook', 'forest.uz/hooks/' + i.id]],
+      crm: (i) => [['API kalit', '•••• •••• ••••'], ['Uzatiladi', 'Lead, buyurtma, mijoz']],
+      market: (i) => [['Feed URL', 'forest.uz/feeds/' + i.id + '.xml'], ['Yangilanish', 'Har soat · MoySklad qoldig\'i']],
+      fiscal: (i) => [['Kassa / OFD ID', '[kiritiladi]'], ['IKPU', 'Har SKU uchun majburiy']],
+      comm: (i) => [['Token', '•••• •••• ••••'], ['Yuboruvchi', 'Forest']],
+      ads: (i) => [['Pixel / Teg ID', '[kiritiladi]'], ['Server token', '•••• •••• ••••'], ['Hodisalar', 'ViewContent, AddToCart, Purchase']],
+      seo: (i) => [['Tasdiqlash kodi', '<meta name="…-verification" content="…">'], ['Sitemap', 'forest.uz/sitemap.xml']],
+      auto: (i) => [['API kalit', '•••• •••• ••••'], ['Webhook', 'forest.uz/hooks/' + i.id]]
+    };
+    const LINKS = { moysklad: ['Admin-MoySklad.dc.html', 'Batafsil sozlash →'], telegram: ['Admin-Bot.dc.html', 'Bot sozlamalari →'], gsc: ['Admin-SEO.dc.html', 'SEO markazi →'], ywm: ['Admin-SEO.dc.html', 'SEO markazi →'], bing: ['Admin-SEO.dc.html', 'SEO markazi →'] };
+
+    const st = (i) => i.soon ? ['Tez orada', '#EEEFEA', '#5E6459'] : i.on ? ['Ulangan', '#E8F2EA', '#1F6B35'] : ['Ulanmagan', '#F7F7F4', '#5E6459'];
+    const chipSt = (i) => { const [l, bg, fg] = st(i); return { stLabel: l, stStyle: 'align-self: flex-start; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: ' + bg + '; color: ' + fg + ';' }; };
+    const lmS = (i, size, r, fs) => 'width: ' + size + 'px; height: ' + size + 'px; border-radius: ' + r + 'px; background: ' + i.lmBg + '; color: ' + i.lmFg + '; display: grid; place-items: center; font-size: ' + fs + 'px; font-weight: 700; letter-spacing: -0.02em; flex: none;';
+
+    const list = I.filter(i => s.cat === 'all' ? true : s.cat === 'on' ? i.on : i.cat === s.cat);
+    const cur = I.find(i => i.id === s.sel) || I[0];
+    const kitItems = I.filter(i => i.kit);
+    const kitDone = kitItems.filter(i => i.on).length;
+    const lk = LINKS[cur.id];
+
+    return {
+      connected: I.filter(i => i.on).length, total: I.length,
+      kitDone, kitTotal: kitItems.length,
+      kitBar: 'display: block; height: 100%; border-radius: 999px; background: #A9C98F; width: ' + Math.round(kitDone / kitItems.length * 100) + '%;',
+      kit: kitItems.map(i => ({ name: i.name, mark: i.on ? '✓' : '○', pick: () => this.setState({ sel: i.id }),
+        style: 'border: 0; border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; ' + (i.on ? 'background: #2E332A; color: #D5DDC8;' : 'background: #FFF4D6; color: #6B4E00;') })),
+      chips: CATS.map(([id, label]) => ({ label, n: id === 'all' ? I.length : id === 'on' ? I.filter(i => i.on).length : I.filter(i => i.cat === id).length,
+        pick: () => this.setState({ cat: id }),
+        style: 'border: 0; border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; ' + (s.cat === id ? 'background: #141712; color: #FFFFFF;' : 'background: #FFFFFF; color: #141712;') })),
+      cards: list.map(i => ({ ...i, ...chipSt(i), catLabel: catName[i.cat], lmStyle: lmS(i, 44, 12, i.lm && i.lm.length > 3 ? 11 : 14),
+        pick: () => this.setState({ sel: i.id }),
+        style: 'display: flex; flex-direction: column; gap: 10px; align-items: stretch; background: #FFFFFF; border-radius: 22px; padding: 16px; font: inherit; color: #141712; cursor: pointer; text-align: left; border: 2px solid ' + (i.id === s.sel ? '#141712' : 'transparent') + ';' })),
+      cur: { ...cur, ...chipSt(cur), lmBig: lmS(cur, 56, 16, cur.lm && cur.lm.length > 3 ? 13 : 18),
+        fields: FIELDS[cur.cat](cur).map(([l, v]) => ({ l, v })),
+        toggle: () => cur.soon ? null : this.setState({ flip: { ...s.flip, [cur.id]: !s.flip[cur.id] } }),
+        btnLabel: cur.soon ? 'Kutish ro\'yxati' : cur.on ? 'Uzish' : 'Ulash',
+        btnStyle: 'flex: 1; border: 0; border-radius: 999px; padding: 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (cur.on ? 'background: #FBEAE8; color: #8A1C12;' : 'background: #141712; color: #FFFFFF;'),
+        link: lk ? lk[0] : 'Admin-Integratsiya.dc.html', linkLabel: lk ? lk[1] : 'Hodisalar jurnali →' },
+      hooks: [['order.created', 'MoySklad · Telegram admin guruh', '37'], ['order.paid', 'MoySklad · Meta CAPI · Google Ads', '29'], ['order.shipped', 'Telegram bot · Eskiz SMS', '31'], ['cart.abandoned', 'Telegram bot (2 soat)', '18'], ['customer.created', 'MoySklad kontragent', '22'], ['stock.low', 'Telegram admin guruh', '2']].map(([e, to, n]) => ({ e, to, n }))
+    };
+  }
+}
+</script>
+</body>
+</html>

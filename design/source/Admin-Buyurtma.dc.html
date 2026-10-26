@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Buyurtma FR-240913</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="orders" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 4px; margin-right: auto;">
+        <span style="font-size: 13px; color: #5E6459;"><a href="Admin-Buyurtmalar.dc.html" style="color: #5E6459;">Buyurtmalar</a> / FR-240913 · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+        <span style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;"><h1 style="margin: 0; font-size: 34px; font-weight: 500; letter-spacing: -0.035em;">FR-240913</h1><span style="background: #EEEFEA; border: 1px solid #DADDD3; border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600;">Yig'ilmoqda</span><span style="font-size: 13px; color: #5E6459;">26.10.2026, 10:42</span></span>
+      </div>
+      <span style="border: 0; background: #FFFFFF; border-radius: 999px; padding: 12px 16px; font-size: 13px; font-weight: 600;">Chek (PDF)</span>
+      <span style="border: 1px solid #F2C2BC; color: #8A1C12; border-radius: 999px; padding: 11px 16px; font-size: 13px; font-weight: 600;">Bekor qilish</span>
+      <button type="button" onClick="{{next}}" style="display: inline-flex; align-items: center; gap: 10px; border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;"><img src="../assets/logos/yandex-delivery-on-dark.png" alt="" style="height: 11px;">{{nextLabel}}</button>
+    </header>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px 26px; display: flex; flex-wrap: wrap; gap: 20px; align-items: center;">
+      <div style="flex: 3 1 520px; display: flex; align-items: flex-start;">
+        <sc-for list="{{steps}}" as="s" hint-placeholder-count="5">
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 8px; position: relative;">
+            <span style="display: flex; align-items: center;"><span style="{{s.dot}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span style="{{s.line}}"></span></span>
+            <b style="font-size: 13px; font-weight: 600;">{{s.label}}</b>
+            <span style="font-size: 12px; color: #5E6459;">{{s.time}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: 1 1 240px; background: #F7F7F4; border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="display: flex; justify-content: space-between; font-size: 12px;"><span style="color: #5E6459;">12 soatlik Yandex muddati</span><b>{{slaLeft}}</b></span>
+        <span style="height: 8px; border-radius: 4px; background: #E3E6DD; display: block;"><span style="{{slaBar}}"></span></span>
+        <span style="font-size: 12px; color: #5E6459;">Muddat: bugun 22:42 gacha</span>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 540px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px 26px; display: flex; flex-direction: column; gap: 6px;">
+          <h2 style="margin: 0 0 8px; font-size: 18px; font-weight: 600;">Mahsulotlar</h2>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #EEEFEA; font-size: 14px;"><img src="../assets/photos/white-dresser.jpg" alt="" style="width: 52px; height: 52px; border-radius: 14px; object-fit: cover;"><span style="flex: 1;"><b style="font-weight: 600;">Chalk White mebel bo'yog'i</b><span style="display: block; font-size: 12px; color: #5E6459;">1 L · Oq · SKU FR-CW-1000</span></span><span>× 1</span><b style="width: 110px; text-align: right;">329 000</b></div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #EEEFEA; font-size: 14px;"><img src="../assets/photos/sprayer-hand.jpg" alt="" style="width: 52px; height: 52px; border-radius: 14px; object-fit: cover;"><span style="flex: 1;"><b style="font-weight: 600;">Mato bo'yog'i spreyi</b><span style="display: block; font-size: 12px; color: #5E6459;">400 ml · Zaytun · SKU FR-FS-OLV</span></span><span>× 2</span><b style="width: 110px; text-align: right;">498 000</b></div>
+          <div style="display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #EEEFEA; font-size: 14px;"><img src="../assets/photos/brush-hand.jpg" alt="" style="width: 52px; height: 52px; border-radius: 14px; object-fit: cover;"><span style="flex: 1;"><b style="font-weight: 600;">Oval 40 cho'tka</b><span style="display: block; font-size: 12px; color: #5E6459;">SKU FR-BR-40</span></span><span>× 1</span><b style="width: 110px; text-align: right;">119 000</b></div>
+          <div style="display: grid; grid-template-columns: 1fr auto; gap: 6px 20px; font-size: 14px; padding-top: 10px; font-variant-numeric: tabular-nums;"><span style="color: #5E6459;">Mahsulotlar</span><span style="text-align: right;">946 000</span><span style="color: #5E6459;">Yetkazish (Toshkent, 500 000+ bepul)</span><span style="text-align: right;">0</span><b>Jami</b><b style="text-align: right; font-size: 20px;">946 000 so'm</b></div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <div style="flex: 1 1 260px; background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <span style="display: flex; justify-content: space-between; align-items: center;"><img src="../assets/logos/payme.png" alt="Payme" style="height: 20px;"><span style="background: #E8F2EA; color: #1F5A30; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;">To'langan</span></span>
+            <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Tranzaksiya</span><b style="font-family: ui-monospace, Menlo, monospace; font-weight: 500;">6538…f21a</b></span>
+            <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Vaqt</span><b>10:43:12</b></span>
+            <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Karta</span><b>Humo · •••• 4417</b></span>
+            <span style="align-self: flex-start; border: 1px solid #DADDD3; border-radius: 999px; padding: 7px 12px; font-size: 12px; margin-top: 4px;">Pulni qaytarish</span>
+          </div>
+          <div style="flex: 1 1 260px; background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <span style="display: flex; justify-content: space-between; align-items: center;"><img src="../assets/logos/yandex-delivery.png" alt="Yandex Dostavka" style="height: 15px;"><span style="background: #EEEFEA; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600;">Kuryer chaqirilmagan</span></span>
+            <span style="display: flex; justify-content: space-between; gap: 10px;"><span style="color: #5E6459;">Manzil</span><b style="text-align: right;">Mirzo Ulug'bek, [ko'cha, uy]</b></span>
+            <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Qabul qiluvchi</span><b>+998 90 *** ** 67</b></span>
+            <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Tarif</span><b>Ekspress · API orqali</b></span>
+            <span style="align-self: flex-start; border: 1px solid #DADDD3; border-radius: 999px; padding: 7px 12px; font-size: 12px; margin-top: 4px;">Yorliq chop etish</span>
+          </div>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px 26px; display: flex; flex-direction: column; gap: 10px;">
+          <h2 style="margin: 0 0 6px; font-size: 18px; font-weight: 600;">Tizim jurnali</h2>
+          <sc-for list="{{log}}" as="l" hint-placeholder-count="6">
+            <div style="display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #F3F3EF;"><span style="color: #5E6459; font-variant-numeric: tabular-nums;">{{l.t}}</span><span>{{l.m}}</span></div>
+          </sc-for>
+          <label for="note" style="display: flex; gap: 8px; margin-top: 6px;"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Ichki izoh</span><input id="note" placeholder="Ichki izoh qo'shish (mijoz ko'rmaydi)" style="flex: 1; min-width: 0; border: 1px solid #DADDD3; border-radius: 999px; padding: 11px 16px; font: inherit; font-size: 13px;"><span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 11px 16px; font-size: 13px; font-weight: 600;">Saqlash</span></label>
+        </div>
+      </div>
+
+      <div style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <a href="Admin-Mijoz.dc.html" style="background: #141712; color: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; align-items: center; gap: 14px; text-decoration: none;">
+          <span style="width: 52px; height: 52px; border-radius: 50%; background: #334229; display: grid; place-items: center; font-size: 20px; font-weight: 600;">D</span>
+          <span style="flex: 1; display: flex; flex-direction: column; gap: 3px; font-size: 13px;"><b style="font-size: 16px; font-weight: 600;">Dilnoza Rahimova</b><span style="color: #C9CFC2;">VIP · 3-xarid · LTV 2 140 000</span></span>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+        </a>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;"><h2 style="margin: 0; font-size: 18px; font-weight: 600;">Buyurtma yo'li</h2>
+            <div role="group" aria-label="Atributsiya modeli" style="display: flex; background: #EEEFEA; border-radius: 999px; padding: 3px;"><sc-for list="{{models}}" as="m" hint-placeholder-count="3"><button type="button" onClick="{{m.pick}}" style="{{m.style}}">{{m.label}}</button></sc-for></div>
+          </div>
+          <sc-for list="{{touch}}" as="t" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 30px minmax(0, 1fr) 46px; gap: 10px; align-items: center;">
+              <span style="width: 30px; height: 30px; border-radius: 50%; background: #F7F7F4; display: grid; place-items: center;"><sc-if value="{{t.icon}}" hint-placeholder-val="{{true}}"><img src="{{t.icon}}" alt="" style="width: 16px; height: 16px;"></sc-if><sc-if value="{{t.noIcon}}" hint-placeholder-val="{{false}}"><b style="font-size: 11px;">T</b></sc-if></span>
+              <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0;"><span style="font-size: 13px;"><b style="font-weight: 600;">{{t.ch}}</b> <span style="color: #5E6459;">· {{t.date}}</span></span><span style="font-size: 12px; color: #5E6459; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{t.detail}}</span><span style="height: 6px; border-radius: 3px; background: #EEEFEA; display: block;"><span style="{{t.bar}}"></span></span></span>
+              <b style="text-align: right; font-size: 14px; font-variant-numeric: tabular-nums;">{{t.pct}}</b>
+            </div>
+          </sc-for>
+          <span style="font-size: 12px; color: #5E6459; line-height: 1.5;">Daromad ulushi tanlangan model bo'yicha kanallarga taqsimlanadi va Analitika'dagi ROAS hisobiga tushadi.</span>
+          <a href="Admin-Heatmap.dc.html" style="display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; border: 1px solid #DADDD3; border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; text-decoration: none;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Xarid sessiyasini ko'rish</a>
+        </div>
+        <div style="background: #D5DDC8; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.5;">
+          <b style="font-size: 15px;">Keyingi qadam (avtomatik)</b>
+          <span>Yetkazilgandan 3 kun keyin: Telegram orqali sharh so'rovi va foto uchun −5% kod.</span>
+          <span>21 kundan keyin: "Himoya mumi" upsell auditoriyasiga qo'shiladi.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { step: 2, model: 'linear' }; }
+  renderVals() {
+    const s = this.state;
+    const ST = [['Qabul qilindi', '10:42'], ['To\'landi', '10:43'], ['Yig\'ilmoqda', '10:58'], ['Yo\'lda', '—'], ['Yetkazildi', '—']];
+    const T = [['../assets/icons/instagram.png', 'Instagram reklama', '03.09', 'divan_oldin_keyin_reels'], ['../assets/icons/telegram.png', 'Telegram bot', '05.09', 'savol: rang mosligi'], ['../assets/icons/facebook.png', 'Facebook retarget', '24.09', 'retarget_mebel_upsell'], ['', 'To\'g\'ridan', '13.10', 'forest.uz ga o\'zi kirdi']];
+    const W = { first: [100, 0, 0, 0], last: [0, 0, 0, 100], linear: [25, 25, 25, 25] }[s.model];
+    const seg = (on) => 'border: 0; border-radius: 999px; padding: 6px 10px; font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #141712; color: #FFFFFF;' : 'background: transparent; color: #5E6459;');
+    const left = [6.3, 1.4, 0.3, 0, 0][Math.min(s.step, 4)];
+    const labels = ['To\'lovni tasdiqlash', 'Yig\'ishni boshlash', 'Yandex kuryer chaqirish', 'Yetkazildi deb belgilash', 'Yakunlangan'];
+    return {
+      steps: ST.map(([label, time], i) => ({ label, time: i <= s.step ? (i === 3 && s.step >= 3 ? 'hozir' : i === 4 && s.step >= 4 ? 'hozir' : time) : '—',
+        dot: 'width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; box-sizing: border-box; ' + (i < s.step ? 'background: #334229; color: #FFFFFF;' : i === s.step ? 'background: #141712; color: #FFFFFF; box-shadow: 0 0 0 4px #D5DDC8;' : 'background: #FFFFFF; color: transparent; border: 2px solid #DADDD3;'),
+        line: i === 4 ? 'flex: 1;' : 'flex: 1; height: 2px; margin: 0 6px; background: ' + (i < s.step ? '#334229' : '#DADDD3') + ';' })),
+      next: () => this.setState({ step: Math.min(4, s.step + 1) }),
+      nextLabel: labels[s.step],
+      slaLeft: s.step >= 4 ? 'Bajarildi' : left + ' soat qoldi',
+      slaBar: 'display: block; height: 100%; border-radius: 4px; width: ' + (s.step >= 4 ? 100 : (12 - left) / 12 * 100) + '%; background: ' + (s.step >= 4 ? '#3E8E4E' : left < 1 ? '#B42318' : '#334229') + ';',
+      models: [['first', 'Birinchi'], ['linear', 'Chiziqli'], ['last', 'Oxirgi']].map(([id, label]) => ({ label, pick: () => this.setState({ model: id }), style: seg(id === s.model) })),
+      touch: T.map(([icon, ch, date, detail], i) => ({ icon, noIcon: !icon, ch, date, detail, pct: W[i] + '%', bar: 'display: block; height: 100%; border-radius: 3px; background: #3A7D44; width: ' + W[i] + '%;' })),
+      log: [['10:42', 'Buyurtma yaratildi · sayt, mobil · promokod yo\'q'], ['10:43', 'Payme webhook: to\'lov tasdiqlandi (946 000 so\'m)'], ['10:43', 'Mijozga SMS va Telegram xabari yuborildi'], ['10:44', 'Meta CAPI va Google Ads\'ga Purchase hodisasi yuborildi'], ['10:58', 'Operator Aziz yig\'ishni boshladi'], ['10:58', 'Ombor: Chalk White 1 L qoldig\'i 41 → 40']].map(([t, m]) => ({ t, m }))
+    };
+  }
+}
+</script>
+</body>
+</html>

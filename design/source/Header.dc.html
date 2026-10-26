@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Header</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<header style="font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; background: #EEEFEA;">
+  <div style="background: #334229; color: #E6EBDF; font-size: 13px; font-weight: 500; padding: 9px 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 28px;">
+    <span style="display: inline-flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Toshkent bo'ylab <b style="color: #FFFFFF;">12 soat ichida</b> · Yandex tezkor</span>
+    <span style="display: inline-flex; align-items: center; gap: 8px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>Respublika bo'ylab <b style="color: #FFFFFF;">24 soat ichida</b> · BTS pochta</span>
+  </div>
+  <div style="max-width: 1392px; margin: 0 auto; padding: 16px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+    <a href="Main.dc.html" aria-label="Forest bosh sahifa" style="display: block; width: 120px; flex: none;"><img src="../assets/brand/forest-logo-green.png" alt="Forest" style="width: 120px; height: auto; display: block;"></a>
+    <nav aria-label="Asosiy menyu" style="display: flex; flex-wrap: wrap; gap: 4px; background: #FFFFFF; border-radius: 999px; padding: 5px; margin-left: 24px;">
+      <sc-for list="{{nav}}" as="n" hint-placeholder-count="5">
+        <a href="{{n.href}}" style="{{n.style}}">{{n.label}}</a>
+      </sc-for>
+    </nav>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 8px;">
+      <label for="hdrSearch" style="display: flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 0 16px; height: 48px; width: 240px; box-sizing: border-box;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="hdrSearch" placeholder="Mahsulot qidirish" style="border: 0; outline: none; background: transparent; font: inherit; font-size: 14px; width: 100%; color: #141712;">
+      </label>
+      <span style="display: flex; background: #FFFFFF; border-radius: 999px; padding: 4px; height: 48px; box-sizing: border-box; align-items: center;">
+        <button type="button" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 600;">UZ</button>
+        <button type="button" style="border: 0; background: transparent; color: #5E6459; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 600;">RU</button>
+      </span>
+      <a href="Kabinet.dc.html" aria-label="Shaxsiy kabinet" style="width: 48px; height: 48px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center; color: #141712;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></a>
+      <a href="Savat.dc.html" style="display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 8px 0 20px; border-radius: 999px; background: #141712; color: #FFFFFF; text-decoration: none; font-size: 14px; font-weight: 600;">Savat
+        <span style="min-width: 32px; height: 32px; border-radius: 999px; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 13px;">{{cart}}</span></a>
+    </div>
+  </div>
+</header>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["home","catalog","furniture","fabric","inspo","brand","none"],"default":"home"},"cart":{"editor":"text","default":"2"},"$preview":{"width":1440,"height":120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const active = this.props.active ?? 'home';
+    const items = [
+      ['catalog', 'Katalog', 'Katalog.dc.html'],
+      ['furniture', 'Mebel uchun', 'Katalog.dc.html'],
+      ['fabric', 'Divan uchun', 'Katalog.dc.html'],
+      ['inspo', 'Ilhom', 'Ilhom.dc.html'],
+      ['brand', 'Brend haqida', 'Brend.dc.html']
+    ];
+    const base = 'text-decoration: none; border-radius: 999px; padding: 11px 18px; font-size: 14px; font-weight: 500;';
+    return {
+      cart: this.props.cart ?? '2',
+      nav: items.map(([id, label, href]) => ({
+        label, href,
+        style: base + (id === active ? ' background: #141712; color: #FFFFFF;' : ' color: #141712;')
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

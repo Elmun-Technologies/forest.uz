@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Analitika</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="analytics" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Analitika</h1>
+        <span style="font-size: 13px; color: #5E6459;">O'z serverimizdagi birinchi tomon ma'lumotlari · 27.09–26.10 · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <span style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 14px; font-size: 13px;">Qurilma: <b>Hammasi</b><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 14px; font-size: 13px;">Manba: <b>Hammasi</b><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 14px; font-size: 13px;">Davr: <b>30 kun</b> · oldingi bilan solishtirish</span>
+      </span>
+    </header>
+
+    <nav aria-label="Bo'limlar" style="display: flex; flex-wrap: wrap; gap: 6px; background: #FFFFFF; border-radius: 999px; padding: 5px; align-self: flex-start;">
+      <a href="#live" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600;">Real vaqt</a>
+      <a href="#utm" style="text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500;">Manbalar va UTM</a>
+      <a href="#pages" style="text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500;">Kirish va chiqish</a>
+      <a href="#events" style="text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500;">Hodisalar</a>
+      <a href="#geo" style="text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500;">Qurilma va hudud</a>
+      <a href="#cohort" style="text-decoration: none; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500;">Qayta xarid</a>
+    </nav>
+
+    <!-- REALTIME -->
+    <section id="live" style="background: #141712; color: #FFFFFF; border-radius: 28px; padding: 26px 28px; display: flex; flex-wrap: wrap; gap: 28px;">
+      <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 14px;">
+        <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #A9B39E;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #5FBF6E;"></span>Hozir saytda</span>
+        <b style="font-size: 72px; font-weight: 500; letter-spacing: -0.05em; line-height: 1;">37</b>
+        <span style="font-size: 13px; color: #C9CFC2;">oxirgi 30 daqiqa, har daqiqada</span>
+        <div style="display: flex; align-items: flex-end; gap: 2px; height: 64px;">
+          <sc-for list="{{live}}" as="b" hint-placeholder-count="30"><span style="{{b}}"></span></sc-for>
+        </div>
+      </div>
+      <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+        <b style="font-size: 14px; color: #FFFFFF;">Faol sahifalar</b>
+        <span style="display: flex; justify-content: space-between; border-bottom: 1px solid #2E332A; padding-bottom: 8px;"><span>/ (bosh sahifa)</span><b>14</b></span>
+        <span style="display: flex; justify-content: space-between; border-bottom: 1px solid #2E332A; padding-bottom: 8px;"><span>/divan-toplami</span><b>9</b></span>
+        <span style="display: flex; justify-content: space-between; border-bottom: 1px solid #2E332A; padding-bottom: 8px;"><span>/checkout</span><b>5</b></span>
+        <span style="display: flex; justify-content: space-between; border-bottom: 1px solid #2E332A; padding-bottom: 8px;"><span>/chalk-white</span><b>5</b></span>
+        <span style="display: flex; justify-content: space-between;"><span>/savat</span><b>4</b></span>
+      </div>
+      <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+        <b style="font-size: 14px; color: #FFFFFF;">Hozirgi oqim</b>
+        <span style="display: flex; gap: 10px; align-items: center;"><img src="../assets/icons/instagram.png" alt="" style="width: 18px; height: 18px; background: #FFFFFF; border-radius: 5px; padding: 2px;">Instagram · divan_oldin_keyin<b style="margin-left: auto;">16</b></span>
+        <span style="display: flex; gap: 10px; align-items: center;"><img src="../assets/icons/googleads.png" alt="" style="width: 18px; height: 18px; background: #FFFFFF; border-radius: 5px; padding: 2px;">Google organik<b style="margin-left: auto;">9</b></span>
+        <span style="display: flex; gap: 10px; align-items: center;"><img src="../assets/icons/telegram.png" alt="" style="width: 18px; height: 18px; background: #FFFFFF; border-radius: 5px; padding: 2px;">Telegram kanal<b style="margin-left: auto;">7</b></span>
+        <span style="display: flex; gap: 10px; align-items: center;"><span style="width: 18px; height: 18px; border-radius: 5px; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 10px; font-weight: 700;">T</span>To'g'ridan<b style="margin-left: auto;">5</b></span>
+        <span style="margin-top: 6px; font-size: 12px; color: #A9B39E;">Toshkent 24 · Samarqand 5 · Farg'ona 3 · boshqa 5</span>
+      </div>
+    </section>
+
+    <!-- UTM -->
+    <section id="utm" style="background: #FFFFFF; border-radius: 28px; padding: 24px 28px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Manbalar va kampaniyalar (UTM)</h2><span style="font-size: 12px; color: #5E6459;">Reklama xarajati Meta, Google va TikTok API'dan avtomatik olinadi</span></div>
+      <div style="overflow-x: auto;">
+        <div style="min-width: 1000px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 64px 70px 50px 76px 96px 86px 70px; gap: 8px; padding: 10px 8px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px; text-align: right;"><span style="text-align: left;">Manba / kanal / kampaniya</span><span>Sessiya</span><span>Bounce</span><span>O'rt. vaqt</span><span>Lead</span><span>Buyurtma</span><span>Daromad</span><span>Xarajat</span><span>ROAS</span></div>
+          <sc-for list="{{utm}}" as="u" hint-placeholder-count="7">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 64px 70px 50px 76px 96px 86px 70px; gap: 8px; padding: 12px 8px; border-bottom: 1px solid #EEEFEA; align-items: center; text-align: right;">
+              <span style="text-align: left; display: inline-flex; align-items: center; gap: 10px; min-width: 0;"><sc-if value="{{u.icon}}" hint-placeholder-val="{{true}}"><img src="{{u.icon}}" alt="" style="width: 18px; height: 18px; object-fit: contain;"></sc-if><span style="display: flex; flex-direction: column; min-width: 0;"><b style="font-weight: 600;">{{u.src}}</b><span style="font-size: 12px; color: #5E6459;">{{u.camp}}</span></span></span>
+              <span>{{u.s}}</span><span>{{u.b}}</span><span>{{u.t}}</span><span>{{u.l}}</span>
+              <b style="font-weight: 600;">{{u.o}}</b><b style="font-weight: 600;">{{u.r}}</b>
+              <span style="color: #5E6459;">{{u.x}}</span>
+              <span><span style="{{u.roasStyle}}">{{u.roas}}</span></span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGES -->
+    <section id="pages" style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 600;">Kirish sahifalari</h2>
+        <sc-for list="{{entries}}" as="e" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px 70px; gap: 10px; align-items: center; font-size: 13px; font-variant-numeric: tabular-nums; padding: 8px 0; border-bottom: 1px solid #EEEFEA;">
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0;"><span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{e.p}}</span><span style="height: 6px; background: #EEEFEA; border-radius: 3px; display: block;"><span style="{{e.bar}}"></span></span></span>
+            <span style="text-align: right;">{{e.v}}</span><span style="text-align: right; color: #5E6459;">bounce {{e.b}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: 1 1 420px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 600;">Chiqib ketish nuqtalari</h2>
+        <sc-for list="{{exits}}" as="e" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 64px 70px; gap: 10px; align-items: center; font-size: 13px; font-variant-numeric: tabular-nums; padding: 8px 0; border-bottom: 1px solid #EEEFEA;">
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0;"><span style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{e.p}}</span><span style="height: 6px; background: #EEEFEA; border-radius: 3px; display: block;"><span style="{{e.bar}}"></span></span></span>
+            <span style="text-align: right;">{{e.v}}</span><span style="text-align: right; font-weight: 600;">{{e.b}}</span>
+          </div>
+        </sc-for>
+        <a href="Admin-Heatmap.dc.html" style="align-self: flex-start; margin-top: 4px; font-size: 13px; font-weight: 600;">/savat sahifasi sessiyalarini ko'rish</a>
+      </div>
+    </section>
+
+    <!-- EVENTS -->
+    <section id="events" style="background: #FFFFFF; border-radius: 28px; padding: 24px 28px; display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Hodisalar va maqsadlar</h2><span style="font-size: 12px; color: #5E6459;">Hodisani bajarganlar orasida xarid ulushi, umumiy 2,8% ga nisbatan</span></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px;">
+        <sc-for list="{{events}}" as="e" hint-placeholder-count="8">
+          <div style="border: 1px solid #DADDD3; border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 12px; color: #5E6459; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;">{{e.code}}</span>
+            <b style="font-size: 15px; font-weight: 600;">{{e.name}}</b>
+            <span style="display: flex; justify-content: space-between; align-items: baseline; font-variant-numeric: tabular-nums;"><b style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">{{e.n}}</b><span style="{{e.liftStyle}}">{{e.cr}}</span></span>
+          </div>
+        </sc-for>
+      </div>
+      <span style="display: flex; gap: 10px; align-items: flex-start; background: #E8F2EA; border-radius: 16px; padding: 12px 14px; font-size: 13px; line-height: 1.5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F6B35" stroke-width="2" style="flex: none; margin-top: 1px;" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></svg><span><b>Xulosa:</b> tanlovchidan foydalanganlar 3 barobar ko'proq xarid qiladi. Uni reklama kreativlarida va mobil hero'da birinchi o'ringa qo'yish kerak.</span></span>
+    </section>
+
+    <!-- DEVICES + GEO -->
+    <section id="geo" style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1 1 340px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Qurilmalar</h2>
+        <sc-for list="{{devices}}" as="d" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-variant-numeric: tabular-nums;">
+            <span style="display: flex; justify-content: space-between;"><b style="font-weight: 600;">{{d.n}}</b><span>{{d.share}} · konversiya <b>{{d.cr}}</b></span></span>
+            <span style="height: 22px; background: #EEEFEA; border-radius: 4px; display: block;"><span style="{{d.bar}}"></span></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: 2 1 480px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0 0 4px; font-size: 20px; font-weight: 600;">Hududlar</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 28px;">
+          <sc-for list="{{geo}}" as="g" hint-placeholder-count="10">
+            <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr) 50px; gap: 10px; align-items: center; font-size: 13px; font-variant-numeric: tabular-nums;">
+              <span>{{g.n}}</span><span style="height: 8px; background: #EEEFEA; border-radius: 4px; display: block;"><span style="{{g.bar}}"></span></span><b style="text-align: right; font-weight: 600;">{{g.v}}</b>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <!-- COHORT -->
+    <section id="cohort" style="background: #FFFFFF; border-radius: 28px; padding: 24px 28px; display: flex; flex-direction: column; gap: 14px;">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Qayta xarid (kohortlar)</h2><span style="font-size: 12px; color: #5E6459;">birinchi xarid oyi bo'yicha, keyingi oylarda qayta xarid qilganlar ulushi</span></div>
+      <div style="overflow-x: auto;">
+        <div style="min-width: 640px; max-width: 760px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: 110px 80px repeat(4, minmax(0, 1fr)); gap: 4px; color: #5E6459; font-size: 12px; text-align: center;"><span style="text-align: left;">Kohort</span><span>Mijozlar</span><span>1-oy</span><span>2-oy</span><span>3-oy</span><span>4-oy</span></div>
+          <sc-for list="{{cohorts}}" as="c" hint-placeholder-count="4">
+            <div style="display: grid; grid-template-columns: 110px 80px repeat(4, minmax(0, 1fr)); gap: 4px; align-items: center;">
+              <b style="font-weight: 600;">{{c.m}}</b><span style="text-align: center;">{{c.n}}</span>
+              <sc-for list="{{c.cells}}" as="x" hint-placeholder-count="4"><span style="{{x.style}}">{{x.v}}</span></sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const L = [22,25,28,24,30,33,29,27,31,35,38,34,32,36,40,37,33,35,39,42,38,36,34,37,41,39,36,38,35,37];
+    const bar = (w, c) => 'display: block; height: 100%; border-radius: 3px; background: ' + (c || '#3A7D44') + '; width: ' + w + '%;';
+    const roasStyle = (r) => 'display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 600; ' + (r === '—' ? 'color: #5E6459;' : parseFloat(r) >= 4 ? 'background: #E8F2EA; color: #1F5A30;' : parseFloat(r) >= 2 ? 'background: #FFF4D6; color: #6B4E00;' : 'background: #FBEAE8; color: #8A1C12;');
+    const ig = '../assets/icons/instagram.png', fb = '../assets/icons/facebook.png', gg = '../assets/icons/googleads.png', tg = '../assets/icons/telegram.png', tt = '../assets/icons/tiktok.png';
+    const U = [
+      [ig, 'instagram / cpc', 'divan_oldin_keyin_reels', '4 210', '38%', '1:52', '312', '131', '104,8 mln', '18,2 mln', '5,8x'],
+      [ig, 'instagram / cpc', 'komod_chalk_white_carousel', '1 180', '46%', '1:21', '74', '29', '17,4 mln', '6,1 mln', '2,9x'],
+      [gg, 'google / organic', '—', '3 020', '41%', '2:10', '96', '103', '78,1 mln', '—', '—'],
+      [tg, 'telegram / social', 'kanal_post_oktabr', '1 990', '29%', '2:44', '118', '84', '61,9 mln', '—', '—'],
+      [fb, 'facebook / cpc', 'retarget_savat_7kun', '640', '24%', '2:31', '21', '58', '44,7 mln', '3,4 mln', '13,1x'],
+      [tt, 'tiktok / cpc', 'test_mato_spreyi', '1 470', '68%', '0:38', '19', '6', '4,2 mln', '5,0 mln', '0,8x'],
+      ['', '(direct) / (none)', '—', '1 720', '35%', '2:02', '41', '45', '33,9 mln', '—', '—']
+    ];
+    const E = [['tanlovchi_click', 'Tanlovchi ishlatildi', '3 870', '8,6%', 3.1], ['ba_slider_move', 'Oldin/keyin surildi', '5 120', '5,2%', 1.9], ['popup_shown', 'Popup ko\'rsatildi', '6 450', '2,1%', 0.75], ['lead_phone', 'Raqam qoldirildi', '681', '21,4%', 7.6], ['telegram_click', 'Telegram bosildi', '904', '9,8%', 3.5], ['add_to_cart', 'Savatga qo\'shildi', '1 410', '28,2%', 10.1], ['begin_checkout', 'Checkout boshlandi', '690', '57,7%', 20.6], ['purchase', 'Xarid', '398', '100%', 0]];
+    const seq = ['#F1F5EC', '#D9E6CC', '#B6CF9F', '#86AD6E', '#4E7F45'];
+    const cell = (v) => { const i = v >= 20 ? 4 : v >= 14 ? 3 : v >= 9 ? 2 : v >= 4 ? 1 : 0; return 'text-align: center; padding: 10px 6px; border-radius: 4px; font-weight: 600; background: ' + seq[i] + '; color: ' + (i >= 4 ? '#FFFFFF' : '#141712') + ';'; };
+    const C = [['Iyul', 214, [18, 11, 9, 7]], ['Avgust', 287, [21, 14, 10, null]], ['Sentyabr', 342, [24, 15, null, null]], ['Oktabr', 398, [null, null, null, null]]];
+    return {
+      live: L.map(v => 'flex: 1; height: ' + (v / 42 * 100) + '%; background: #5FBF6E; border-radius: 2px 2px 0 0; opacity: 0.85;'),
+      utm: U.map(([icon, src, camp, s, b, t, l, o, r, x, roas]) => ({ icon, src, camp, s, b, t, l, o, r, x, roas, roasStyle: roasStyle(roas) })),
+      entries: [['/ (bosh sahifa)', 6120, '34%'], ['/divan-toplami', 3240, '29%'], ['/chalk-white', 1810, '37%'], ['/ilhom/burchak-divan', 1290, '22%'], ['/katalog', 980, '41%']].map(([p, v, b]) => ({ p, v: String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '), b, bar: bar(v / 6120 * 100) })),
+      exits: [['/savat', 920, '51%'], ['/checkout (to\'lov tanlash)', 410, '42%'], ['/chalk-white', 760, '38%'], ['/ (bosh sahifa)', 2080, '34%'], ['/katalog', 402, '41%']].map(([p, v, b]) => ({ p, v: String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '), b, bar: bar(parseFloat(b) / 51 * 100, '#C9692C') })),
+      events: E.map(([code, name, n, cr, lift]) => ({ code, name, n, cr: lift ? cr + ' · ' + lift.toString().replace('.', ',') + 'x' : 'maqsad', liftStyle: 'font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 9px; ' + (lift >= 2 ? 'background: #E8F2EA; color: #1F5A30;' : lift === 0 ? 'background: #EEEFEA; color: #141712;' : 'background: #FFF4D6; color: #6B4E00;') })),
+      devices: [['Mobil', 78, '2,4%'], ['Desktop', 19, '4,6%'], ['Planshet', 3, '2,9%']].map(([n, s, cr]) => ({ n, share: s + '%', cr, bar: bar(s) })),
+      geo: [['Toshkent sh.', 6480], ['Toshkent vil.', 1240], ['Samarqand', 1120], ['Farg\'ona', 910], ['Andijon', 780], ['Namangan', 720], ['Buxoro', 640], ['Qashqadaryo', 590], ['Surxondaryo', 410], ['Boshqa', 1340]].map(([n, v]) => ({ n, v: String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ' '), bar: bar(v / 6480 * 100) })),
+      cohorts: C.map(([m, n, xs]) => ({ m, n, cells: xs.map(v => v == null ? { v: '', style: 'background: #F7F7F4; border-radius: 4px; height: 40px; display: block;' } : { v: v + '%', style: cell(v) }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

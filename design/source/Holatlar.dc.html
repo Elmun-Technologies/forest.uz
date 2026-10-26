@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Xato va chekka holatlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 40px 24px 64px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+  <header style="max-width: 1392px; width: 100%; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <span style="font-size: 13px; color: #5E6459; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">Holatlar</span>
+      <h1 style="margin: 0; font-size: 56px; line-height: 1; font-weight: 500; letter-spacing: -0.045em;">Hech qachon «o'lik nuqta» yo'q</h1>
+    </div>
+    <span style="max-width: 460px; font-size: 14px; color: #5E6459; line-height: 1.55;">Har xato ekranida bitta asosiy chiqish yo'li va bitta muqobil bor. Matn aybni mijozga yuklamaydi.</span>
+  </header>
+
+  <div style="max-width: 1392px; width: 100%; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 16px;">
+
+    <section style="background: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="align-self: flex-start; background: #FBEAE8; color: #8A1C12; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">1 · To'lov o'tmadi</span>
+      <span style="width: 64px; height: 64px; border-radius: 50%; background: #FBEAE8; display: grid; place-items: center;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8A1C12" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h3"/></svg></span>
+      <h2 style="margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -0.03em;">To'lov yakunlanmadi</h2>
+      <p style="margin: 0; font-size: 15px; line-height: 1.6; color: #3F453B;">Buyurtma <b>#F-10490</b> saqlandi va 30 daqiqa band qilib turiladi. Pul yechilmagan. Boshqa usul bilan urinib ko'ring:</p>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+        <span style="border: 2px solid #141712; border-radius: 16px; padding: 14px; display: grid; place-items: center;"><img src="../assets/logos/payme.png" alt="Payme" style="height: 20px;"></span>
+        <span style="border: 1px solid #DADDD3; border-radius: 16px; padding: 14px; display: grid; place-items: center;"><img src="../assets/logos/click.png" alt="Click" style="height: 20px;"></span>
+        <span style="border: 1px solid #DADDD3; border-radius: 16px; padding: 14px; display: grid; place-items: center; font-size: 13px; font-weight: 600; text-align: center;">Olganda to'lash</span>
+      </div>
+      <span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 16px; text-align: center; font-size: 15px; font-weight: 600;">Payme orqali qayta to'lash</span>
+      <span style="font-size: 13px; color: #5E6459; text-align: center;">Admin'ga signal: «to'lov xatosi» · bot 15 daqiqadan keyin eslatadi</span>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="align-self: flex-start; background: #FFF4D6; color: #6B4E00; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">2 · Mahsulot tugagan</span>
+      <div style="display: flex; gap: 18px; align-items: center;">
+        <span style="position: relative; flex: none;"><img src="../assets/photos/wax-varnish.jpg" alt="" style="width: 120px; height: 120px; border-radius: 22px; object-fit: cover; filter: grayscale(0.6); opacity: 0.8;"><span style="position: absolute; left: 8px; top: 8px; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700;">Tez orada</span></span>
+        <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 20px; font-weight: 600;">Himoya mumi Clear · 250 ml</b><span style="font-size: 14px; color: #5E6459;">Keyingi partiya: ~[5] kunda</span></span>
+      </div>
+      <sc-if value="{{waitDone}}" hint-placeholder-val="{{false}}">
+        <span style="background: #E8F2EA; color: #1F6B35; border-radius: 18px; padding: 16px; font-size: 14px; font-weight: 600;">✓ Kelishi bilan Telegram/SMS orqali xabar beramiz.</span>
+      </sc-if>
+      <sc-if value="{{waitOpen}}" hint-placeholder-val="{{true}}">
+        <label for="waitPhone" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600;">Kelganda xabar beraylik
+          <span style="display: flex; gap: 8px;"><input id="waitPhone" value="+998 90 " style="flex: 1; min-width: 0; border: 1px solid #DADDD3; border-radius: 999px; padding: 14px 18px; font: inherit; font-size: 15px; font-weight: 400;"><button type="button" onClick="{{joinWait}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 0 20px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">Xabar bering</button></span>
+        </label>
+      </sc-if>
+      <span style="font-size: 13px; font-weight: 600;">Hozir bor muqobil:</span>
+      <span style="display: flex; gap: 12px; align-items: center; background: #F7F7F4; border-radius: 18px; padding: 10px;"><img src="../assets/photos/wax-varnish.jpg" alt="" style="width: 48px; height: 48px; border-radius: 12px; object-fit: cover;"><span style="flex: 1; font-size: 14px;">Himoya mumi Clear · 500 ml</span><b style="font-size: 14px;">279 000</b><span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 600;">+ Savat</span></span>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="align-self: flex-start; background: #EEEFEA; color: #5E6459; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">3 · Bo'sh savat</span>
+      <h2 style="margin: 0; font-size: 30px; font-weight: 500; letter-spacing: -0.03em;">Savat hozircha bo'sh</h2>
+      <p style="margin: 0; font-size: 15px; color: #3F453B; line-height: 1.6;">Nima yangilamoqchisiz? Bitta savol — to'g'ri to'plamni tanlab beramiz.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;">
+        <a href="Katalog.dc.html" style="position: relative; height: 150px; border-radius: 22px; overflow: hidden; text-decoration: none;"><img src="../assets/photos/white-dresser.jpg" alt="" style="width: 100%; height: 100%; object-fit: cover;"><span style="position: absolute; left: 10px; bottom: 10px; background: #FFFFFF; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;">Mebel →</span></a>
+        <a href="Katalog.dc.html" style="position: relative; height: 150px; border-radius: 22px; overflow: hidden; text-decoration: none;"><img src="../assets/photos/green-couch.jpg" alt="" style="width: 100%; height: 100%; object-fit: cover;"><span style="position: absolute; left: 10px; bottom: 10px; background: #FFFFFF; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;">Divan →</span></a>
+      </div>
+      <span style="font-size: 13px; color: #5E6459;">Avval ko'rganlaringiz: Chalk White · Mato spreyi (cookie'dan)</span>
+    </section>
+
+    <section style="background: #141712; color: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="align-self: flex-start; background: #2E332A; color: #D5DDC8; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">4 · 404</span>
+      <b style="font-size: 120px; line-height: 0.9; font-weight: 500; letter-spacing: -0.06em; color: #D5DDC8;">404</b>
+      <h2 style="margin: 0; font-size: 28px; font-weight: 500; letter-spacing: -0.03em;">Bu sahifa bo'yalib ketganga o'xshaydi</h2>
+      <label for="nfSearch" style="display: flex; align-items: center; gap: 10px; background: #23271F; border-radius: 999px; padding: 0 18px; height: 52px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A9B59C" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="nfSearch" placeholder="Mahsulot qidirish" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: #FFFFFF; font: inherit; font-size: 15px;"></label>
+      <span style="display: flex; flex-wrap: wrap; gap: 8px;"><a href="Main.dc.html" style="background: #FFFFFF; color: #141712; border-radius: 999px; padding: 12px 18px; font-size: 14px; font-weight: 600; text-decoration: none;">Bosh sahifa</a><a href="Katalog.dc.html" style="border: 1px solid #3A4035; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font-size: 14px; font-weight: 600; text-decoration: none;">Katalog</a></span>
+      <span style="font-size: 12px; color: #8D9586;">Har 404 admin SEO markazida qayd etiladi → 301 yo'naltirish taklif qilinadi.</span>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="align-self: flex-start; background: #EEEFEA; color: #5E6459; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">5 · Qidiruvda natija yo'q</span>
+      <span style="display: flex; align-items: center; gap: 10px; border: 1px solid #DADDD3; border-radius: 999px; padding: 0 18px; height: 52px; font-size: 15px;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>kraska dlya kozhi</span>
+      <p style="margin: 0; font-size: 15px; color: #3F453B; line-height: 1.6;">«Teri» uchun bo'yoq bizda yo'q. Mato va yog'och uchun bor — mos kelishi mumkin:</p>
+      <span style="display: flex; flex-wrap: wrap; gap: 8px;"><span style="background: #EEEFEA; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 600;">Mato bo'yog'i spreyi</span><span style="background: #EEEFEA; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 600;">Tozalovchi</span><span style="background: #EEEFEA; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 600;">Mutaxassisdan so'rash</span></span>
+      <span style="font-size: 12px; color: #5E6459;">Kiril/lotin, RU/UZ va xatolar (krаska → kraska → bo'yoq) sinonimlar lug'ati orqali topiladi. Natijasiz so'rovlar adminda ro'yxat bo'ladi.</span>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 36px; padding: 32px; display: flex; flex-direction: column; gap: 16px;">
+      <span style="align-self: flex-start; background: #EEEFEA; color: #5E6459; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 700;">6 · Forma xatolari</span>
+      <label for="errPhone" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600;">Telefon
+        <input id="errPhone" value="+998 90 12" aria-invalid="true" style="border: 1.5px solid #B42318; border-radius: 16px; padding: 14px 16px; font: inherit; font-size: 15px; font-weight: 400;">
+        <span style="color: #B42318; font-weight: 500; font-size: 13px;">Raqam to'liq emas: 9 ta raqam kerak (90 123 45 67)</span>
+      </label>
+      <label for="errPromo" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600;">Promo-kod
+        <span style="display: flex; gap: 8px;"><input id="errPromo" value="SALOM10" style="flex: 1; min-width: 0; border: 1.5px solid #9A6700; border-radius: 16px; padding: 14px 16px; font: inherit; font-size: 15px; font-weight: 400;"><span style="border: 1px solid #DADDD3; border-radius: 16px; padding: 14px 16px; font-size: 14px; font-weight: 600;">Qo'llash</span></span>
+        <span style="color: #6B4E00; font-weight: 500; font-size: 13px;">Bu kod faqat birinchi buyurtma uchun. Sizda RAHMAT5 bor — qo'llaymi?</span>
+      </label>
+      <span style="display: flex; align-items: center; gap: 10px; background: #FFF4D6; color: #6B4E00; border-radius: 16px; padding: 14px 16px; font-size: 13px; font-weight: 600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4M12 17h.01M10.3 3.9 2 18a2 2 0 0 0 1.7 3h16.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>Internet uzildi. Savatingiz saqlangan — aloqa tiklanishi bilan davom etamiz.</span>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2000}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { wait: false }; }
+  renderVals() {
+    return { waitDone: this.state.wait, waitOpen: !this.state.wait, joinWait: () => this.setState({ wait: true }) };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Katalog</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#EEEFEA}
+a{color:#141712}a:hover{color:#334229}
+</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712;">
+<dc-import name="Header" active="catalog" cart="2" hint-size="100%,96px"></dc-import>
+<div style="max-width: 1392px; margin: 0 auto; padding: 8px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+
+<!-- TITLE + CATEGORIES -->
+<section style="background: #FFFFFF; border-radius: 40px; padding: 40px 48px 48px; display: flex; flex-direction: column; gap: 36px;">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <span style="font-size: 13px; color: #5E6459;"><a href="Main.dc.html" style="color: #5E6459; text-decoration: none;">Bosh sahifa</a> / Katalog</span>
+      <h1 style="margin: 0; font-size: 96px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">Katalog</h1>
+    </div>
+    <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 10px 18px; font-size: 14px; color: #5E6459;">8 ta mahsulot</span>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px;">
+    <sc-for list="{{cats}}" as="c" hint-placeholder-count="4">
+      <a href="Katalog.dc.html" style="{{c.style}}">
+        <img src="{{c.img}}" alt="" style="width: 72px; height: 72px; border-radius: 50%; object-fit: cover; flex: none;">
+        <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+          <span style="font-size: 17px; font-weight: 600;">{{c.name}}</span>
+          <span style="{{c.subStyle}}">{{c.count}}</span>
+        </span>
+      </a>
+    </sc-for>
+  </div>
+</section>
+
+<!-- FILTERS + GRID -->
+<section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <aside aria-label="Filtrlar" style="flex: 1 1 280px; max-width: 320px; background: #FFFFFF; border-radius: 32px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 20px; font-weight: 600;">Filtrlar</span>
+      <button type="button" style="border: 0; background: none; font: inherit; font-size: 13px; color: #5E6459; text-decoration: underline; padding: 0;">Tozalash</button>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #DADDD3; padding-top: 20px;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Yuza turi</span>
+      <label style="display: flex; gap: 10px; align-items: center; font-size: 15px;"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #334229;">Yog'och va MDF</label>
+      <label style="display: flex; gap: 10px; align-items: center; font-size: 15px;"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #334229;">Lakli yuza</label>
+      <label style="display: flex; gap: 10px; align-items: center; font-size: 15px;"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #334229;">Metall</label>
+      <label style="display: flex; gap: 10px; align-items: center; font-size: 15px;"><input type="checkbox" style="width: 18px; height: 18px; accent-color: #334229;">Mato (velur, paxta)</label>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #DADDD3; padding-top: 20px;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Rang</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+        <button type="button" aria-label="Oq" style="width: 36px; height: 36px; border-radius: 50%; background: #F7F6F2; border: 2px solid #141712; box-shadow: inset 0 0 0 3px #FFFFFF;"></button>
+        <button type="button" aria-label="Antrasit" style="width: 36px; height: 36px; border-radius: 50%; background: #3B3E40; border: 1px solid #DADDD3;"></button>
+        <button type="button" aria-label="Zaytun" style="width: 36px; height: 36px; border-radius: 50%; background: #56603C; border: 1px solid #DADDD3;"></button>
+        <button type="button" aria-label="Bej" style="width: 36px; height: 36px; border-radius: 50%; background: #C7B796; border: 1px solid #DADDD3;"></button>
+        <button type="button" aria-label="Kulrang" style="width: 36px; height: 36px; border-radius: 50%; background: #8E918C; border: 1px solid #DADDD3;"></button>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #DADDD3; padding-top: 20px;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Hajmi</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 8px 14px; font-size: 14px;">0,5 L</span>
+        <span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 8px 14px; font-size: 14px;">1 L</span>
+        <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 8px 14px; font-size: 14px;">2,5 L</span>
+        <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 8px 14px; font-size: 14px;">400 ml</span>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 14px; border-top: 1px solid #DADDD3; padding-top: 20px;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Narx, so'm</span>
+      <div style="position: relative; height: 4px; background: #E3E6DD; border-radius: 2px;">
+        <span style="position: absolute; left: 8%; right: 30%; top: 0; bottom: 0; background: #334229; border-radius: 2px;"></span>
+        <span style="position: absolute; left: 8%; top: -8px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: #FFFFFF; border: 2px solid #334229;"></span>
+        <span style="position: absolute; left: 70%; top: -8px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%; background: #FFFFFF; border: 2px solid #334229;"></span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <span style="flex: 1; border: 1px solid #DADDD3; border-radius: 14px; padding: 10px 12px; font-size: 14px; font-variant-numeric: tabular-nums;">79 000</span>
+        <span style="flex: 1; border: 1px solid #DADDD3; border-radius: 14px; padding: 10px 12px; font-size: 14px; font-variant-numeric: tabular-nums;">599 000</span>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #DADDD3; padding-top: 20px;">
+      <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Brend / sotuvchi</span>
+      <label style="display: flex; gap: 10px; align-items: center; font-size: 15px;"><input type="checkbox" checked style="width: 18px; height: 18px; accent-color: #334229;">Forest <span style="margin-left: auto; font-size: 12px; color: #5E6459;">rasmiy</span></label>
+      <span style="font-size: 12px; color: #5E6459; line-height: 1.5;">Marketplace bosqichida boshqa sotuvchilar shu ro'yxatga qo'shiladi.</span>
+    </div>
+    <label style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #DADDD3; padding-top: 20px; font-size: 15px;">Faqat chegirmadagilar
+      <span style="width: 44px; height: 26px; border-radius: 999px; background: #DADDD3; position: relative; flex: none;"><span style="position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF;"></span></span>
+    </label>
+  </aside>
+
+  <div style="flex: 999 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 9px 14px 9px 16px; font-size: 13px; font-weight: 500;">Yog'och va MDF <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
+        <span style="display: inline-flex; align-items: center; gap: 8px; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 9px 14px 9px 16px; font-size: 13px; font-weight: 500;">1 L <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></span>
+      </div>
+      <button type="button" style="display: inline-flex; align-items: center; gap: 10px; border: 0; background: #FFFFFF; border-radius: 999px; padding: 12px 20px; font: inherit; font-size: 14px; font-weight: 500;">Saralash: Ommabop
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px;">
+      <sc-for list="{{first}}" as="p" hint-placeholder-count="5">
+        <a href="Mahsulot.dc.html" style="display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; border-radius: 32px; padding: 12px 12px 24px; text-decoration: none; color: #141712;">
+          <span style="position: relative; display: block; aspect-ratio: 4 / 5; border-radius: 24px; overflow: hidden; background: #E3E6DD;">
+            <img src="{{p.img}}" alt="{{p.name}}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+            <sc-if value="{{p.badge}}" hint-placeholder-val="{{true}}"><span style="position: absolute; top: 14px; left: 14px; background: #FFFFFF; border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600;">{{p.badge}}</span></sc-if>
+            <span style="position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.92); display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+            <span style="position: absolute; right: 14px; bottom: 14px; width: 48px; height: 48px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </span>
+          <span style="display: flex; flex-direction: column; gap: 6px; padding: 0 12px;">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">{{p.cat}}</span>
+            <span style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">{{p.name}}</span>
+            <span style="font-size: 13px; color: #5E6459;">{{p.vol}}</span>
+            <span style="display: flex; align-items: baseline; gap: 8px; margin-top: 6px;">
+              <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{p.price}}</span>
+              <s style="font-size: 13px; color: #5E6459;">{{p.old}}</s>
+            </span>
+          </span>
+        </a>
+      </sc-for>
+      <a href="Mahsulot.dc.html" style="grid-column: span 1; min-height: 420px; background: #141712; color: #FFFFFF; border-radius: 32px; padding: 32px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; text-decoration: none; position: relative; overflow: hidden;">
+        <img src="../assets/photos/dark-fabric.jpg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.35;">
+        <span style="position: relative; align-self: flex-start; background: #D5DDC8; color: #141712; border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 600;">−10% to'plamda</span>
+        <span style="position: relative; display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05;">Komod uchun hammasi bir qutida</span>
+          <span style="font-size: 14px; color: #C9CFC2;">Bo'yoq 1 L, mum va cho'tka</span>
+          <span style="align-self: flex-start; background: #FFFFFF; color: #141712; border-radius: 999px; padding: 12px 20px; font-size: 14px; font-weight: 600;">549 000 so'm</span>
+        </span>
+      </a>
+      <sc-for list="{{rest}}" as="p" hint-placeholder-count="3">
+        <a href="Mahsulot.dc.html" style="display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; border-radius: 32px; padding: 12px 12px 24px; text-decoration: none; color: #141712;">
+          <span style="position: relative; display: block; aspect-ratio: 4 / 5; border-radius: 24px; overflow: hidden; background: #E3E6DD;">
+            <img src="{{p.img}}" alt="{{p.name}}" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+            <sc-if value="{{p.badge}}" hint-placeholder-val="{{true}}"><span style="position: absolute; top: 14px; left: 14px; background: #FFFFFF; border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600;">{{p.badge}}</span></sc-if>
+            <span style="position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,0.92); display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+            <span style="position: absolute; right: 14px; bottom: 14px; width: 48px; height: 48px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </span>
+          <span style="display: flex; flex-direction: column; gap: 6px; padding: 0 12px;">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">{{p.cat}}</span>
+            <span style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">{{p.name}}</span>
+            <span style="font-size: 13px; color: #5E6459;">{{p.vol}}</span>
+            <span style="display: flex; align-items: baseline; gap: 8px; margin-top: 6px;">
+              <span style="font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums;">{{p.price}}</span>
+              <s style="font-size: 13px; color: #5E6459;">{{p.old}}</s>
+            </span>
+          </span>
+        </a>
+      </sc-for>
+    </div>
+    <div style="display: flex; justify-content: center; gap: 8px; padding-top: 16px;">
+      <span style="width: 48px; height: 48px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center; font-weight: 600;">1</span>
+      <span style="width: 48px; height: 48px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center; font-weight: 600;">2</span>
+      <button type="button" style="border: 1.5px solid #141712; background: transparent; border-radius: 999px; padding: 0 22px; height: 48px; font: inherit; font-size: 14px; font-weight: 500;">Yana ko'rsatish</button>
+    </div>
+  </div>
+</section>
+
+<!-- SEO / HELP STRIP -->
+<section style="display: flex; flex-wrap: wrap; gap: 16px;">
+  <div style="flex: 2 1 560px; background: #FFFFFF; border-radius: 32px; padding: 36px 40px; display: flex; flex-direction: column; gap: 12px;">
+    <h2 style="margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">Mebel va mato uchun bo'yoqni qanday tanlash kerak</h2>
+    <p style="margin: 0; color: #5E6459; line-height: 1.7; max-width: 760px;">Yog'och, MDF va lakli yuzalar uchun matli Chalk paint, divan va kreslo matosi uchun esa tolaga singadigan sprey mos keladi. Kerakli miqdorni mahsulot sahifasidagi kalkulyator yordamida hisoblang.</p>
+  </div>
+  <a href="Ilhom.dc.html" style="flex: 1 1 320px; background: #334229; color: #FFFFFF; border-radius: 32px; padding: 36px 40px; display: flex; justify-content: space-between; align-items: center; gap: 16px; text-decoration: none;">
+    <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">Bepul maslahat olish</span>
+    <span style="width: 56px; height: 56px; border-radius: 50%; background: #FFFFFF; color: #141712; display: grid; place-items: center; flex: none;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></span>
+  </a>
+</section>
+</div>
+<dc-import name="Footer" hint-size="100%,520px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const P = [
+      { name: "Chalk White mebel bo'yog'i", cat: "Mebel uchun", vol: "0,5 L · 1 L · 2,5 L", price: "dan 189 000 so'm", old: "", img: "../assets/photos/white-dresser.jpg", badge: "Xit" },
+      { name: "Mato bo'yog'i spreyi", cat: "Mato uchun", vol: "400 ml · 4 rang", price: "249 000 so'm", old: "", img: "../assets/photos/sprayer-hand.jpg", badge: "Yangi" },
+      { name: "Mato tozalovchi sprey", cat: "Mato uchun", vol: "500 ml", price: "149 000 so'm", old: "", img: "../assets/photos/green-spray-bottle.jpg", badge: "" },
+      { name: "Himoya mumi Clear", cat: "Mebel uchun", vol: "250 ml · 500 ml", price: "dan 159 000 so'm", old: "", img: "../assets/photos/wax-varnish.jpg", badge: "" },
+      { name: "Oval 40 cho'tka", cat: "Aksessuar", vol: "40 mm, aralash tola", price: "119 000 so'm", old: "", img: "../assets/photos/brush-hand.jpg", badge: "" },
+      { name: "Mikrofibra valik 10 sm", cat: "Aksessuar", vol: "Ruchka bilan", price: "79 000 so'm", old: "", img: "../assets/photos/painting-materials.jpg", badge: "" },
+      { name: "Mebel yangilash to'plami", cat: "To'plam", vol: "Bo'yoq 1 L, mum, cho'tka", price: "549 000 so'm", old: "607 000", img: "../assets/photos/white-shelf-bedroom.jpg", badge: "-10%" },
+      { name: "Divan yangilash to'plami", cat: "To'plam", vol: "Tozalovchi + 3 sprey", price: "799 000 so'm", old: "896 000", img: "../assets/photos/classic-green-sofa.jpg", badge: "-11%" }
+    ];
+    const cats = [
+      ['Hammasi', '8 mahsulot', '../assets/photos/hero-brand.jpg', true],
+      ['Mebel uchun', '2 mahsulot', '../assets/photos/white-dresser.jpg', false],
+      ['Mato uchun', '2 mahsulot', '../assets/photos/green-fabric.jpg', false],
+      ['Aksessuarlar', '2 mahsulot', '../assets/photos/brushes-jar.jpg', false],
+      ['To\'plamlar', '2 mahsulot', '../assets/photos/white-couch.jpg', false]
+    ];
+    const cardBase = 'display: flex; align-items: center; gap: 16px; border-radius: 999px; padding: 10px 24px 10px 10px; text-decoration: none;';
+    return {
+      first: P.slice(0, 5),
+      rest: P.slice(5),
+      cats: cats.map(([name, count, img, on]) => ({
+        name, count, img,
+        style: cardBase + (on ? ' background: #141712; color: #FFFFFF;' : ' background: #EEEFEA; color: #141712;'),
+        subStyle: 'font-size: 13px; color: ' + (on ? '#C9CFC2;' : '#5E6459;')
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

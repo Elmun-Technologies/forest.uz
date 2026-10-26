@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Menyu</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<nav aria-label="Admin menyusi" style="font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; background: #141712; color: #C9CFC2; border-radius: 28px; padding: 22px 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; min-height: 1060px;">
+  <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 8px;">
+    <img src="../assets/brand/forest-logo-white.png" alt="Forest" style="width: 104px; height: auto; display: block;">
+    <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.08em; background: #334229; color: #D5DDC8; border-radius: 999px; padding: 4px 9px;">ADMIN</span>
+  </div>
+  <label for="navSearch" style="display: flex; align-items: center; gap: 8px; background: #23271F; border-radius: 14px; padding: 0 12px; height: 42px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8D9586" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="navSearch" placeholder="Buyurtma, mijoz, telefon" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: #FFFFFF; font: inherit; font-size: 13px;">
+  </label>
+  <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <span style="padding: 0 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #6E7768;">{{g.label}}</span>
+      <sc-for list="{{g.items}}" as="n" hint-placeholder-count="3">
+        <a href="{{n.href}}" style="{{n.style}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{n.icon}}"/></svg>
+          <span style="flex: 1;">{{n.label}}</span>
+          <sc-if value="{{n.badge}}" hint-placeholder-val="{{false}}"><span style="{{n.badgeStyle}}">{{n.badge}}</span></sc-if>
+        </a>
+      </sc-for>
+    </div>
+  </sc-for>
+  <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 10px; border: 1px solid #2E332A; color: #FFFFFF; text-decoration: none; border-radius: 14px; padding: 11px 12px; font-size: 13px; font-weight: 500;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>Saytni ochish</a>
+    <div style="display: flex; align-items: center; gap: 10px; padding: 6px 8px;">
+      <span style="width: 36px; height: 36px; border-radius: 50%; background: #D5DDC8; color: #141712; display: grid; place-items: center; font-size: 14px; font-weight: 700;">E</span>
+      <span style="display: flex; flex-direction: column; font-size: 13px; line-height: 1.3;"><b style="color: #FFFFFF; font-weight: 600;">Elmurodov</b><span style="font-size: 12px;">Egasi · barcha huquqlar</span></span>
+    </div>
+  </div>
+</nav>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["dashboard","analytics","heatmap","orders","customers","audiences","bot","products","stock","reviews","promo","seo","integrations","settings"],"default":"dashboard"},"$preview":{"width":264,"height":1250}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const a = this.props.active ?? 'dashboard';
+    const ic = {
+      dashboard: 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z',
+      analytics: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+      heatmap: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+      orders: 'M6 7h12l-1 13H7L6 7zM9 7a3 3 0 0 1 6 0',
+      customers: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c1-4 4-6 7-6s6 2 7 6M17 11a3 3 0 1 0 0-6M22 20c-.6-2.5-2-4-4-4.6',
+      audiences: 'M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 15v7M2 12h3M19 12h3',
+      products: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
+      bot: 'M21 4 3 11l6 2 2 6 3-4 5 4z',
+      stock: 'M3 21V9l9-6 9 6v12M7 21v-8h10v8M7 17h10',
+      reviews: 'm12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
+      promo: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
+      seo: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5M8 11h6M11 8v6',
+      integrations: 'M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
+      settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M6.3 17.7l1.4-1.4M16.3 7.7l1.4-1.4'
+    };
+    const G = [
+      ['Asosiy', [['dashboard', 'Dashboard', 'Admin-Dashboard.dc.html', ''], ['analytics', 'Analitika', 'Admin-Analitika.dc.html', 'LIVE'], ['heatmap', 'Heatmap va sessiyalar', 'Admin-Heatmap.dc.html', '']]],
+      ['Savdo', [['orders', 'Buyurtmalar', 'Admin-Buyurtmalar.dc.html', '12'], ['customers', 'Mijozlar', 'Admin-Mijozlar.dc.html', ''], ['audiences', 'Auditoriyalar', 'Admin-Auditoriya.dc.html', ''], ['bot', 'Telegram bot', 'Admin-Bot.dc.html', '3']]],
+      ['Katalog', [['products', 'Mahsulotlar', 'Admin-Mahsulotlar.dc.html', ''], ['stock', 'MoySklad', 'Admin-MoySklad.dc.html', ''], ['reviews', 'Sharhlar va fotolar', 'Admin-Sharhlar.dc.html', '4']]],
+      ['Marketing', [['promo', 'Promo-kodlar', 'Admin-Promo.dc.html', ''], ['seo', 'SEO markazi', 'Admin-SEO.dc.html', ''], ['integrations', 'Integratsiyalar', 'Admin-Integratsiya.dc.html', ''], ['settings', 'Sozlamalar', 'Admin-Sozlamalar.dc.html', '']]]
+    ];
+    const base = 'display: flex; align-items: center; gap: 12px; text-decoration: none; border-radius: 14px; padding: 11px 12px; font-size: 14px; font-weight: 500;';
+    return {
+      groups: G.map(([label, items]) => ({ label, items: items.map(([id, l, href, badge]) => ({
+        label: l, href, icon: ic[id], badge,
+        style: base + (id === a ? ' background: #FFFFFF; color: #141712;' : ' color: #C9CFC2;'),
+        badgeStyle: 'font-size: 10px; font-weight: 700; border-radius: 999px; padding: 3px 8px; ' + (badge === 'LIVE' ? 'background: #3E8E4E; color: #FFFFFF;' : 'background: #D5DDC8; color: #141712;')
+      })) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

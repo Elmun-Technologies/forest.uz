@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Savat</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#EEEFEA}
+a{color:#141712}a:hover{color:#334229}
+</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712;">
+<dc-import name="Header" active="none" cart="4" hint-size="100%,96px"></dc-import>
+<div style="max-width: 1392px; margin: 0 auto; padding: 8px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+
+<section style="background: #FFFFFF; border-radius: 40px; padding: 40px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 13px; color: #5E6459;"><a href="Main.dc.html" style="color: #5E6459; text-decoration: none;">Bosh sahifa</a> / Savat</span>
+    <h1 style="margin: 0; font-size: 96px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">Savat</h1>
+  </div>
+  <div style="display: flex; align-items: center; gap: 0;">
+    <span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 10px 18px; font-size: 14px; font-weight: 600;">1 · Savat</span>
+    <span style="width: 32px; height: 1px; background: #DADDD3;"></span>
+    <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 10px 18px; font-size: 14px; color: #5E6459;">2 · Ma'lumotlar</span>
+    <span style="width: 32px; height: 1px; background: #DADDD3;"></span>
+    <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 10px 18px; font-size: 14px; color: #5E6459;">3 · To'lov</span>
+  </div>
+</section>
+
+<section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="background: #FFFFFF; border-radius: 32px; padding: 24px 32px; display: flex; flex-direction: column; gap: 12px;">
+      <span style="font-size: 15px;">{{freeText}}</span>
+      <span style="height: 8px; border-radius: 999px; background: #EEEFEA; overflow: hidden; display: block;"><span style="{{barStyle}}"></span></span>
+    </div>
+    <div style="background: #FFFFFF; border-radius: 32px; padding: 8px 32px;">
+      <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 20px; padding: 24px 0; border-bottom: 1px solid #DADDD3;">
+          <img src="{{l.img}}" alt="{{l.name}}" style="width: 120px; height: 120px; border-radius: 24px; object-fit: cover; flex: none;">
+          <div style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+            <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">{{l.seller}}</span>
+            <span style="font-size: 19px; font-weight: 600; letter-spacing: -0.01em;">{{l.name}}</span>
+            <span style="font-size: 14px; color: #5E6459;">{{l.variant}}</span>
+          </div>
+          <span style="display: inline-flex; align-items: center; border: 1px solid #DADDD3; border-radius: 999px;">
+            <button type="button" onClick="{{l.dec}}" aria-label="Kamaytirish" style="border: 0; background: none; width: 44px; height: 44px; font: inherit; font-size: 18px; color: #141712;">−</button>
+            <span style="min-width: 24px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums;">{{l.qty}}</span>
+            <button type="button" onClick="{{l.inc}}" aria-label="Ko'paytirish" style="border: 0; background: none; width: 44px; height: 44px; font: inherit; font-size: 18px; color: #141712;">+</button>
+          </span>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; min-width: 140px;">
+            <span style="font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums;">{{l.total}}</span>
+            <button type="button" onClick="{{l.remove}}" style="border: 0; background: none; padding: 0; font: inherit; font-size: 13px; color: #5E6459; text-decoration: underline;">O'chirish</button>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px 0; gap: 16px; flex-wrap: wrap;">
+        <a href="Katalog.dc.html" style="font-size: 14px; font-weight: 500;">← Xaridni davom ettirish</a>
+        <span style="font-size: 13px; color: #5E6459;">Savat qurilmangizda saqlanadi</span>
+      </div>
+    </div>
+    <div style="background: #D5DDC8; border-radius: 32px; padding: 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 20px;">
+      <img src="../assets/photos/wax-varnish.jpg" alt="" style="width: 96px; height: 96px; border-radius: 22px; object-fit: cover;">
+      <span style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">Tavsiya</span><span style="font-size: 18px; font-weight: 600;">Himoya mumi Clear qo'shing</span><span style="font-size: 14px;">Bo'yalgan yuzani dog' va namlikdan saqlaydi</span></span>
+      <a href="Mahsulot.dc.html" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 14px 22px; font-size: 14px; font-weight: 600;">+ 159 000 so'm</a>
+    </div>
+  </div>
+
+  <aside aria-label="Buyurtma xulosasi" style="flex: 1 1 380px; min-width: 0; background: #141712; color: #FFFFFF; border-radius: 40px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px;">
+    <span style="font-size: 26px; font-weight: 600; letter-spacing: -0.02em;">Xulosa</span>
+    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 15px; border-top: 1px solid #2E332A; padding-top: 20px;">
+      <span style="display: flex; justify-content: space-between;"><span style="color: #C9CFC2;">Mahsulotlar ({{count}})</span><span style="font-variant-numeric: tabular-nums;">{{sub}}</span></span>
+      <span style="display: flex; justify-content: space-between;"><span style="color: #C9CFC2;">Yetkazish, Toshkent (Yandex)</span><span>{{delivery}}</span></span>
+      <span style="display: flex; justify-content: space-between;"><span style="color: #C9CFC2;">Chegirma</span><span>0 so'm</span></span>
+    </div>
+    <label for="promo" style="display: flex; align-items: center; background: #23271F; border-radius: 999px; padding: 6px 6px 6px 20px; gap: 8px;">
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Promokod</span>
+      <input id="promo" placeholder="Promokod" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: #FFFFFF; font: inherit; font-size: 14px;">
+      <span style="background: #FFFFFF; color: #141712; border-radius: 999px; padding: 10px 18px; font-size: 13px; font-weight: 600;">Qo'llash</span>
+    </label>
+    <span style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #2E332A; padding-top: 20px;"><span style="font-size: 16px;">Jami</span><span style="font-size: 36px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;">{{total}}</span></span>
+    <a href="Checkout.dc.html" style="background: #FFFFFF; color: #141712; text-decoration: none; border-radius: 999px; padding: 20px 24px; font-size: 16px; font-weight: 600; text-align: center;">Rasmiylashtirish</a>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; align-items: center;">
+      <span style="border: 1px solid #3A4035; border-radius: 999px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center;"><img src="../assets/logos/payme-on-dark.png" alt="Payme" style="height: 18px; width: auto; display: block;"></span>
+      <span style="border: 1px solid #3A4035; border-radius: 999px; height: 40px; padding: 0 16px; display: inline-flex; align-items: center;"><img src="../assets/logos/click-on-dark.png" alt="Click" style="height: 16px; width: auto; display: block;"></span>
+      <span style="border: 1px solid #3A4035; border-radius: 999px; height: 40px; padding: 0 14px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600;">Qabul qilganda</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px; border-top: 1px solid #2E332A; padding-top: 20px; font-size: 13px; color: #C9CFC2;">
+      <span style="display: flex; align-items: center; gap: 12px;"><img src="../assets/logos/yandex-delivery-on-dark.png" alt="Yandex Dostavka" style="height: 13px; width: auto; display: block;"><span>Toshkent · 12 soat ichida</span></span>
+      <span style="display: flex; align-items: center; gap: 12px;"><img src="../assets/logos/bts-on-dark.png" alt="BTS" style="height: 24px; width: auto; display: block;"><span>Respublika bo'ylab · 24 soat ichida</span></span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; color: #C9CFC2; border-top: 1px solid #2E332A; padding-top: 20px;">
+      <span style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A9B39E" stroke-width="2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>14 kun ichida qaytarish</span>
+      <span style="display: flex; gap: 10px; align-items: center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A9B39E" stroke-width="2" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Rasmiy chek va kafolat</span>
+    </div>
+  </aside>
+</section>
+</div>
+<dc-import name="Footer" hint-size="100%,520px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2100}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { items: [
+      { id: 'cw', name: "Chalk White mebel bo'yog'i", variant: '1 L · Oq', seller: 'Forest · rasmiy', price: 329000, qty: 1, img: '../assets/photos/white-dresser.jpg' },
+      { id: 'sp', name: "Mato bo'yog'i spreyi", variant: '400 ml · Zaytun', seller: 'Forest · rasmiy', price: 249000, qty: 2, img: '../assets/photos/sprayer-hand.jpg' },
+      { id: 'br', name: "Oval 40 cho'tka", variant: '40 mm', seller: 'Forest · rasmiy', price: 119000, qty: 1, img: '../assets/photos/brush-hand.jpg' }
+    ] };
+  }
+  renderVals() {
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + " so'm";
+    const items = this.state.items;
+    const set = (id, fn) => this.setState({ items: items.map(x => x.id === id ? fn(x) : x).filter(x => x.qty > 0) });
+    const sub = items.reduce((s, x) => s + x.price * x.qty, 0);
+    const FREE = 500000;
+    const del = sub >= FREE || sub === 0 ? 0 : 30000;
+    const pct = Math.min(100, Math.round(sub / FREE * 100));
+    return {
+      lines: items.map(x => ({
+        ...x, total: fmt(x.price * x.qty),
+        inc: () => set(x.id, y => ({ ...y, qty: Math.min(99, y.qty + 1) })),
+        dec: () => set(x.id, y => ({ ...y, qty: y.qty - 1 })),
+        remove: () => set(x.id, y => ({ ...y, qty: 0 }))
+      })),
+      count: items.reduce((s, x) => s + x.qty, 0),
+      sub: fmt(sub),
+      delivery: del ? fmt(del) : 'Bepul',
+      total: fmt(sub + del),
+      freeText: sub >= FREE ? 'Toshkent bo\'ylab yetkazish bepul' : 'Bepul yetkazishgacha yana ' + fmt(FREE - sub),
+      barStyle: 'display: block; height: 100%; border-radius: 999px; background: #334229; width: ' + pct + '%;'
+    };
+  }
+}
+</script>
+</body>
+</html>

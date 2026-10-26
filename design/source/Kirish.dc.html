@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Kirish</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#EEEFEA}
+a{color:#141712}a:hover{color:#334229}
+input:focus{outline:2px solid #334229;outline-offset:0}
+</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; min-height: 960px; display: flex; flex-wrap: wrap; gap: 16px;">
+  <div style="flex: 1 1 560px; min-width: 0; min-height: 600px; border-radius: 40px; overflow: hidden; position: relative; background: #334229;">
+    <img src="../assets/photos/woman-green-sofa.jpg" alt="Yashil divanda dam olayotgan ayol" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;">
+    <span style="position: absolute; inset: 0; background: linear-gradient(0deg, rgba(20,23,18,0.75) 0%, rgba(20,23,18,0) 50%, rgba(20,23,18,0.35) 100%);"></span>
+    <a href="Main.dc.html" aria-label="Forest bosh sahifa" style="position: absolute; top: 36px; left: 40px;"><img src="../assets/brand/forest-logo-white.png" alt="Forest" style="width: 150px; height: auto; display: block;"></a>
+    <span style="position: absolute; left: 40px; right: 40px; bottom: 40px; color: #FFFFFF; font-size: 48px; font-weight: 500; letter-spacing: -0.04em; line-height: 1.05;">Buyurtmalar, manzillar va sevimlilar bir joyda</span>
+  </div>
+
+  <div style="flex: 1 1 520px; min-width: 0; background: #FFFFFF; border-radius: 40px; padding: 64px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 32px;">
+    <div style="display: flex; flex-direction: column; gap: 14px; max-width: 440px;">
+      <h1 style="margin: 0; font-size: 72px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">Kirish</h1>
+      <p style="margin: 0; color: #5E6459; line-height: 1.6;">Parol kerak emas. Telefon raqamingizga 4 xonali kod yuboramiz.</p>
+    </div>
+    <label for="loginPhone" style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600; max-width: 440px;">Telefon raqam
+      <span style="display: flex; border: 1px solid #DADDD3; border-radius: 20px; overflow: hidden;"><span style="padding: 18px 0 18px 20px; color: #5E6459; font-weight: 500; font-size: 17px;">+998</span><input id="loginPhone" value="90 123 45 67" inputmode="tel" autocomplete="tel-national" style="flex: 1; min-width: 0; border: 0; padding: 18px 20px 18px 10px; font: inherit; font-size: 17px; font-weight: 400; color: #141712;"></span></label>
+    <sc-if value="{{showCode}}" hint-placeholder-val="{{false}}">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 440px;">
+        <span style="font-size: 13px; font-weight: 600;">SMS kod <span style="font-weight: 400; color: #5E6459;">· +998 90 *** ** 67 raqamiga yuborildi</span></span>
+        <div style="display: flex; gap: 10px;">
+          <label for="c1" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">1-raqam</label><input id="c1" value="4" inputmode="numeric" style="width: 72px; height: 80px; border: 2px solid #141712; border-radius: 20px; text-align: center; font: inherit; font-size: 32px; font-weight: 600;">
+          <label for="c2" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">2-raqam</label><input id="c2" value="7" inputmode="numeric" style="width: 72px; height: 80px; border: 2px solid #141712; border-radius: 20px; text-align: center; font: inherit; font-size: 32px; font-weight: 600;">
+          <label for="c3" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">3-raqam</label><input id="c3" inputmode="numeric" style="width: 72px; height: 80px; border: 1px solid #DADDD3; border-radius: 20px; text-align: center; font: inherit; font-size: 32px; font-weight: 600;">
+          <label for="c4" style="position: absolute; width: 1px; height: 1px; overflow: hidden;">4-raqam</label><input id="c4" inputmode="numeric" style="width: 72px; height: 80px; border: 1px solid #DADDD3; border-radius: 20px; text-align: center; font: inherit; font-size: 32px; font-weight: 600;">
+        </div>
+        <span style="font-size: 13px; color: #5E6459;">Kodni qayta yuborish <b style="color: #141712; font-variant-numeric: tabular-nums;">0:42</b></span>
+      </div>
+    </sc-if>
+    <sc-if value="{{showCode}}" hint-placeholder-val="{{false}}">
+      <a href="Kabinet.dc.html" style="max-width: 440px; box-sizing: border-box; background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 20px 24px; font-size: 16px; font-weight: 600; text-align: center;">Tasdiqlash</a>
+    </sc-if>
+    <sc-if value="{{showPhoneBtn}}" hint-placeholder-val="{{true}}">
+      <button type="button" onClick="{{send}}" style="max-width: 440px; border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 20px 24px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Kod olish</button>
+    </sc-if>
+    <div style="display: flex; align-items: center; gap: 16px; max-width: 440px; color: #5E6459; font-size: 13px;"><span style="flex: 1; height: 1px; background: #DADDD3;"></span>yoki<span style="flex: 1; height: 1px; background: #DADDD3;"></span></div>
+    <a href="https://t.me/" style="max-width: 440px; box-sizing: border-box; display: inline-flex; justify-content: center; align-items: center; gap: 10px; border: 1.5px solid #141712; color: #141712; text-decoration: none; border-radius: 999px; padding: 18px 24px; font-size: 15px; font-weight: 600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg>Telegram orqali kirish</a>
+    <span style="font-size: 12px; color: #5E6459; line-height: 1.5; max-width: 440px;">Davom etish orqali <a href="Brend.dc.html">foydalanish shartlari</a> va <a href="Brend.dc.html">maxfiylik siyosati</a>ga rozilik bildirasiz.</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sent: true }; }
+  renderVals() {
+    return {
+      showCode: this.state.sent,
+      showPhoneBtn: !this.state.sent,
+      send: () => this.setState({ sent: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

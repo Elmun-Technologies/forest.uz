@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Buyurtmalar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="orders" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Buyurtmalar</h1>
+        <span style="font-size: 13px; color: #5E6459;">Bugun 31 ta · Payme va Click to'lovlari avtomatik tasdiqlanadi · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <button type="button" style="border: 0; background: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;">Export</button>
+      <button type="button" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;">+ Qo'lda buyurtma</button>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459;">Yetkazishga tayyorlash</span><b style="font-size: 26px; font-weight: 600;">12</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459; display: inline-flex; align-items: center; gap: 8px;"><img src="../assets/logos/yandex-delivery.png" alt="Yandex" style="height: 10px;">yo'lda</span><b style="font-size: 26px; font-weight: 600;">8</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459; display: inline-flex; align-items: center; gap: 8px;"><img src="../assets/logos/bts.png" alt="BTS" style="height: 18px;">yo'lda</span><b style="font-size: 26px; font-weight: 600;">14</b></div>
+      <div style="background: #FBEAE8; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #8A1C12; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>SLA buzilish xavfi</span><b style="font-size: 26px; font-weight: 600; color: #8A1C12;">2</b></div>
+      <div style="background: #FFF4D6; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #6B4E00; font-weight: 600;">To'lov kutilmoqda</span><b style="font-size: 26px; font-weight: 600; color: #6B4E00;">3</b></div>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+      <div role="tablist" aria-label="Holat" style="display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid #EEEFEA; padding-bottom: 14px;">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="7"><button type="button" role="tab" onClick="{{t.pick}}" aria-selected="{{t.on}}" style="{{t.style}}">{{t.label}} <span style="opacity: 0.7;">{{t.n}}</span></button></sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+        <label for="ordSearch" style="flex: 1 1 240px; display: flex; align-items: center; gap: 8px; background: #EEEFEA; border-radius: 999px; padding: 0 16px; height: 42px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="ordSearch" placeholder="№, telefon, yuk raqami" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13px;"></label>
+        <span style="display: inline-flex; align-items: center; gap: 10px; border: 1px solid #DADDD3; border-radius: 999px; padding: 8px 14px; font-size: 13px;">To'lov:<img src="../assets/logos/payme.png" alt="Payme" style="height: 13px;"><img src="../assets/logos/click.png" alt="Click" style="height: 12px;"><b style="font-size: 12px;">Naqd</b></span>
+        <span style="display: inline-flex; align-items: center; gap: 10px; border: 1px solid #DADDD3; border-radius: 999px; padding: 6px 14px; font-size: 13px;">Yetkazish:<img src="../assets/logos/yandex-delivery.png" alt="Yandex" style="height: 10px;"><img src="../assets/logos/bts.png" alt="BTS" style="height: 20px;"></span>
+        <span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 10px 14px; font-size: 13px;">Manba: <b>Hammasi</b></span>
+      </div>
+      <div style="overflow-x: auto;">
+        <div style="min-width: 1080px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: 96px 92px minmax(0, 1fr) minmax(0, 1.2fr) 100px 96px 130px 150px 120px; gap: 10px; padding: 10px 6px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px;"><span>№</span><span>Vaqt</span><span>Mijoz</span><span>Mahsulotlar</span><span style="text-align: right;">Summa</span><span>To'lov</span><span>Yetkazish</span><span>Manba</span><span>Holat</span></div>
+          <sc-for list="{{rows}}" as="o" hint-placeholder-count="9">
+            <div style="display: grid; grid-template-columns: 96px 92px minmax(0, 1fr) minmax(0, 1.2fr) 100px 96px 130px 150px 120px; gap: 10px; padding: 12px 6px; border-bottom: 1px solid #EEEFEA; align-items: center;">
+              <a href="Admin-Buyurtma.dc.html" style="font-weight: 600;">{{o.no}}</a>
+              <span style="color: #5E6459;">{{o.time}}</span>
+              <a href="Admin-Mijoz.dc.html" style="text-decoration: none; display: flex; flex-direction: column; min-width: 0;"><b style="font-weight: 600;">{{o.name}}</b><span style="font-size: 12px; color: #5E6459;">{{o.city}}</span></a>
+              <span style="color: #3F453B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{o.items}}</span>
+              <b style="text-align: right; font-weight: 600;">{{o.sum}}</b>
+              <span style="display: flex; flex-direction: column; gap: 4px;"><sc-if value="{{o.payLogo}}" hint-placeholder-val="{{true}}"><img src="{{o.payLogo}}" alt="{{o.pay}}" style="{{o.payStyle}}"></sc-if><sc-if value="{{o.cash}}" hint-placeholder-val="{{false}}"><b style="font-size: 11px;">NAQD</b></sc-if><span style="{{o.paidStyle}}">{{o.paid}}</span></span>
+              <span style="display: flex; flex-direction: column; gap: 4px;"><img src="{{o.delLogo}}" alt="{{o.del}}" style="{{o.delStyle}}"><span style="{{o.slaStyle}}">{{o.sla}}</span></span>
+              <span style="display: inline-flex; align-items: center; gap: 8px; min-width: 0;"><img src="{{o.srcIcon}}" alt="" style="width: 16px; height: 16px; object-fit: contain; flex: none;"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #3F453B;">{{o.src}}</span></span>
+              <span><span style="{{o.stStyle}}">{{o.st}}</span></span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'all' }; }
+  renderVals() {
+    const ic = { ig: '../assets/icons/instagram.png', gg: '../assets/icons/googleads.png', tg: '../assets/icons/telegram.png', fb: '../assets/icons/facebook.png', tt: '../assets/icons/tiktok.png' };
+    const ST = { new: ['Yangi', 'background: #E3ECF8; color: #1D4F91;'], pack: ['Yig\'ilmoqda', 'background: #EEEFEA; color: #141712;'], way: ['Yo\'lda', 'background: #D5DDC8; color: #22301B;'], done: ['Yetkazildi', 'background: #E8F2EA; color: #1F5A30;'], late: ['Kechikmoqda', 'background: #FBEAE8; color: #8A1C12;'], cancel: ['Bekor qilingan', 'background: #F7F7F4; color: #5E6459;'] };
+    const R = [
+      ['FR-240913', '10:42', 'Dilnoza R.', 'Toshkent', 'Chalk White 1 L, sprey ×2, cho\'tka', '946 000', 'Payme', 'paid', 'yandex', '6 soat 18 daq qoldi', 'ig', 'instagram / divan_oldin_keyin', 'pack'],
+      ['FR-240912', '10:15', 'Jasur T.', 'Buxoro', 'Mebel yangilash to\'plami', '549 000', 'Click', 'paid', 'bts', '19 soat qoldi', 'gg', 'google / organic', 'pack'],
+      ['FR-240911', '09:58', 'Malika S.', 'Toshkent', 'Divan yangilash to\'plami', '799 000', 'Naqd', 'cod', 'yandex', 'Kuryer yo\'lda · 40 daq', 'tg', 'telegram / kanal', 'way'],
+      ['FR-240909', '22:10', 'Nodira X.', 'Toshkent', 'Chalk White 1 L', '329 000', 'Click', 'paid', 'yandex', '42 daq qoldi', 'fb', 'facebook / retarget_savat', 'late'],
+      ['FR-240908', '21:47', 'Sardor M.', 'Toshkent', 'Mato spreyi ×3, tozalovchi', '896 000', 'Payme', 'paid', 'yandex', '18 daq qoldi', 'ig', 'instagram / divan_oldin_keyin', 'late'],
+      ['FR-240906', '19:20', 'Gulnora A.', 'Samarqand', 'Chalk White 2,5 L, mum 500 ml', '1 028 000', 'Payme', 'wait', 'bts', '—', 'ig', 'instagram / komod_carousel', 'new'],
+      ['FR-240905', '18:02', 'Akmal Q.', 'Samarqand', 'Mebel yangilash to\'plami', '549 000', 'Payme', 'paid', 'bts', 'Yuk: BTS 7731…', 'gg', 'google / organic', 'way'],
+      ['FR-240901', 'Kecha', 'Sevara N.', 'Toshkent', 'Himoya mumi, valik', '238 000', 'Click', 'paid', 'yandex', '9 s 12 daqda yetkazildi', 'tg', 'telegram / bot', 'done'],
+      ['FR-240897', 'Kecha', 'Bekzod E.', 'Andijon', 'Mato spreyi', '249 000', 'Naqd', 'cod', 'bts', '—', 'tt', 'tiktok / test_mato', 'cancel']
+    ];
+    const TABS = [['all', 'Hammasi', R.length], ['new', 'Yangi', 1], ['pack', 'Yig\'ilmoqda', 2], ['way', 'Yo\'lda', 2], ['late', 'Kechikmoqda', 2], ['done', 'Yetkazildi', 1], ['cancel', 'Bekor', 1]];
+    const tab = this.state.tab;
+    const paid = { paid: ['To\'langan', '#1F6B35'], cod: ['Qabulda', '#6B4E00'], wait: ['Kutilmoqda', '#8A1C12'] };
+    return {
+      tabs: TABS.map(([id, label, n]) => ({ label, n, on: id === tab ? 'true' : 'false', pick: () => this.setState({ tab: id }), style: 'border: 0; border-radius: 999px; padding: 9px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (id === tab ? 'background: #141712; color: #FFFFFF;' : (id === 'late' ? 'background: #FBEAE8; color: #8A1C12;' : 'background: #EEEFEA; color: #141712;')) })),
+      rows: R.filter(r => tab === 'all' || r[12] === tab).map(r => ({ no: r[0], time: r[1], name: r[2], city: r[3], items: r[4], sum: r[5], pay: r[6],
+        payLogo: r[6] === 'Payme' ? '../assets/logos/payme.png' : r[6] === 'Click' ? '../assets/logos/click.png' : '', cash: r[6] === 'Naqd',
+        payStyle: 'height: ' + (r[6] === 'Payme' ? 14 : 12) + 'px; width: auto; align-self: flex-start;',
+        paid: paid[r[7]][0], paidStyle: 'font-size: 11px; font-weight: 600; color: ' + paid[r[7]][1] + ';',
+        del: r[8], delLogo: r[8] === 'yandex' ? '../assets/logos/yandex-delivery.png' : '../assets/logos/bts.png',
+        delStyle: r[8] === 'yandex' ? 'height: 10px; width: auto; align-self: flex-start;' : 'height: 20px; width: auto; align-self: flex-start;',
+        sla: r[9], slaStyle: 'font-size: 11px; font-weight: 600; color: ' + (r[12] === 'late' ? '#B42318' : '#5E6459') + ';',
+        srcIcon: ic[r[10]], src: r[11], st: ST[r[12]][0], stStyle: 'display: inline-block; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; ' + ST[r[12]][1] }))
+    };
+  }
+}
+</script>
+</body>
+</html>

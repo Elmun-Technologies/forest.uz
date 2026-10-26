@@ -1,0 +1,526 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-13T04:50:00Z"
+  },
+  "title": "Forest internet-do'kon",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Talablar.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 2900,
+      "title": "00 · Sayt xaritasi va talablar",
+      "expand": "fill"
+    },
+    "Main.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 5600,
+      "title": "01 · Bosh sahifa",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Katalog.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 2900,
+      "title": "02 · Katalog",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Mahsulot.dc.html": {
+      "x": 4560,
+      "y": 0,
+      "w": 1440,
+      "h": 3900,
+      "title": "03 · Mahsulot sahifasi",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Savat.dc.html": {
+      "x": 6080,
+      "y": 0,
+      "w": 1440,
+      "h": 2100,
+      "title": "04 · Savat",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Checkout.dc.html": {
+      "x": 7600,
+      "y": 0,
+      "w": 1440,
+      "h": 1800,
+      "title": "05 · Checkout",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Buyurtma.dc.html": {
+      "x": 9120,
+      "y": 0,
+      "w": 1440,
+      "h": 2400,
+      "title": "06 · Buyurtma qabul qilindi",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Kabinet.dc.html": {
+      "x": 0,
+      "y": 6020,
+      "w": 1440,
+      "h": 2300,
+      "title": "07 · Shaxsiy kabinet",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Ilhom.dc.html": {
+      "x": 1520,
+      "y": 6020,
+      "w": 1440,
+      "h": 3200,
+      "title": "08 · Ilhom va qo'llanma",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Brend.dc.html": {
+      "x": 3040,
+      "y": 6020,
+      "w": 1440,
+      "h": 3300,
+      "title": "09 · Brend haqida",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Kirish.dc.html": {
+      "x": 4560,
+      "y": 6020,
+      "w": 1440,
+      "h": 960,
+      "title": "10 · Kirish (SMS kod)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Header.dc.html": {
+      "x": 6080,
+      "y": 6020,
+      "w": 1440,
+      "h": 120,
+      "title": "Komponent · Header",
+      "is_interactive": true
+    },
+    "Footer.dc.html": {
+      "x": 6080,
+      "y": 6260,
+      "w": 1440,
+      "h": 560,
+      "title": "Komponent · Footer",
+      "is_interactive": true
+    },
+    "Audit.dc.html": {
+      "x": 0,
+      "y": 9740,
+      "w": 1440,
+      "h": 2700,
+      "title": "UI audit va o'zgarishlar",
+      "expand": "fill"
+    },
+    "Popup.dc.html": {
+      "x": 1520,
+      "y": 9740,
+      "w": 1440,
+      "h": 900,
+      "title": "Exit-intent popup (lead)",
+      "is_interactive": true
+    },
+    "Mobil-Bosh.dc.html": {
+      "x": 3040,
+      "y": 9740,
+      "w": 390,
+      "h": 4300,
+      "title": "Mobil · Bosh sahifa",
+      "is_interactive": true
+    },
+    "Mobil-Mahsulot.dc.html": {
+      "x": 3510,
+      "y": 9740,
+      "w": 390,
+      "h": 3000,
+      "title": "Mobil · Mahsulot",
+      "is_interactive": true
+    },
+    "Mobil-Checkout.dc.html": {
+      "x": 3980,
+      "y": 9740,
+      "w": 390,
+      "h": 2100,
+      "title": "Mobil · Checkout",
+      "is_interactive": true
+    },
+    "Admin-Dashboard.dc.html": {
+      "x": 0,
+      "y": 14460,
+      "w": 1440,
+      "h": 1900,
+      "title": "A1 · Dashboard",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Analitika.dc.html": {
+      "x": 1520,
+      "y": 14460,
+      "w": 1440,
+      "h": 2100,
+      "title": "A2 · Analitika",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Heatmap.dc.html": {
+      "x": 3040,
+      "y": 14460,
+      "w": 1440,
+      "h": 1900,
+      "title": "A3 · Heatmap va sessiyalar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Mijozlar.dc.html": {
+      "x": 4560,
+      "y": 14460,
+      "w": 1440,
+      "h": 1500,
+      "title": "A4 · Mijozlar (CRM)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Mijoz.dc.html": {
+      "x": 6080,
+      "y": 14460,
+      "w": 1440,
+      "h": 2000,
+      "title": "A5 · Mijoz profili 360°",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Buyurtmalar.dc.html": {
+      "x": 0,
+      "y": 16980,
+      "w": 1440,
+      "h": 1500,
+      "title": "A6 · Buyurtmalar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Buyurtma.dc.html": {
+      "x": 1520,
+      "y": 16980,
+      "w": 1440,
+      "h": 1700,
+      "title": "A7 · Buyurtma yo'li",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Auditoriya.dc.html": {
+      "x": 3040,
+      "y": 16980,
+      "w": 1440,
+      "h": 1700,
+      "title": "A8 · Auditoriyalar va retarget",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-SEO.dc.html": {
+      "x": 4560,
+      "y": 16980,
+      "w": 1440,
+      "h": 2200,
+      "title": "A9 · SEO markazi",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Integratsiya.dc.html": {
+      "x": 6080,
+      "y": 16980,
+      "w": 1440,
+      "h": 3000,
+      "title": "A10 · Integratsiyalar markazi",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "AdminNav.dc.html": {
+      "x": 7600,
+      "y": 16980,
+      "w": 264,
+      "h": 1250,
+      "title": "Komponent · Admin menyu",
+      "is_interactive": true
+    },
+    "Bot-Xarita.dc.html": {
+      "x": 0,
+      "y": 20300,
+      "w": 1440,
+      "h": 1100,
+      "title": "Bot · Oqimlar xaritasi"
+    },
+    "Bot-1-Lead.dc.html": {
+      "x": 1520,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Bot 1 · Lead va promokod",
+      "is_interactive": true
+    },
+    "Bot-2-Holat.dc.html": {
+      "x": 1990,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Bot 2 · Buyurtma holati",
+      "is_interactive": true
+    },
+    "Bot-3-Savat.dc.html": {
+      "x": 2460,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Bot 3 · Tashlangan savat",
+      "is_interactive": true
+    },
+    "Bot-4-Operator.dc.html": {
+      "x": 2930,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Bot 4 · Rang maslahati (operator)",
+      "is_interactive": true
+    },
+    "Bot-5-Sharh.dc.html": {
+      "x": 3400,
+      "y": 20300,
+      "w": 390,
+      "h": 844,
+      "title": "Bot 5 · Sharh va foto",
+      "is_interactive": true
+    },
+    "Admin-Mahsulotlar.dc.html": {
+      "x": 0,
+      "y": 21820,
+      "w": 1440,
+      "h": 1700,
+      "title": "A11 · Mahsulotlar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Bot.dc.html": {
+      "x": 1520,
+      "y": 21820,
+      "w": 1440,
+      "h": 1700,
+      "title": "A12 · Telegram bot va xabarlar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-MoySklad.dc.html": {
+      "x": 3040,
+      "y": 21820,
+      "w": 1440,
+      "h": 1700,
+      "title": "A13 · MoySklad sinxronlash",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Huquqiy.dc.html": {
+      "x": 0,
+      "y": 24000,
+      "w": 1440,
+      "h": 2200,
+      "title": "07 · Oferta, maxfiylik, qaytarish, yetkazish",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Kuzatish.dc.html": {
+      "x": 1520,
+      "y": 24000,
+      "w": 1440,
+      "h": 1500,
+      "title": "08 · Buyurtmani kuzatish",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Holatlar.dc.html": {
+      "x": 3040,
+      "y": 24000,
+      "w": 1440,
+      "h": 2000,
+      "title": "09 · Xato va chekka holatlar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Mobil-Katalog.dc.html": {
+      "x": 4560,
+      "y": 24000,
+      "w": 390,
+      "h": 2400,
+      "title": "M4 · Mobil katalog",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Mobil-Savat.dc.html": {
+      "x": 5030,
+      "y": 24000,
+      "w": 390,
+      "h": 1700,
+      "title": "M5 · Mobil savat",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Promo.dc.html": {
+      "x": 0,
+      "y": 26900,
+      "w": 1440,
+      "h": 1500,
+      "title": "A14 · Promo-kodlar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Sharhlar.dc.html": {
+      "x": 1520,
+      "y": 26900,
+      "w": 1440,
+      "h": 1600,
+      "title": "A15 · Sharhlar va fotolar",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Admin-Sozlamalar.dc.html": {
+      "x": 3040,
+      "y": 26900,
+      "w": 1440,
+      "h": 1500,
+      "title": "A16 · Sozlamalar, rollar, yetkazish",
+      "expand": "fill",
+      "is_interactive": true
+    }
+  },
+  "order": [
+    "Talablar.dc.html",
+    "Main.dc.html",
+    "Katalog.dc.html",
+    "Mahsulot.dc.html",
+    "Savat.dc.html",
+    "Checkout.dc.html",
+    "Buyurtma.dc.html",
+    "Kabinet.dc.html",
+    "Ilhom.dc.html",
+    "Brend.dc.html",
+    "Kirish.dc.html",
+    "Header.dc.html",
+    "Footer.dc.html",
+    "Audit.dc.html",
+    "Popup.dc.html",
+    "Mobil-Bosh.dc.html",
+    "Mobil-Mahsulot.dc.html",
+    "Mobil-Checkout.dc.html",
+    "Admin-Dashboard.dc.html",
+    "Admin-Analitika.dc.html",
+    "Admin-Heatmap.dc.html",
+    "Admin-Mijozlar.dc.html",
+    "Admin-Mijoz.dc.html",
+    "Admin-Buyurtmalar.dc.html",
+    "Admin-Buyurtma.dc.html",
+    "Admin-Auditoriya.dc.html",
+    "Admin-SEO.dc.html",
+    "Admin-Integratsiya.dc.html",
+    "AdminNav.dc.html",
+    "Bot-Xarita.dc.html",
+    "Bot-1-Lead.dc.html",
+    "Bot-2-Holat.dc.html",
+    "Bot-3-Savat.dc.html",
+    "Bot-4-Operator.dc.html",
+    "Bot-5-Sharh.dc.html",
+    "Admin-Mahsulotlar.dc.html",
+    "Admin-Bot.dc.html",
+    "Admin-MoySklad.dc.html",
+    "Huquqiy.dc.html",
+    "Kuzatish.dc.html",
+    "Holatlar.dc.html",
+    "Mobil-Katalog.dc.html",
+    "Mobil-Savat.dc.html",
+    "Admin-Promo.dc.html",
+    "Admin-Sharhlar.dc.html",
+    "Admin-Sozlamalar.dc.html"
+  ],
+  "notes": {
+    "row1": {
+      "x": 0,
+      "y": -300,
+      "text": "Forest — xarid oqimi",
+      "kind": "title1",
+      "maxW": 10560
+    },
+    "row2": {
+      "x": 0,
+      "y": 5720,
+      "text": "Hisob, kontent va komponentlar",
+      "kind": "title1",
+      "maxW": 7520
+    },
+    "row3": {
+      "x": 0,
+      "y": 9440,
+      "text": "UI optimizatsiya: konversiya va mobil",
+      "kind": "title1",
+      "maxW": 4370
+    },
+    "row4": {
+      "x": 0,
+      "y": 14160,
+      "text": "Admin panel: analitika va mijozlar",
+      "kind": "title1",
+      "maxW": 7520
+    },
+    "row5": {
+      "x": 0,
+      "y": 16680,
+      "text": "Admin panel: buyurtmalar, retarget, SEO",
+      "kind": "title1",
+      "maxW": 7864
+    },
+    "row6": {
+      "x": 0,
+      "y": 20000,
+      "text": "Telegram xizmat bot",
+      "kind": "title1",
+      "maxW": 3790
+    },
+    "row7": {
+      "x": 0,
+      "y": 21520,
+      "text": "Admin: katalog, bot va ombor",
+      "kind": "title1",
+      "maxW": 4480
+    },
+    "row8": {
+      "x": 0,
+      "y": 23700,
+      "text": "Sayt: huquqiy, kuzatish, holatlar va mobil",
+      "kind": "title1",
+      "maxW": 5420
+    },
+    "row9": {
+      "x": 0,
+      "y": 26600,
+      "text": "Admin: promo, sharhlar, sozlamalar",
+      "kind": "title1",
+      "maxW": 4480
+    }
+  },
+  "designSystems": []
+}

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · SEO markazi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}input:focus,textarea:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="seo" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">SEO markazi</h1>
+        <span style="font-size: 13px; color: #5E6459;">Meta teglar, sitemap, redirect va schema shu yerdan boshqariladi; qidiruv ma'lumotlari API orqali keladi · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <a href="Admin-Integratsiya.dc.html" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600; text-decoration: none;"><img src="../assets/icons/googlesearchconsole.png" alt="" style="width: 16px; height: 16px;"><img src="../assets/icons/yandexwebmaster.png" alt="" style="width: 16px; height: 16px;"><img src="../assets/icons/bing.png" alt="" style="width: 16px; height: 16px;">3 ta ulangan</a>
+    </header>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1 1 220px; background: #141712; color: #FFFFFF; border-radius: 28px; padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <span style="font-size: 13px; color: #A9B39E;">SEO salomatligi</span>
+        <span style="display: flex; align-items: baseline; gap: 6px;"><b style="font-size: 64px; font-weight: 500; letter-spacing: -0.05em; line-height: 1;">86</b><span style="color: #A9B39E;">/ 100</span></span>
+        <span style="height: 8px; border-radius: 4px; background: #2E332A; display: block;"><span style="display: block; height: 100%; width: 86%; border-radius: 4px; background: #5FBF6E;"></span></span>
+        <span style="display: flex; gap: 8px; font-size: 12px; flex-wrap: wrap;"><span style="background: #4A1D18; color: #F2A08F; border-radius: 999px; padding: 4px 10px; font-weight: 600;">2 kritik</span><span style="background: #3D3214; color: #F2C46D; border-radius: 999px; padding: 4px 10px; font-weight: 600;">7 ogohlantirish</span></span>
+      </div>
+      <div style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 22px 24px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;">
+          <div role="group" aria-label="Manba" style="display: flex; background: #EEEFEA; border-radius: 999px; padding: 4px;"><sc-for list="{{engines}}" as="e" hint-placeholder-count="2"><button type="button" onClick="{{e.pick}}" style="{{e.style}}"><img src="{{e.icon}}" alt="" style="width: 16px; height: 16px;">{{e.label}}</button></sc-for></div>
+          <span style="font-size: 12px; color: #5E6459;">oxirgi 28 kun · har kuni sinxronlanadi</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+          <sc-for list="{{gsc}}" as="g" hint-placeholder-count="4"><div style="background: #F7F7F4; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">{{g.l}}</span><b style="font-size: 26px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums;">{{g.v}}</b><span style="font-size: 12px; font-weight: 600; color: #1F6B35;">{{g.d}}</span></div></sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 26px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Sahifa meta teglari</h2>
+          <div role="group" aria-label="Til" style="display: flex; background: #EEEFEA; border-radius: 999px; padding: 4px;"><sc-for list="{{langs}}" as="l" hint-placeholder-count="2"><button type="button" onClick="{{l.pick}}" style="{{l.style}}">{{l.label}}</button></sc-for></div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <sc-for list="{{pages}}" as="p" hint-placeholder-count="5"><button type="button" onClick="{{p.pick}}" style="{{p.style}}">{{p.label}}<span style="{{p.dot}}"></span></button></sc-for>
+        </div>
+        <label for="seoTitle" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600;"><span style="display: flex; justify-content: space-between;">Title<span style="{{tCountStyle}}">{{tCount}} / 60</span></span>
+          <input id="seoTitle" value="{{title}}" onChange="{{setTitle}}" style="border: 1px solid #DADDD3; border-radius: 14px; padding: 13px 14px; font: inherit; font-size: 14px; font-weight: 400;"></label>
+        <label for="seoDesc" style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600;"><span style="display: flex; justify-content: space-between;">Description<span style="{{dCountStyle}}">{{dCount}} / 160</span></span>
+          <textarea id="seoDesc" onChange="{{setDesc}}" value="{{desc}}" style="border: 1px solid #DADDD3; border-radius: 14px; padding: 13px 14px; font: inherit; font-size: 14px; font-weight: 400; min-height: 70px; resize: vertical;"></textarea></label>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px;">
+          <span style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">URL</b><span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 14px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #3F453B;">forest.uz/{{langCode}}/{{slug}}</span></span>
+          <span style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Canonical va hreflang</b><span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 14px; font-size: 12px; color: #1F6B35; font-weight: 600;">Avtomatik · uz ↔ ru</span></span>
+          <span style="flex: 0 1 140px; display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Indekslash</b><span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 14px; font-size: 12px; font-weight: 600;">index, follow</span></span>
+        </div>
+        <div style="background: #F7F7F4; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459; margin-bottom: 6px;">Google'dagi ko'rinishi</span>
+          <span style="display: flex; align-items: center; gap: 10px;"><span style="width: 26px; height: 26px; border-radius: 50%; background: #FFFFFF; border: 1px solid #DADDD3; display: grid; place-items: center;"><img src="../assets/brand/forest-logo-green.png" alt="" style="width: 18px;"></span><span style="display: flex; flex-direction: column; font-size: 12px; line-height: 1.3;"><span style="color: #202124;">Forest</span><span style="color: #4D5156;">https://forest.uz › {{langCode}} › {{slug}}</span></span></span>
+          <span style="font-family: Arial, sans-serif; font-size: 20px; color: #1A0DAB; line-height: 1.3; margin-top: 4px;">{{titleShown}}</span>
+          <span style="font-family: Arial, sans-serif; font-size: 14px; color: #4D5156; line-height: 1.55;">{{descShown}}</span>
+          <span style="font-family: Arial, sans-serif; font-size: 13px; color: #4D5156; margin-top: 4px;">★★★★★ Reyting: [4,9] · [N] sharh · 329 000 so'm · Omborda bor</span>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;"><span style="border: 1px solid #DADDD3; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600;">AI bilan taklif</span><span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 10px 18px; font-size: 13px; font-weight: 600;">Saqlash va qayta indekslash</span></div>
+      </div>
+
+      <div style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+          <h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Sahifa tekshiruvi</h2>
+          <sc-for list="{{checks}}" as="c" hint-placeholder-count="7">
+            <span style="display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45;"><span style="{{c.iconStyle}}">{{c.mark}}</span><span><b style="font-weight: 600;">{{c.t}}</b><span style="display: block; color: #5E6459;">{{c.d}}</span></span></span>
+          </sc-for>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+          <h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Core Web Vitals · mobil</h2>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; text-align: center;">
+            <span style="background: #E8F2EA; border-radius: 16px; padding: 12px 6px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 11px; color: #1F5A30; font-weight: 600;">LCP ✓</span><b style="font-size: 20px;">2,1 s</b></span>
+            <span style="background: #E8F2EA; border-radius: 16px; padding: 12px 6px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 11px; color: #1F5A30; font-weight: 600;">INP ✓</span><b style="font-size: 20px;">140 ms</b></span>
+            <span style="background: #FFF4D6; border-radius: 16px; padding: 12px 6px; display: flex; flex-direction: column; gap: 4px;"><span style="font-size: 11px; color: #6B4E00; font-weight: 600;">CLS !</span><b style="font-size: 20px;">0,14</b></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 540px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 26px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <h2 style="margin: 0 0 4px; font-size: 20px; font-weight: 600;">Qidiruv so'rovlari</h2>
+        <div style="overflow-x: auto;"><div style="min-width: 560px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 90px 60px 70px; gap: 8px; padding: 8px 4px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px; text-align: right;"><span style="text-align: left;">So'rov</span><span>Bosish</span><span>Ko'rinish</span><span>CTR</span><span>Pozitsiya</span></div>
+          <sc-for list="{{queries}}" as="q" hint-placeholder-count="7">
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 90px 60px 70px; gap: 8px; padding: 10px 4px; border-bottom: 1px solid #EEEFEA; text-align: right; align-items: center;"><span style="text-align: left; font-weight: 600;">{{q.q}}</span><span>{{q.c}}</span><span style="color: #5E6459;">{{q.i}}</span><span>{{q.ctr}}</span><span><span style="{{q.posStyle}}">{{q.p}}</span></span></div>
+          </sc-for>
+        </div></div>
+      </div>
+      <div style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Texnik</h2>
+          <span style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEEFEA;"><span>sitemap.xml · 42 URL</span><b style="color: #1F6B35;">Avtomatik · bugun 06:00</b></span>
+          <span style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEEFEA;"><span>robots.txt</span><b>Tahrirlash</b></span>
+          <span style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEEFEA;"><span>301 redirectlar</span><b>6 ta · qo'shish</b></span>
+          <span style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #EEEFEA;"><span>404 xatolar (7 kun)</span><b style="color: #8A1C12;">3 ta</b></span>
+          <span style="display: flex; justify-content: space-between; padding: 8px 0;"><span>IndexNow (Yandex, Bing)</span><b style="color: #1F6B35;">Yoqilgan</b></span>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Schema.org shablonlari</h2>
+          <span style="display: flex; justify-content: space-between;"><span>Product + Offer + AggregateRating</span><b style="color: #1F6B35;">Faol</b></span>
+          <span style="display: flex; justify-content: space-between;"><span>Organization + LocalBusiness</span><b style="color: #1F6B35;">Faol</b></span>
+          <span style="display: flex; justify-content: space-between;"><span>BreadcrumbList</span><b style="color: #1F6B35;">Faol</b></span>
+          <span style="display: flex; justify-content: space-between;"><span>FAQPage</span><b style="color: #6B4E00;">2 sahifada yo'q</b></span>
+          <span style="display: flex; justify-content: space-between;"><span>HowTo / VideoObject</span><b style="color: #5E6459;">O'chiq</b></span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2200}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { eng: 'g', lang: 'uz', page: 1, meta: {
+      'uz-0': ['Forest — mebel va divan uchun Yevropa bo\'yoqlari', 'Eski mebel va divanni bir kunda yangilang. Yevropa bo\'yog\'i, Toshkentda 12 soatda yetkazish, Payme va Click.'],
+      'uz-1': ['Chalk White mebel bo\'yog\'i 1 L — narxi, sotib olish | Forest', 'Matli oq bo\'yoq: yog\'och, MDF va lakni grunt va jilvirlashsiz yopadi. 10–12 m²/L. Toshkentda 12 soatda yetkazamiz.'],
+      'uz-2': ['Divan yangilash to\'plami: mato bo\'yog\'i va tozalovchi | Forest', 'Divan va kreslo matosi rangini uyda tiklang. 4 rang, velur va paxtaga mos. Yetkazish 12–24 soat.'],
+      'uz-3': ['Katalog', ''],
+      'uz-4': ['Burchak divanni kulrangdan yashilga: 3 ballon, 1 kun | Forest', 'Mijozimiz loyihasi: oldin va keyin fotolari, sarf, vaqt va xarajat.'],
+      'ru-0': ['Forest — европейские краски для мебели и диванов', 'Обновите старую мебель и диван за один день. Доставка по Ташкенту за 12 часов, оплата Payme и Click.'],
+      'ru-1': ['Краска для мебели Chalk White 1 л — цена, купить | Forest', 'Матовая белая краска без грунта и шлифовки. Расход 10–12 м²/л. Доставка по Ташкенту за 12 часов.'],
+      'ru-2': ['Набор для обновления дивана | Forest', 'Восстановите цвет обивки дома. 4 цвета, для велюра и хлопка.'],
+      'ru-3': ['Каталог', ''],
+      'ru-4': ['Угловой диван: из серого в зелёный за 1 день | Forest', 'Проект клиента: фото до и после, расход и стоимость.']
+    } };
+  }
+  renderVals() {
+    const s = this.state;
+    const key = s.lang + '-' + s.page;
+    const [title, desc] = s.meta[key];
+    const PG = [['Bosh sahifa', '', 'ok'], ['Chalk White', 'chalk-white', 'ok'], ['Divan to\'plami', 'divan-toplami', 'ok'], ['Katalog', 'katalog', 'bad'], ['Ilhom: burchak divan', 'ilhom/burchak-divan', 'warn']];
+    const seg = (on) => 'display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #141712; color: #FFFFFF;' : 'background: transparent; color: #5E6459;');
+    const cnt = (n, lo, hi) => 'font-weight: 600; color: ' + (n === 0 || n > hi ? '#B42318' : n < lo ? '#9A6700' : '#1F6B35') + ';';
+    const set = (i, v) => { const m = { ...s.meta }; const cur = m[key].slice(); cur[i] = v; m[key] = cur; this.setState({ meta: m }); };
+    const ok = (t, d) => ({ t, d, mark: '✓', iconStyle: 'width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; background: #E8F2EA; color: #1F5A30;' });
+    const warn = (t, d) => ({ t, d, mark: '!', iconStyle: 'width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; font-weight: 700; background: #FFF4D6; color: #6B4E00;' });
+    const bad = (t, d) => ({ t, d, mark: '×', iconStyle: 'width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 13px; font-weight: 700; background: #FBEAE8; color: #8A1C12;' });
+    const G = s.eng === 'g'
+      ? [['Bosishlar', '4 820', '▲ 23%'], ['Ko\'rinishlar', '96 400', '▲ 31%'], ['O\'rtacha CTR', '5,0%', '▲ 0,4 pp'], ['O\'rtacha pozitsiya', '11,8', '▲ 2,1']]
+      : [['Bosishlar', '1 260', '▲ 12%'], ['Ko\'rinishlar', '28 900', '▲ 18%'], ['O\'rtacha CTR', '4,4%', '▲ 0,2 pp'], ['O\'rtacha pozitsiya', '9,6', '▲ 1,4']];
+    const posStyle = (p) => 'display: inline-block; border-radius: 999px; padding: 3px 9px; font-weight: 600; ' + (p <= 3 ? 'background: #E8F2EA; color: #1F5A30;' : p <= 10 ? 'background: #EEEFEA; color: #141712;' : 'background: #FFF4D6; color: #6B4E00;');
+    return {
+      engines: [['g', 'Search Console', '../assets/icons/googlesearchconsole.png'], ['y', 'Yandex Webmaster', '../assets/icons/yandexwebmaster.png']].map(([id, label, icon]) => ({ label, icon, pick: () => this.setState({ eng: id }), style: seg(id === s.eng) })),
+      gsc: G.map(([l, v, d]) => ({ l, v, d })),
+      langs: [['uz', 'O\'zbekcha'], ['ru', 'Русский']].map(([id, label]) => ({ label, pick: () => this.setState({ lang: id }), style: seg(id === s.lang) })),
+      pages: PG.map(([label, slug, st], i) => ({ label, pick: () => this.setState({ page: i }),
+        style: 'display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 8px 12px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; ' + (i === s.page ? 'background: #141712; color: #FFFFFF; border: 1px solid #141712;' : 'background: #FFFFFF; color: #141712; border: 1px solid #DADDD3;'),
+        dot: 'width: 7px; height: 7px; border-radius: 50%; background: ' + (st === 'ok' ? '#3E8E4E' : st === 'warn' ? '#D19A1E' : '#B42318') + ';' })),
+      title, desc, tCount: title.length, dCount: desc.length,
+      tCountStyle: cnt(title.length, 30, 60), dCountStyle: cnt(desc.length, 70, 160),
+      setTitle: (e) => set(0, e.target.value), setDesc: (e) => set(1, e.target.value),
+      titleShown: title.length > 60 ? title.slice(0, 58) + '…' : (title || 'Sarlavha yo\'q'),
+      descShown: desc.length > 160 ? desc.slice(0, 157) + '…' : (desc || 'Tavsif yo\'q: Google sahifadan tasodifiy matn oladi.'),
+      langCode: s.lang, slug: PG[s.page][1],
+      checks: s.page === 3
+        ? [bad('Title juda qisqa', '"Katalog": kalit so\'z va brend yo\'q'), bad('Description yo\'q', '70–160 belgi tavsiya etiladi'), ok('H1 bitta', '"Katalog"'), warn('3 ta rasmda alt yo\'q', 'Mahsulot kartochkalari'), ok('hreflang uz/ru', 'To\'g\'ri'), ok('Canonical', 'O\'z-o\'ziga'), warn('Ichki havolalar kam', '2 ta sahifadan havola')]
+        : [ok('Title uzunligi', '30–60 belgi oralig\'ida'), ok('Description', '70–160 belgi'), ok('H1 bitta', 'Sarlavha bilan mos'), warn('1 ta rasmda alt yo\'q', 'Galereya, 4-rasm'), ok('hreflang uz/ru', 'To\'g\'ri'), ok('Product schema', 'Narx, qoldiq va reyting bor'), ok('Indekslangan', 'Google va Yandex')],
+      queries: [['mebel uchun kraska', 210, '3 400', '6,2%', 4.1], ['divan bo\'yash', 182, '2 950', '6,2%', 3.2], ['краска для мебели ташкент', 164, '5 100', '3,2%', 7.8], ['chalk paint toshkent', 120, '1 480', '8,1%', 2.4], ['покраска дивана', 96, '4 200', '2,3%', 12.6], ['eski mebelni yangilash', 74, '1 900', '3,9%', 8.9], ['краска для ткани дивана', 61, '3 300', '1,8%', 15.2]].map(([q, c, i, ctr, p]) => ({ q, c, i, ctr, p: String(p).replace('.', ','), posStyle: posStyle(p) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Sharhlar va natija fotolari</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="reviews" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Sharhlar va natija fotolari</h1>
+        <span style="font-size: 13px; color: #5E6459;">Faqat haqiqiy xarid qilganlar sharh yoza oladi · foto faqat rozilik bilan saytga chiqadi · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;">
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">O'rtacha baho</span><b style="font-size: 26px; font-weight: 600;">[4,8] ★</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Tasdiqlangan sharh</span><b style="font-size: 26px; font-weight: 600;">[214]</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Foto bilan</span><b style="font-size: 26px; font-weight: 600;">41%</b></div>
+      <div style="background: #FBEAE8; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #8A1C12; font-weight: 600;">≤3★ ochiq shikoyat</span><b style="font-size: 26px; font-weight: 600; color: #8A1C12;">1</b></div>
+    </section>
+
+    <div role="tablist" aria-label="Holat" style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}} <span style="opacity: 0.6;">{{t.n}}</span></button></sc-for>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 10px;">
+      <sc-for list="{{list}}" as="r" hint-placeholder-count="4">
+        <article style="background: #FFFFFF; border-radius: 26px; padding: 20px; display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start;">
+          <sc-if value="{{r.photo}}" hint-placeholder-val="{{true}}"><img src="{{r.photo}}" alt="Mijoz natijasi" style="width: 150px; height: 150px; border-radius: 18px; object-fit: cover; flex: none;"></sc-if>
+          <div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+            <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px;"><b style="font-size: 15px; font-weight: 600;">{{r.name}}</b><span style="{{r.starStyle}}">{{r.stars}}</span><span style="font-size: 12px; color: #5E6459;">{{r.when}} · {{r.src}}</span></span>
+            <span style="font-size: 13px; color: #5E6459;">{{r.product}}</span>
+            <p style="margin: 0; font-size: 14px; line-height: 1.6;">{{r.text}}</p>
+            <span style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <span style="background: #E8F2EA; color: #1F6B35; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700;">✓ Xarid tasdiqlangan · {{r.order}}</span>
+              <sc-if value="{{r.consent}}" hint-placeholder-val="{{true}}"><span style="background: #EEEFEA; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 700;">Foto: saytga rozilik ✓</span></sc-if>
+            </span>
+          </div>
+          <div style="flex: 0 1 220px; display: flex; flex-direction: column; gap: 8px;">
+            <sc-if value="{{r.pending}}" hint-placeholder-val="{{true}}">
+              <button type="button" onClick="{{r.approve}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">Tasdiqlash</button>
+              <button type="button" onClick="{{r.toGallery}}" style="{{r.galStyle}}">{{r.galLabel}}</button>
+              <button type="button" onClick="{{r.reject}}" style="border: 1px solid #DADDD3; background: #FFFFFF; border-radius: 999px; padding: 11px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; color: #8A1C12;">Rad etish</button>
+            </sc-if>
+            <sc-if value="{{r.done}}" hint-placeholder-val="{{false}}"><span style="{{r.doneStyle}}">{{r.doneLabel}}</span></sc-if>
+            <span style="font-size: 12px; color: #2A6A9A; font-weight: 600; text-align: center;">Ochiq javob yozish</span>
+          </div>
+        </article>
+      </sc-for>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 12px;">
+      <span style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Saytdagi «Natijalar» galereyasi</h2><span style="font-size: 12px; color: #5E6459;">Tartibni sudrab o'zgartirish · bosh sahifa va mahsulot sahifasida</span></span>
+      <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px;">
+        <img src="../assets/photos/green-velvet-living.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+        <img src="../assets/photos/hero-after.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+        <img src="../assets/photos/shkaf.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+        <img src="../assets/photos/stol.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+        <img src="../assets/photos/oshxona.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+        <span style="aspect-ratio: 1; border: 1.5px dashed #B9BEB2; border-radius: 14px; display: grid; place-items: center; font-size: 12px; color: #5E6459; text-align: center; padding: 8px;">+ oldin/keyin juftligi</span>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1600}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'pending', st: {}, gal: { 0: true } }; }
+  renderVals() {
+    const s = this.state;
+    const R = [
+      { name: 'Dilnoza Y.', r: 5, when: '2 soat oldin', src: 'Telegram bot', product: 'Divan yangilash to\'plami · Zaytun', order: '#F-10431', text: 'Eski kulrang velur divan butunlay yangidek bo\'ldi. Hid 1 kunda ketdi. Ikki qatlam surtdim.', photo: '../assets/photos/green-velvet-living.jpg', consent: true },
+      { name: 'Aziz K.', r: 5, when: 'kecha', src: 'Sayt', product: 'Chalk White · 1 L', order: '#F-10402', text: 'Oshxona fasadini grunt qilmasdan bo\'yadim, yaxshi yopdi. 1 litr 6 eshikka yetdi.', photo: '../assets/photos/oshxona.jpg', consent: true },
+      { name: 'Наталья М.', r: 3, when: 'kecha', src: 'Telegram bot', product: 'Mato bo\'yog\'i spreyi · Bej', order: '#F-10377', text: 'Цвет хороший, но понадобился второй слой и больше баллонов, чем писали.', photo: null, consent: false },
+      { name: 'Sardor R.', r: 4, when: '3 kun oldin', src: 'Sayt', product: 'Mebel yangilash to\'plami', order: '#F-10340', text: 'Natija zo\'r, faqat cho\'tka biroz tuk tashladi.', photo: '../assets/photos/shkaf.jpg', consent: true }
+    ];
+    const state = (i) => s.st[i] || 'pending';
+    const list = R.map((r, i) => ({ ...r, i, state: state(i) })).filter(r => s.tab === 'all' ? true : r.state === s.tab);
+    const count = (k) => R.filter((_, i) => state(i) === k).length;
+    return {
+      tabs: [['pending', 'Kutmoqda'], ['ok', 'Tasdiqlangan'], ['no', 'Rad etilgan']].map(([id, label]) => ({ label, n: count(id), pick: () => this.setState({ tab: id }),
+        style: 'border: 0; border-radius: 999px; padding: 10px 16px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (s.tab === id ? 'background: #141712; color: #FFFFFF;' : 'background: #FFFFFF; color: #141712;') })),
+      list: list.map(r => { const inGal = !!s.gal[r.i]; return { ...r,
+        stars: '★'.repeat(r.r) + '☆'.repeat(5 - r.r),
+        starStyle: 'font-size: 14px; letter-spacing: 1px; color: ' + (r.r <= 3 ? '#B42318' : '#334229') + ';',
+        pending: r.state === 'pending', done: r.state !== 'pending',
+        doneLabel: r.state === 'ok' ? '✓ Saytda' + (inGal ? ' · galereyada' : '') : 'Rad etildi',
+        doneStyle: 'text-align: center; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 700; ' + (r.state === 'ok' ? 'background: #E8F2EA; color: #1F6B35;' : 'background: #FBEAE8; color: #8A1C12;'),
+        approve: () => this.setState({ st: { ...s.st, [r.i]: 'ok' } }),
+        reject: () => this.setState({ st: { ...s.st, [r.i]: 'no' } }),
+        toGallery: () => this.setState({ gal: { ...s.gal, [r.i]: !inGal } }),
+        galLabel: r.photo && r.consent ? (inGal ? '✓ Galereyaga' : '+ Galereyaga') : 'Foto/rozilik yo\'q',
+        galStyle: 'border: 1px solid #DADDD3; border-radius: 999px; padding: 11px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (inGal ? 'background: #F1F5EC; color: #1F5A30;' : 'background: #FFFFFF; color: #141712;') + (r.photo && r.consent ? '' : ' opacity: 0.45;') }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

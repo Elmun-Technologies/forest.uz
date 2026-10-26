@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Huquqiy ma'lumotlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712;">
+<dc-import name="Header" active="none" cart="2" hint-size="100%,96px"></dc-import>
+<div style="max-width: 1392px; margin: 0 auto; padding: 8px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+
+<section style="background: #FFFFFF; border-radius: 40px; padding: 40px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+  <div style="display: flex; flex-direction: column; gap: 16px;">
+    <span style="font-size: 13px; color: #5E6459;"><a href="Main.dc.html" style="color: #5E6459; text-decoration: none;">Bosh sahifa</a> / Huquqiy ma'lumotlar</span>
+    <h1 style="margin: 0; font-size: 72px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">Shartlar va siyosat</h1>
+  </div>
+  <span style="background: #FFF4D6; color: #6B4E00; border-radius: 14px; padding: 12px 16px; font-size: 13px; font-weight: 600; max-width: 360px; line-height: 1.5;">Namuna matn. E'lon qilishdan oldin yurist tekshiradi. [Qavs] ichidagilar — kompaniya ma'lumotlari.</span>
+</section>
+
+<section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <nav aria-label="Hujjatlar" style="flex: 1 1 260px; max-width: 320px; background: #FFFFFF; border-radius: 32px; padding: 16px; display: flex; flex-direction: column; gap: 4px;">
+    <sc-for list="{{docs}}" as="d" hint-placeholder-count="4">
+      <button type="button" onClick="{{d.pick}}" style="{{d.style}}"><b style="font-size: 15px; font-weight: 600;">{{d.label}}</b><span style="font-size: 12px; opacity: 0.7;">{{d.sub}}</span></button>
+    </sc-for>
+    <span style="font-size: 12px; color: #5E6459; padding: 12px 14px 4px; line-height: 1.5;">Oxirgi tahrir: [sana] · Har bir buyurtmada qaysi versiya qabul qilingani saqlanadi.</span>
+  </nav>
+
+  <article style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border-radius: 32px; padding: 40px 48px; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; font-size: 15px; line-height: 1.7; color: #2A2E26;">
+    <sc-if value="{{isOferta}}" hint-placeholder-val="{{true}}">
+      <h2 style="margin: 0; font-size: 36px; line-height: 1.1; font-weight: 500; letter-spacing: -0.03em; color: #141712;">Ommaviy oferta</h2>
+      <p style="margin: 0;">Ushbu hujjat [MChJ nomi] (STIR [__________], manzil: [__________], keyingi o'rinlarda — «Sotuvchi») tomonidan forest.uz sayti orqali mahsulot sotish shartlarini belgilaydi. Saytda buyurtmani tasdiqlash ushbu oferta shartlarini to'liq qabul qilish hisoblanadi.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">1. Buyurtma va narx</h3>
+      <p style="margin: 0;">Narxlar so'mda ko'rsatiladi va buyurtma tasdiqlangan paytdagi narx qat'iy bo'ladi. Mahsulot omborda tugagan bo'lsa, Sotuvchi 1 soat ichida mijoz bilan bog'lanib, almashtirish yoki pulni qaytarishni taklif qiladi.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">2. To'lov</h3>
+      <p style="margin: 0;">To'lov Payme, Click yoki mahsulotni olganda naqd/karta orqali amalga oshiriladi. Har bir to'lov uchun fiskal chek beriladi. Karta ma'lumotlari Sotuvchi serverlarida saqlanmaydi — ular to'lov tizimi tomonida qayta ishlanadi.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">3. Yetkazish</h3>
+      <p style="margin: 0;">Toshkent shahri bo'ylab — Yandex Dostavka orqali 12 soat ichida. O'zbekiston bo'ylab — BTS Express orqali 24 soat ichida. Muddat to'lov tasdiqlangan (yoki naqd buyurtma qabul qilingan) paytdan hisoblanadi. Narx va bepul yetkazish chegarasi <a href="#" style="font-weight: 600;">Yetkazish va to'lov</a> sahifasida.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">4. Qaytarish</h3>
+      <p style="margin: 0;">Qaytarish va almashtirish tartibi «Qaytarish» bo'limida belgilangan va O'zbekiston Respublikasining iste'molchilar huquqlarini himoya qilish to'g'risidagi qonunchiligiga muvofiq.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">5. Javobgarlik</h3>
+      <p style="margin: 0;">Sotuvchi mahsulot yo'riqnomaga muvofiq qo'llanganda uning sifati uchun javob beradi. Yo'riqnomaga zid foydalanish (sirtni tayyorlamaslik, quritish vaqtini buzish) natijasi kafolatga kirmaydi.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">6. Rekvizitlar</h3>
+      <div style="background: #F7F7F4; border-radius: 20px; padding: 20px 24px; display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 8px 16px; font-size: 14px;">
+        <span style="color: #5E6459;">Nomi</span><b style="font-weight: 600;">[MChJ «__________»]</b>
+        <span style="color: #5E6459;">STIR</span><b style="font-weight: 600;">[_________]</b>
+        <span style="color: #5E6459;">Hisob raqami / bank</span><b style="font-weight: 600;">[_________] · [bank, MFO]</b>
+        <span style="color: #5E6459;">Manzil</span><b style="font-weight: 600;">[Toshkent sh., __________]</b>
+        <span style="color: #5E6459;">Aloqa</span><b style="font-weight: 600;">+998 [__] [___ __ __] · info@forest.uz</b>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isPrivacy}}" hint-placeholder-val="{{false}}">
+      <h2 style="margin: 0; font-size: 36px; line-height: 1.1; font-weight: 500; letter-spacing: -0.03em; color: #141712;">Maxfiylik siyosati</h2>
+      <p style="margin: 0;">Biz faqat buyurtmani bajarish va xizmatni yaxshilash uchun kerakli ma'lumotlarni yig'amiz.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+        <div style="background: #F7F7F4; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #141712;">Nimani yig'amiz</b><span style="font-size: 14px;">Ism, telefon, yetkazish manzili, buyurtmalar tarixi, saytdagi harakatlar (sahifalar, bosishlar), qurilma turi.</span></div>
+        <div style="background: #F7F7F4; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #141712;">Nimani yig'maymiz</b><span style="font-size: 14px;">Karta raqami va parollar. Sessiya yozuvida kiritish maydonlari avtomatik yashiriladi.</span></div>
+        <div style="background: #F7F7F4; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #141712;">Qayerda saqlanadi</b><span style="font-size: 14px;">O'zbekiston Respublikasi hududidagi serverlarda, shaxsga doir ma'lumotlar to'g'risidagi qonunchilik talabiga muvofiq.</span></div>
+        <div style="background: #F7F7F4; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #141712;">Kimga beriladi</b><span style="font-size: 14px;">Faqat buyurtma uchun kerak bo'lganlarga: to'lov tizimi, kuryer xizmati, SMS provayder. Reklama tizimlariga faqat shifrlangan (hash) ko'rinishda.</span></div>
+      </div>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">Sizning huquqlaringiz</h3>
+      <p style="margin: 0;">Ma'lumotlaringizni ko'rish, tuzatish yoki o'chirishni so'rashingiz mumkin: shaxsiy kabinetda yoki info@forest.uz orqali. So'rov [10] ish kuni ichida bajariladi. Telegram va SMS xabarlardan istalgan vaqtda voz kechish mumkin.</p>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">Cookie</h3>
+      <p style="margin: 0;">Zarur cookie'lar savat va kirish uchun ishlaydi. Analitika va reklama cookie'lari faqat roziligingiz bilan yoqiladi.</p>
+    </sc-if>
+
+    <sc-if value="{{isReturn}}" hint-placeholder-val="{{false}}">
+      <h2 style="margin: 0; font-size: 36px; line-height: 1.1; font-weight: 500; letter-spacing: -0.03em; color: #141712;">Qaytarish va almashtirish</h2>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">
+        <div style="background: #E8F2EA; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #1F5A30;">Qaytariladi</b><span style="font-size: 14px;">Ochilmagan, plombasi butun mahsulot — [10] kun ichida.</span></div>
+        <div style="background: #FFF4D6; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #6B4E00;">Almashtiriladi</b><span style="font-size: 14px;">Nuqsonli yoki yo'lda shikastlangan mahsulot — foto bilan 48 soat ichida xabar bering.</span></div>
+        <div style="background: #FBEAE8; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 15px; color: #8A1C12;">Qaytarilmaydi</b><span style="font-size: 14px;">Ochilgan bo'yoq va sprey, buyurtma asosida aralashtirilgan rang.</span></div>
+      </div>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">Qanday qaytariladi</h3>
+      <ol style="margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 6px;">
+        <li>Kabinetda buyurtmani tanlab «Qaytarish» ni bosing yoki Telegram botga yozing.</li>
+        <li>Kuryer mahsulotni o'zi olib ketadi (Toshkent) yoki BTS filialiga topshirasiz (viloyat).</li>
+        <li>Pul to'lov qilingan usulga [3–10] ish kuni ichida qaytadi.</li>
+      </ol>
+    </sc-if>
+
+    <sc-if value="{{isDelivery}}" hint-placeholder-val="{{false}}">
+      <h2 style="margin: 0; font-size: 36px; line-height: 1.1; font-weight: 500; letter-spacing: -0.03em; color: #141712;">Yetkazish va to'lov</h2>
+      <div style="display: flex; flex-direction: column; border: 1px solid #DADDD3; border-radius: 20px; overflow: hidden; font-size: 14px;">
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 150px 110px 140px minmax(0, 1fr); gap: 12px; padding: 12px 18px; background: #F7F7F4; color: #5E6459; font-size: 12px;"><span>Hudud</span><span>Xizmat</span><span>Muddat</span><span>Narx</span><span>Bepul</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 150px 110px 140px minmax(0, 1fr); gap: 12px; padding: 16px 18px; align-items: center; border-top: 1px solid #EEEFEA;"><b style="font-weight: 600;">Toshkent shahri</b><img src="../assets/logos/yandex-delivery.png" alt="Yandex Dostavka" style="height: 16px; width: auto;"><span>12 soat</span><span>[35 000] so'm</span><span>[500 000] so'mdan</span></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 150px 110px 140px minmax(0, 1fr); gap: 12px; padding: 16px 18px; align-items: center; border-top: 1px solid #EEEFEA;"><b style="font-weight: 600;">Viloyatlar va Qoraqalpog'iston</b><img src="../assets/logos/bts.png" alt="BTS" style="height: 18px; width: auto;"><span>24 soat</span><span>[45 000] so'm</span><span>[700 000] so'mdan</span></div>
+      </div>
+      <span style="font-size: 13px; color: #5E6459;">Toshkentda [19:00] gacha berilgan buyurtma shu kuni yetkaziladi. Viloyatga — BTS filialigacha yoki eshikkacha.</span>
+      <h3 style="margin: 8px 0 0; font-size: 20px; font-weight: 600; color: #141712;">To'lov usullari</h3>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+        <span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 16px; display: grid; place-items: center;"><img src="../assets/logos/payme.png" alt="Payme" style="height: 20px;"></span>
+        <span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 16px; display: grid; place-items: center;"><img src="../assets/logos/click.png" alt="Click" style="height: 20px;"></span>
+        <span style="border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 16px; font-size: 14px; font-weight: 600;">Olganda naqd yoki karta</span>
+      </div>
+    </sc-if>
+  </article>
+</section>
+</div>
+<dc-import name="Footer" hint-size="100%,520px"></dc-import>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"doc":{"editor":"enum","options":["oferta","privacy","return","delivery"],"default":"oferta"},"$preview":{"width":1440,"height":2200}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { doc: null }; }
+  renderVals() {
+    const doc = this.state.doc ?? this.props.doc ?? 'oferta';
+    const D = [['oferta', 'Ommaviy oferta', 'Sotib olish shartlari'], ['privacy', 'Maxfiylik siyosati', 'Shaxsiy ma\'lumotlar va cookie'], ['return', 'Qaytarish', 'Almashtirish va pulni qaytarish'], ['delivery', 'Yetkazish va to\'lov', 'Hududlar, muddat, narx']];
+    return {
+      docs: D.map(([id, label, sub]) => ({ label, sub, pick: () => this.setState({ doc: id }),
+        style: 'display: flex; flex-direction: column; gap: 2px; align-items: flex-start; text-align: left; border: 0; border-radius: 18px; padding: 14px; font: inherit; cursor: pointer; ' + (id === doc ? 'background: #141712; color: #FFFFFF;' : 'background: transparent; color: #141712;') })),
+      isOferta: doc === 'oferta', isPrivacy: doc === 'privacy', isReturn: doc === 'return', isDelivery: doc === 'delivery'
+    };
+  }
+}
+</script>
+</body>
+</html>

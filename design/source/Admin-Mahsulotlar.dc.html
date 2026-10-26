@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Mahsulotlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="products" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Mahsulotlar</h1>
+        <span style="font-size: 13px; color: #5E6459;">Narx va qoldiq MoySklad'dan keladi · tavsif, rasm va SEO shu yerda · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <a href="Admin-MoySklad.dc.html" style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 11px 16px; font-size: 13px; font-weight: 600; text-decoration: none;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3E8E4E;"></span>MoySklad · 3 daq oldin</a>
+      <button type="button" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;">+ Mahsulot</button>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;">
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459;">Faol mahsulotlar</span><b style="font-size: 26px; font-weight: 600;">8 · 14 variant</b></div>
+      <div style="background: #FFF4D6; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #6B4E00; font-weight: 600;">Kam qoldiq</span><b style="font-size: 26px; font-weight: 600; color: #6B4E00;">2 variant</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459;">Katalog feed'lari</span><span style="display: flex; gap: 8px; align-items: center;"><img src="../assets/icons/meta.png" alt="Meta" style="width: 22px;"><img src="../assets/icons/googleads.png" alt="Google" style="width: 20px;"><img src="../assets/icons/tiktok.png" alt="TikTok" style="width: 18px; opacity: 0.35;"><b style="font-size: 13px; margin-left: 4px;">2 / 3</b></span></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 10px;"><span style="font-size: 12px; color: #5E6459;">IKPU (MXIK) kodi yo'q</span><b style="font-size: 26px; font-weight: 600;">0</b></div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 18px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <label for="prodSearch" style="flex: 1 1 220px; display: flex; align-items: center; gap: 8px; background: #EEEFEA; border-radius: 999px; padding: 0 16px; height: 42px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5E6459" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="prodSearch" placeholder="Nom yoki SKU" style="flex: 1; min-width: 0; border: 0; outline: none; background: transparent; font: inherit; font-size: 13px;"></label>
+          <span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 9px 14px; font-size: 12px; font-weight: 600;">Hammasi</span>
+          <span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 12px; font-weight: 600;">Mebel</span>
+          <span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 12px; font-weight: 600;">Mato</span>
+          <span style="background: #EEEFEA; border-radius: 999px; padding: 9px 14px; font-size: 12px; font-weight: 600;">To'plam</span>
+        </div>
+        <div style="overflow-x: auto;"><div style="min-width: 720px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 70px 110px 110px 90px 90px; gap: 10px; padding: 10px 8px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px;"><span>Mahsulot</span><span style="text-align: right;">Variant</span><span style="text-align: right;">Narx</span><span style="text-align: right;">Qoldiq</span><span style="text-align: right;">Sotuv 30k</span><span>Holat</span></div>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+            <button type="button" onClick="{{r.pick}}" style="{{r.rowStyle}}">
+              <span style="display: flex; align-items: center; gap: 12px; min-width: 0; text-align: left;"><img src="{{r.img}}" alt="" style="width: 44px; height: 44px; border-radius: 12px; object-fit: cover; flex: none;"><span style="display: flex; flex-direction: column; min-width: 0;"><b style="font-weight: 600;">{{r.name}}</b><span style="font-size: 12px; color: #5E6459;">{{r.sku}}</span></span></span>
+              <span style="text-align: right;">{{r.vars}}</span>
+              <b style="text-align: right; font-weight: 600;">{{r.price}}</b>
+              <span style="text-align: right;"><span style="{{r.stockStyle}}">{{r.stock}}</span></span>
+              <span style="text-align: right;">{{r.sold}}</span>
+              <span><span style="{{r.stStyle}}">{{r.st}}</span></span>
+            </button>
+          </sc-for>
+        </div></div>
+      </div>
+
+      <aside style="flex: 2 1 380px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+        <span style="display: flex; align-items: center; gap: 14px;"><img src="{{cur.img}}" alt="" style="width: 64px; height: 64px; border-radius: 16px; object-fit: cover;"><span style="display: flex; flex-direction: column; gap: 4px;"><b style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em;">{{cur.name}}</b><span style="font-size: 12px; color: #5E6459;">Sotuvchi: Forest · rasmiy</span></span></span>
+        <div role="tablist" aria-label="Bo'limlar" style="display: flex; flex-wrap: wrap; gap: 4px; background: #EEEFEA; border-radius: 999px; padding: 4px; align-self: flex-start;">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4"><button type="button" role="tab" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+        </div>
+        <sc-if value="{{tabMain}}" hint-placeholder-val="{{true}}">
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            <label for="pnUz" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600;">Nomi · UZ<input id="pnUz" value="{{cur.name}}" style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font: inherit; font-size: 14px; font-weight: 400;"></label>
+            <label for="pnRu" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600;">Nomi · RU<input id="pnRu" value="{{cur.ru}}" style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font: inherit; font-size: 14px; font-weight: 400;"></label>
+            <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; font-size: 12px;">
+              <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Kategoriya</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.cat}}</span></span>
+              <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Belgi</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.badge}}</span></span>
+            </div>
+            <span style="font-size: 12px; font-weight: 600;">Saytda ko'rsatiladigan kanallar</span>
+            <span style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px;"><span style="background: #E8F2EA; color: #1F5A30; border-radius: 999px; padding: 6px 10px; font-weight: 600;">Sayt ✓</span><span style="background: #E8F2EA; color: #1F5A30; border-radius: 999px; padding: 6px 10px; font-weight: 600;">Meta katalog ✓</span><span style="background: #E8F2EA; color: #1F5A30; border-radius: 999px; padding: 6px 10px; font-weight: 600;">Google Merchant ✓</span><span style="background: #EEEFEA; color: #5E6459; border-radius: 999px; padding: 6px 10px; font-weight: 600;">Telegram bot</span></span>
+          </div>
+        </sc-if>
+        <sc-if value="{{tabVars}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-variant-numeric: tabular-nums;">
+            <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 90px 60px; gap: 8px; color: #5E6459; font-size: 12px; padding: 0 4px;"><span>Variant</span><span>SKU · IKPU</span><span style="text-align: right;">Narx</span><span style="text-align: right;">Qoldiq</span></div>
+            <sc-for list="{{cur.variants}}" as="v" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 70px minmax(0, 1fr) 90px 60px; gap: 8px; align-items: center; padding: 10px 4px; border-top: 1px solid #EEEFEA;"><b style="font-weight: 600;">{{v.l}}</b><span style="display: flex; flex-direction: column; min-width: 0;"><span>{{v.sku}}</span><span style="font-size: 11px; color: #5E6459;">IKPU {{v.ikpu}}</span></span><b style="text-align: right; font-weight: 600;">{{v.p}}</b><span style="{{v.qStyle}}">{{v.q}}</span></div>
+            </sc-for>
+            <span style="font-size: 12px; color: #5E6459; line-height: 1.5; margin-top: 4px;">Narx va qoldiq MoySklad'da o'zgartiriladi. IKPU (MXIK) kodi fiskal chek uchun to'lov tizimiga yuboriladi.</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{tabSeo}}" hint-placeholder-val="{{false}}">
+          <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+            <span style="background: #F7F7F4; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 4px;"><span style="font-family: Arial, sans-serif; font-size: 17px; color: #1A0DAB;">{{cur.name}} — narxi, sotib olish | Forest</span><span style="font-family: Arial, sans-serif; color: #4D5156; line-height: 1.5;">Toshkentda 12 soatda, viloyatlarga 24 soatda yetkazamiz. Payme, Click.</span></span>
+            <a href="Admin-SEO.dc.html" style="font-weight: 600;">SEO markazida tahrirlash</a>
+          </div>
+        </sc-if>
+        <sc-if value="{{tabImg}}" hint-placeholder-val="{{false}}">
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+            <img src="{{cur.img}}" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; border: 2px solid #141712; box-sizing: border-box;">
+            <img src="../assets/photos/brush-hand.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+            <img src="../assets/photos/parquet.jpg" alt="" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px;">
+            <span style="aspect-ratio: 1; border: 1.5px dashed #B9BEB2; border-radius: 14px; display: grid; place-items: center; font-size: 12px; color: #5E6459;">+ rasm / video</span>
+          </div>
+        </sc-if>
+        <div style="display: flex; gap: 8px; margin-top: auto;"><span style="flex: 1; text-align: center; border: 1px solid #DADDD3; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 600;">Saytda ko'rish</span><span style="flex: 1; text-align: center; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 600;">Saqlash</span></div>
+      </aside>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 0, tab: 'vars' }; }
+  renderVals() {
+    const s = this.state;
+    const P = [
+      { name: 'Chalk White mebel bo\'yog\'i', ru: 'Краска для мебели Chalk White', sku: 'FR-CW', cat: 'Mebel uchun', badge: 'Xit', img: '../assets/photos/white-dresser.jpg', price: 'dan 189 000', stock: 47, low: false, sold: 188, st: 'Faol',
+        variants: [['0,5 L', 'FR-CW-0500', '[IKPU]', '189 000', 22], ['1 L', 'FR-CW-1000', '[IKPU]', '329 000', 41], ['2,5 L', 'FR-CW-2500', '[IKPU]', '749 000', 6]] },
+      { name: 'Mato bo\'yog\'i spreyi', ru: 'Спрей-краска для ткани', sku: 'FR-FS', cat: 'Mato uchun', badge: 'Yangi', img: '../assets/photos/sprayer-hand.jpg', price: '249 000', stock: 132, low: false, sold: 236, st: 'Faol',
+        variants: [['Antrasit', 'FR-FS-ANT', '[IKPU]', '249 000', 38], ['Zaytun', 'FR-FS-OLV', '[IKPU]', '249 000', 44], ['Bej', 'FR-FS-BEJ', '[IKPU]', '249 000', 31], ['Kulrang', 'FR-FS-GRY', '[IKPU]', '249 000', 19]] },
+      { name: 'Mato tozalovchi sprey', ru: 'Очиститель для ткани', sku: 'FR-CL', cat: 'Mato uchun', badge: '—', img: '../assets/photos/green-spray-bottle.jpg', price: '149 000', stock: 58, low: false, sold: 171, st: 'Faol', variants: [['500 ml', 'FR-CL-0500', '[IKPU]', '149 000', 58]] },
+      { name: 'Himoya mumi Clear', ru: 'Защитный воск Clear', sku: 'FR-WX', cat: 'Mebel uchun', badge: '—', img: '../assets/photos/wax-varnish.jpg', price: 'dan 159 000', stock: 9, low: true, sold: 96, st: 'Faol', variants: [['250 ml', 'FR-WX-0250', '[IKPU]', '159 000', 4], ['500 ml', 'FR-WX-0500', '[IKPU]', '279 000', 5]] },
+      { name: 'Oval 40 cho\'tka', ru: 'Кисть Oval 40', sku: 'FR-BR-40', cat: 'Aksessuar', badge: '—', img: '../assets/photos/brush-hand.jpg', price: '119 000', stock: 64, low: false, sold: 88, st: 'Faol', variants: [['40 mm', 'FR-BR-40', '[IKPU]', '119 000', 64]] },
+      { name: 'Mikrofibra valik 10 sm', ru: 'Валик 10 см', sku: 'FR-RL-10', cat: 'Aksessuar', badge: '—', img: '../assets/photos/painting-materials.jpg', price: '79 000', stock: 70, low: false, sold: 52, st: 'Faol', variants: [['10 sm', 'FR-RL-10', '[IKPU]', '79 000', 70]] },
+      { name: 'Mebel yangilash to\'plami', ru: 'Набор для мебели', sku: 'FR-KIT-F', cat: 'To\'plam', badge: '−10%', img: '../assets/photos/white-shelf-bedroom.jpg', price: '549 000', stock: 18, low: false, sold: 74, st: 'Faol', variants: [['To\'plam', 'FR-KIT-F', 'komplekt', '549 000', 18]] },
+      { name: 'Divan yangilash to\'plami', ru: 'Набор для дивана', sku: 'FR-KIT-S', cat: 'To\'plam', badge: '−11%', img: '../assets/photos/classic-green-sofa.jpg', price: '799 000', stock: 0, low: true, sold: 142, st: 'Qoralama', variants: [['To\'plam', 'FR-KIT-S', 'komplekt', '799 000', 0]] }
+    ];
+    const row = 'display: grid; grid-template-columns: minmax(0, 1fr) 70px 110px 110px 90px 90px; gap: 10px; align-items: center; width: 100%; border: 0; border-bottom: 1px solid #EEEFEA; border-radius: 12px; padding: 10px 8px; font: inherit; font-size: 13px; color: #141712; cursor: pointer; ';
+    const cur = P[s.sel];
+    const seg = (on) => 'border: 0; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #141712; color: #FFFFFF;' : 'background: transparent; color: #5E6459;');
+    return {
+      rows: P.map((p, i) => ({ ...p, vars: p.variants.length, pick: () => this.setState({ sel: i }),
+        rowStyle: row + (i === s.sel ? 'background: #F1F5EC;' : 'background: transparent;'),
+        stockStyle: 'display: inline-block; border-radius: 999px; padding: 4px 10px; font-weight: 600; ' + (p.stock === 0 ? 'background: #FBEAE8; color: #8A1C12;' : p.low ? 'background: #FFF4D6; color: #6B4E00;' : 'color: #141712;'),
+        stStyle: 'display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; ' + (p.st === 'Faol' ? 'background: #E8F2EA; color: #1F5A30;' : 'background: #EEEFEA; color: #5E6459;') })),
+      cur: { ...cur, variants: cur.variants.map(([l, sku, ikpu, p, q]) => ({ l, sku, ikpu, p, q, qStyle: 'text-align: right; font-weight: 600; color: ' + (q === 0 ? '#B42318' : q < 10 ? '#9A6700' : '#141712') + ';' })) },
+      tabs: [['main', 'Asosiy'], ['vars', 'Variantlar'], ['img', 'Rasmlar'], ['seo', 'SEO']].map(([id, label]) => ({ label, pick: () => this.setState({ tab: id }), style: seg(id === s.tab) })),
+      tabMain: s.tab === 'main', tabVars: s.tab === 'vars', tabImg: s.tab === 'img', tabSeo: s.tab === 'seo'
+    };
+  }
+}
+</script>
+</body>
+</html>

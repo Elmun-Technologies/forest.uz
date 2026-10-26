@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Promo-kodlar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="promo" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Promo-kodlar va aksiyalar</h1>
+        <span style="font-size: 13px; color: #5E6459;">Har kod manba bilan: qaysi kanal qancha foyda keltirgani ko'rinadi · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <button type="button" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;">+ Yangi kod</button>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;">
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Kod bilan buyurtma · 30 kun</span><b style="font-size: 26px; font-weight: 600;">38%</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Berilgan chegirma</span><b style="font-size: 26px; font-weight: 600;">14,2 mln</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Kod keltirgan daromad</span><b style="font-size: 26px; font-weight: 600;">168 mln</b></div>
+      <div style="background: #FFF4D6; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #6B4E00; font-weight: 600;">Shubhali ishlatish</span><b style="font-size: 26px; font-weight: 600; color: #6B4E00;">3</b></div>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 560px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 18px 20px; box-sizing: border-box;">
+        <div style="overflow-x: auto;"><div style="min-width: 700px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 90px minmax(0, 1fr) 100px 110px 90px; gap: 10px; padding: 10px 8px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px;"><span>Kod</span><span>Chegirma</span><span>Manba</span><span style="text-align: right;">Ishlatildi</span><span style="text-align: right;">Daromad</span><span>Holat</span></div>
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="6">
+            <button type="button" onClick="{{r.pick}}" style="{{r.rowStyle}}">
+              <span style="display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0;"><b style="font-family: ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 700;">{{r.code}}</b><span style="font-size: 12px; color: #5E6459;">{{r.rule}}</span></span>
+              <b style="font-weight: 600;">{{r.val}}</b>
+              <span>{{r.src}}</span>
+              <span style="text-align: right;">{{r.used}}</span>
+              <b style="text-align: right; font-weight: 600;">{{r.rev}}</b>
+              <span><span style="{{r.stStyle}}">{{r.st}}</span></span>
+            </button>
+          </sc-for>
+        </div></div>
+      </div>
+
+      <aside style="flex: 2 1 380px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+        <span style="display: flex; justify-content: space-between; align-items: center;"><b style="font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: 0.02em;">{{cur.code}}</b><span style="{{cur.stStyle}}">{{cur.st}}</span></span>
+        <span style="font-size: 12px; font-weight: 600;">Turi</span>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+          <sc-for list="{{types}}" as="t" hint-placeholder-count="4"><button type="button" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; font-size: 12px;">
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Qiymat</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.val}}</span></span>
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Min. savat</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.min}}</span></span>
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Kimga</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.who}}</span></span>
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Limit</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.limit}}</span></span>
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Muddat</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.until}}</span></span>
+          <span style="display: flex; flex-direction: column; gap: 6px;"><b style="font-weight: 600;">Manba (UTM)</b><span style="border: 1px solid #DADDD3; border-radius: 12px; padding: 11px 12px; font-size: 14px;">{{cur.src}}</span></span>
+        </div>
+        <div style="background: #F7F7F4; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+          <b style="font-size: 12px;">Himoya qoidalari</b>
+          <span>✓ Boshqa kod va to'plam chegirmasi bilan qo'shilmaydi</span>
+          <span>✓ Marja himoyasi: jami chegirma ≤ 15%</span>
+          <span>✓ Bir telefon / bir qurilma — bir marta</span>
+        </div>
+        <div style="display: flex; gap: 8px;"><span style="flex: 1; text-align: center; border: 1px solid #DADDD3; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 600;">To'xtatish</span><span style="flex: 1; text-align: center; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px; font-size: 13px; font-weight: 600;">Saqlash</span></div>
+      </aside>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px;">
+      <h2 style="margin: 0 0 4px; font-size: 20px; font-weight: 600;">Avtomatik aksiyalar <span style="font-size: 13px; color: #5E6459; font-weight: 500;">· kodsiz, savatda o'zi qo'llanadi</span></h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; font-size: 13px;">
+        <div style="background: #F1F5EC; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 14px;">Bepul yetkazish</b><span style="color: #3F453B;">Toshkent [500 000]+ · viloyat [700 000]+</span></div>
+        <div style="background: #F1F5EC; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 14px;">To'plam narxi</b><span style="color: #3F453B;">To'plamlar −10–11%, kodlar bilan qo'shilmaydi</span></div>
+        <div style="background: #F7F7F4; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 6px;"><b style="font-size: 14px;">2-xarid sovg'asi</b><span style="color: #5E6459;">Cho'tka sovg'a · o'chiq</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 0, type: null }; }
+  renderVals() {
+    const s = this.state;
+    const R = [
+      { code: 'SALOM10', rule: 'Birinchi buyurtma', val: '−10%', type: 'pct', src: 'Bot lead', used: '412', rev: '93,1 mln', st: 'Faol', min: '—', who: 'Yangi mijozlar', limit: '1 / telefon', until: 'Muddatsiz' },
+      { code: 'SAVAT5', rule: 'Tashlangan savat', val: '−5%', type: 'pct', src: 'Bot 2 soat', used: '61', rev: '38,6 mln', st: 'Faol', min: '300 000', who: 'Savati qolganlar', limit: '1 / telefon · 24 soat', until: 'Shaxsiy · 24 soat' },
+      { code: 'RAHMAT5', rule: 'Foto-sharh uchun', val: '−5%', type: 'pct', src: 'Bot sharh', used: '88', rev: '24,3 mln', st: 'Faol', min: '—', who: 'Sharh qoldirganlar', limit: '1 / telefon', until: '60 kun' },
+      { code: 'ZARINA', rule: 'Bloger · Instagram', val: '−7%', type: 'pct', src: 'utm=zarina', used: '47', rev: '11,9 mln', st: 'Faol', min: '—', who: 'Hamma', limit: '500 jami', until: '30.11.2026' },
+      { code: 'KUZ50', rule: 'Kuzgi kampaniya', val: '50 000', type: 'sum', src: 'Meta reklama', used: '0', rev: '—', st: 'Rejada', min: '600 000', who: 'Hamma', limit: '1 / telefon', until: '01–15.11.2026' },
+      { code: 'TEST100', rule: 'Ichki test', val: '−100%', type: 'pct', src: '—', used: '3', rev: '—', st: 'Shubhali', min: '—', who: 'Xodimlar', limit: '—', until: '—' }
+    ];
+    const stS = (st) => 'display: inline-block; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 600; ' + (st === 'Faol' ? 'background: #E8F2EA; color: #1F6B35;' : st === 'Shubhali' ? 'background: #FBEAE8; color: #8A1C12;' : 'background: #EEEFEA; color: #5E6459;');
+    const row = 'display: grid; grid-template-columns: minmax(0, 1.3fr) 90px minmax(0, 1fr) 100px 110px 90px; gap: 10px; align-items: center; width: 100%; border: 0; border-bottom: 1px solid #EEEFEA; border-radius: 12px; padding: 12px 8px; font: inherit; font-size: 13px; color: #141712; cursor: pointer; text-align: left; ';
+    const cur = R[s.sel];
+    const type = s.type ?? cur.type;
+    return {
+      rows: R.map((r, i) => ({ ...r, stStyle: stS(r.st), pick: () => this.setState({ sel: i, type: null }), rowStyle: row + (i === s.sel ? 'background: #F1F5EC;' : 'background: transparent;') })),
+      cur: { ...cur, stStyle: stS(cur.st) },
+      types: [['pct', 'Foiz %'], ['sum', 'Summa so\'m'], ['ship', 'Bepul yetkazish'], ['gift', 'Sovg\'a mahsulot']].map(([id, label]) => ({ label, pick: () => this.setState({ type: id }),
+        style: 'border: 0; border-radius: 12px; padding: 11px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (id === type ? 'background: #141712; color: #FFFFFF;' : 'background: #EEEFEA; color: #141712;') }))
+    };
+  }
+}
+</script>
+</body>
+</html>

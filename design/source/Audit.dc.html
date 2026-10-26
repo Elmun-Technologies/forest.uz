@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · UI audit</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#EEEFEA}
+a{color:#141712}a:hover{color:#334229}
+</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 48px 24px 64px;">
+<div style="max-width: 1392px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+
+<section style="display: flex; flex-wrap: wrap; gap: 16px;">
+  <div style="flex: 2 1 640px; min-width: 0; background: #FFFFFF; border-radius: 40px; padding: 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+    <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">1-bosqich · UI va konversiya</span>
+    <h1 style="margin: 0; font-size: 80px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">UI audit<br><span style="display: inline-flex; align-items: center; gap: 24px;"><span style="display: inline-block; width: 100px; height: 8px; background: #141712; border-radius: 4px;"></span>va yechimlar</span></h1>
+    <p style="margin: 0; max-width: 640px; color: #5E6459; font-size: 17px; line-height: 1.6;">Maqsad: saytga kirgan har bir mijozni birinchi 3 soniyada ushlab qolish, keyin uni xaridga yoki kamida telefon raqamini qoldirishga olib borish.</p>
+  </div>
+  <div style="flex: 1 1 380px; min-width: 0; background: #141712; color: #FFFFFF; border-radius: 40px; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px;">
+    <span style="font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #A9B39E;">Mijoz yo'li</span>
+    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 15px;">
+      <span style="display: flex; gap: 12px; align-items: center;"><b style="width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 13px; flex: none;">1</b>Ushlab qolish: oldin/keyin slayder</span>
+      <span style="display: flex; gap: 12px; align-items: center;"><b style="width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 13px; flex: none;">2</b>Shaxsiylashtirish: buyum tanlovchi</span>
+      <span style="display: flex; gap: 12px; align-items: center;"><b style="width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 13px; flex: none;">3</b>Ishonch: natijalar, sharhlar, kafolat</span>
+      <span style="display: flex; gap: 12px; align-items: center;"><b style="width: 30px; height: 30px; border-radius: 50%; background: #FFFFFF; color: #141712; display: grid; place-items: center; font-size: 13px; flex: none;">4</b>Xarid: 1 sahifali checkout</span>
+      <span style="display: flex; gap: 12px; align-items: center;"><b style="width: 30px; height: 30px; border-radius: 50%; background: #D5DDC8; color: #141712; display: grid; place-items: center; font-size: 13px; flex: none;">5</b>Ketayotganni ushlash: −10% evaziga raqam</span>
+    </div>
+  </div>
+</section>
+
+<section style="background: #FFFFFF; border-radius: 40px; padding: 40px 48px; display: flex; flex-direction: column; gap: 20px;">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px;">
+    <h2 style="margin: 0; font-size: 44px; font-weight: 500; letter-spacing: -0.04em;">Topilgan kamchiliklar va qilingan ishlar</h2>
+    <span style="display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 600;">
+      <span style="background: #334229; color: #FFFFFF; border-radius: 999px; padding: 6px 12px;">Yuqori</span>
+      <span style="background: #D5DDC8; border-radius: 999px; padding: 6px 12px;">O'rta</span>
+      <span style="background: #EEEFEA; border-radius: 999px; padding: 6px 12px;">Past</span>
+    </span>
+  </div>
+  <div style="overflow-x: auto;">
+    <div style="min-width: 1100px; font-size: 14px; line-height: 1.5;">
+      <div style="display: grid; grid-template-columns: 26% minmax(0, 1fr) 110px 120px 150px; gap: 16px; padding: 12px 10px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;">
+        <span>Muammo</span><span>Yechim (kanvasda)</span><span>Ta'sir</span><span>Murakkablik</span><span>Sahifa</span>
+      </div>
+      <sc-for list="{{rows}}" as="r" hint-placeholder-count="12">
+        <div style="display: grid; grid-template-columns: 26% minmax(0, 1fr) 110px 120px 150px; gap: 16px; padding: 16px 10px; border-bottom: 1px solid #DADDD3; align-items: start;">
+          <b style="font-weight: 600;">{{r.p}}</b>
+          <span style="color: #3F453B;">{{r.s}}</span>
+          <span><span style="{{r.iStyle}}">{{r.i}}</span></span>
+          <span><span style="{{r.cStyle}}">{{r.c}}</span></span>
+          <a href="{{r.href}}" style="font-weight: 500;">{{r.page}}</a>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</section>
+
+<section style="display: flex; flex-wrap: wrap; gap: 16px;">
+  <div style="flex: 1 1 400px; min-width: 0; background: #D5DDC8; border-radius: 32px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+    <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">O'lchanadigan maqsadlar</span>
+    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5;">
+      <li>Bounce rate (bosh sahifa): [hozirgi] → maqsad −25%</li>
+      <li>Tanlovchi bilan ishlash: tashrifchilarning [X]%</li>
+      <li>Lead (telefon) konversiyasi: [X]% tashriflardan</li>
+      <li>Savat → buyurtma: [X]% → maqsad 60%+</li>
+      <li>Mobil sahifa yuklanishi: LCP 2,5 soniyadan kam</li>
+    </ul>
+  </div>
+  <div style="flex: 1 1 400px; min-width: 0; background: #FFFFFF; border-radius: 32px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+    <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">A/B test navbati</span>
+    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5;">
+      <li>Hero sarlavha: "yangidek bir kunda" va "yangisidan 5 barobar arzon"</li>
+      <li>Asosiy CTA: tanlovchi yoki to'g'ridan katalog</li>
+      <li>Popup vaqti: chiqishda yoki 40 soniyadan keyin</li>
+      <li>Chegirma: −10% yoki bepul yetkazish</li>
+    </ul>
+  </div>
+  <div style="flex: 1 1 400px; min-width: 0; background: #141712; color: #FFFFFF; border-radius: 32px; padding: 36px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+    <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">Kontentdan kerak</span>
+    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.5; color: #D9DED3;">
+      <li>5–10 ta haqiqiy oldin/keyin juft fotosi (bir xil burchakdan)</li>
+      <li>Qadoq fotolari oq fonda (packshot)</li>
+      <li>15 soniyalik vertikal video: bo'yash jarayoni</li>
+      <li>Birinchi 20 ta mijozdan fotoli sharh</li>
+    </ul>
+  </div>
+</section>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2700}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const lvl = (v) => 'display: inline-block; border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; ' + (v === 'Yuqori' ? 'background: #334229; color: #FFFFFF;' : v === "O'rta" ? 'background: #D5DDC8; color: #141712;' : 'background: #EEEFEA; color: #141712;');
+    const R = [
+      ['Hero foydani ko\'rsatmaydi, faqat chiroyli rasm', 'Interaktiv oldin/keyin slayder: natija 1 soniyada ko\'rinadi', 'Yuqori', 'Past', '01 Bosh sahifa', 'Main.dc.html'],
+      ['Mijoz qaysi mahsulot kerakligini bilmaydi', '"Nimani yangilaymiz?" tanlovchisi: buyum, tayyor to\'plam, narx, vaqt', 'Yuqori', "O'rta", '01 Bosh sahifa', 'Main.dc.html'],
+      ['Narx qimmat tuyuladi, solishtirish yo\'q', 'Tanlovchida "Yangisini sotib olish" va "Forest bilan" narxi yonma-yon', 'Yuqori', 'Past', '01 Bosh sahifa', 'Main.dc.html'],
+      ['Ijtimoiy isbot yo\'q (sharh, reyting, natija)', 'Reyting hero\'da, mijoz natijalari galereyasi, tasdiqlangan sharhlar bloki', 'Yuqori', 'Past', '01 Bosh sahifa', 'Main.dc.html'],
+      ['Ketayotgan mijoz izsiz yo\'qoladi', 'Exit-intent popup va sahifa oxirida −10% evaziga telefon raqami', 'Yuqori', 'Past', 'Popup', 'Popup.dc.html'],
+      ['Mobil versiya chizilmagan, trafik asosan telefondan', 'Mobil bosh sahifa, mahsulot va checkout; pastki doimiy panel', 'Yuqori', "O'rta", 'Mobil', 'Mobil-Bosh.dc.html'],
+      ['Mahsulotda "Sotib olish" pastga tushgach yo\'qoladi', 'Pastda doim ko\'rinadigan xarid paneli (narx, son, savat)', 'Yuqori', 'Past', '03 Mahsulot', 'Mahsulot.dc.html'],
+      ['Shoshilinchlik va yetkazish vaqti ko\'rinmaydi', '"Hozir buyurtma bersangiz, bugun 22:00 gacha" va ombordagi qoldiq', "O'rta", 'Past', '03 Mahsulot', 'Mahsulot.dc.html'],
+      ['E\'tirozlarga javob yo\'q (hid, chidamlilik, eplay olamanmi)', 'Xarid oldidan savollar bloki bosh sahifada', "O'rta", 'Past', '01 Bosh sahifa', 'Main.dc.html'],
+      ['Savolni tez berish imkoni yo\'q', 'Doimiy "Savol bormi?" Telegram tugmasi', "O'rta", 'Past', 'Barcha sahifalar', 'Main.dc.html'],
+      ['Kartochkada bir bosishda savatga qo\'shish yo\'q', 'Har kartochkada "Savatga" va reyting', "O'rta", 'Past', '01 Bosh sahifa', 'Main.dc.html'],
+      ['Ko\'p bo\'lim bir xil og\'irlikda, ierarxiya yo\'q', 'Bo\'limlar qisqartirildi: Ilhom va brend bloklari alohida sahifaga', 'Past', 'Past', '01 Bosh sahifa', 'Main.dc.html']
+    ];
+    return { rows: R.map(([p, s, i, c, page, href]) => ({ p, s, i, c, page, href, iStyle: lvl(i), cStyle: lvl(c === 'Past' ? 'Pastx' : c) })) };
+  }
+}
+</script>
+</body>
+</html>
