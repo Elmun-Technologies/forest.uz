@@ -112,8 +112,14 @@ describe('search, content, SEO feeds (integration)', () => {
       { variantId: cleaner.id, productSlug: 'mato-tozalovchi', qty: 1 },
       { variantId: spray.id, productSlug: 'mato-boyogi-spreyi', qty: 2 },
     ]);
-    // The sofa kit has no stock in the seed → flagged, not hidden.
     expect(res.body.selector.find((s: { key: string }) => s.key === 'divan').inStock).toBe(true);
+
+    // home.media from settings: hero slider with its product card, lead photo, no how-to video.
+    expect(res.body.hero.before.url).toMatch(/hero-before\.jpg$/);
+    expect(res.body.hero.after.url).toMatch(/hero-after\.jpg$/);
+    expect(res.body.hero.product.slug).toBe('divan-yangilash-toplami');
+    expect(res.body.leadImage.url).toMatch(/woman-green-sofa\.jpg$/);
+    expect(res.body.howTo).toBeNull();
   });
 
   it('home: reviews summary is the real aggregate of approved reviews only', async () => {
@@ -121,7 +127,13 @@ describe('search, content, SEO feeds (integration)', () => {
     const customer = await prisma.customer.create({
       data: { phone: '+998977770001', name: 'Malika Karimova' },
     });
-    const review = (rating: number, status: 'APPROVED' | 'PENDING', orderId: string) =>
+    const photo = await prisma.file.findFirstOrThrow({ where: { isPublic: true } });
+    const review = (
+      rating: number,
+      status: 'APPROVED' | 'PENDING',
+      orderId: string,
+      photoConsent = false,
+    ) =>
       prisma.review.create({
         data: {
           productId: product.id,
@@ -132,11 +144,13 @@ describe('search, content, SEO feeds (integration)', () => {
           locale: 'uz',
           source: 'web',
           status,
+          photoFileIds: [photo.id],
+          photoConsent,
         },
       });
     // Review.orderId has no FK in the schema; unique per (orderId, productId).
     const created = await Promise.all([
-      review(5, 'APPROVED', 'o-1'),
+      review(5, 'APPROVED', 'o-1', true),
       review(4, 'APPROVED', 'o-2'),
       review(1, 'PENDING', 'o-3'),
     ]);
@@ -151,6 +165,17 @@ describe('search, content, SEO feeds (integration)', () => {
         { stars: 1, pct: 0 },
       ]);
       expect(res.body.reviewsSummary.latest[0].author).toBe('Malika');
+
+      const list = await http().get('/v1/catalog/products/chalk-white/reviews').expect(200);
+      expect(list.body).toMatchObject({ page: 1, pageCount: 1, total: 2 });
+      const byRating = new Map(
+        list.body.items.map((r: { rating: number; photos: unknown[] }) => [r.rating, r]),
+      );
+      // Photos are published only with the customer's consent.
+      expect((byRating.get(5) as { photos: unknown[] }).photos).toHaveLength(1);
+      expect((byRating.get(4) as { photos: unknown[] }).photos).toEqual([]);
+      expect(list.body.items[0].author).toBe('Malika');
+      await http().get('/v1/catalog/products/no-such-product/reviews').expect(404);
     } finally {
       await prisma.review.deleteMany({ where: { id: { in: created.map((r) => r.id) } } });
       await prisma.customer.delete({ where: { id: customer.id } });

@@ -6,7 +6,9 @@ import {
   type ProductDetailDto,
   type ProductListDto,
   type ProductListQuery,
+  type ProductReviewsDto,
   productListQuerySchema,
+  productReviewsQuerySchema,
 } from '@forest/contracts';
 import { ReqLocale, ZodPipe } from '../common/http';
 import { CatalogService } from './catalog.service';
@@ -42,6 +44,16 @@ export class CatalogController {
   @Header('Cache-Control', CACHE)
   detail(@Param('slug') slug: string, @ReqLocale() locale: Locale): Promise<ProductDetailDto> {
     return this.catalog.detail(slug, locale);
+  }
+
+  @Get('products/:slug/reviews')
+  @Header('Cache-Control', CACHE)
+  reviews(
+    @Param('slug') slug: string,
+    @Query(new ZodPipe(productReviewsQuerySchema)) q: { page: number },
+    @ReqLocale() locale: Locale,
+  ): Promise<ProductReviewsDto> {
+    return this.catalog.reviews(slug, q.page, locale);
   }
 }
 

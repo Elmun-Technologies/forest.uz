@@ -13,7 +13,6 @@ import { ReqLocale, ZodPipe } from '../../common/http';
 import { maskPhonesInText } from '../../common/redact';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CustomerCommonModule } from '../common/customer-common.module';
-import { ProductCards } from '../common/product-cards';
 import { buildSearchTerms, queryTokens } from './search-terms';
 
 const MAX_CATEGORIES = 3;
@@ -26,7 +25,6 @@ export class SearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
-    private readonly cards: ProductCards,
   ) {}
 
   async search(q: SearchQuery, locale: Locale): Promise<SearchResultDto> {
@@ -43,7 +41,7 @@ export class SearchService {
     );
 
     const ids = terms.length ? await this.matchProducts(terms, q.limit) : [];
-    const products = await this.cards.byIds(ids, locale);
+    const products = await this.catalog.byIds(ids, locale);
     const categories = await this.matchCategories(tokens, products, locale);
     const suggestions = products.length ? [] : await this.suggest(normalized, categories, locale);
 

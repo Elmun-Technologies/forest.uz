@@ -91,5 +91,19 @@ export const settings: { [K in SettingKey]: SettingValue<K> } = {
   'seo.verification': { google: null, yandex: null, bing: null },
   'tracking.rules': { replaySamplePct: 30, replayCheckoutPct: 100 },
   'returns.rules': { returnDays: 14, defectReportHours: 48, refundBusinessDays: '3–10' },
+  // Stock photos (design/assets/photos) until the owner uploads real ones; no how-to video yet.
+  'home.media': {
+    hero: {
+      beforeKey: 'seed/photos/hero-before.jpg',
+      afterKey: 'seed/photos/hero-after.jpg',
+      alt: { uz: 'Divan yangilashdan oldin va keyin', ru: 'Диван до и после обновления' },
+      productSlug: 'divan-yangilash-toplami',
+    },
+    howTo: null,
+    leadImage: {
+      key: 'seed/photos/woman-green-sofa.jpg',
+      alt: { uz: 'Yangilangan yashil divan', ru: 'Обновлённый зелёный диван' },
+    },
+  },
   flags: { marketplace: false, cod: true, bnpl: false },
 };

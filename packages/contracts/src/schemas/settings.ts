@@ -64,6 +64,29 @@ export const settingSchemas = {
     refundBusinessDays: z.string(),
   }),
   flags: z.object({ marketplace: z.boolean(), cod: z.boolean(), bnpl: z.boolean() }),
+  /**
+   * Home page media blocks (admin-managed). Images are referenced by storage key; a block whose
+   * value is null (or whose file is missing) is hidden.
+   */
+  'home.media': z.object({
+    hero: z
+      .object({
+        beforeKey: z.string().min(1),
+        afterKey: z.string().min(1),
+        alt: loc,
+        /** "Shu natija uchun" card on the slider; null hides the card. */
+        productSlug: z.string().nullable(),
+      })
+      .nullable(),
+    howTo: z
+      .object({
+        videoUrl: z.url(),
+        posterKey: z.string().nullable(),
+        durationMinutes: z.number().int().positive().nullable(),
+      })
+      .nullable(),
+    leadImage: z.object({ key: z.string().min(1), alt: loc }).nullable(),
+  }),
 } as const;
 
 export type SettingKey = keyof typeof settingSchemas;

@@ -7,13 +7,20 @@ import {
   type ProductDetailDto,
   type ProductListDto,
   type ProductListQuery,
+  type ProductReviewsDto,
   t,
   tiyinToSoumInt,
 } from '@forest/contracts';
 import { Prisma } from '@forest/db';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { availableQty, formatVolume, mapProductCard, mapVariant } from './catalog.mapper';
+import {
+  availableQty,
+  formatVolume,
+  mapProductCard,
+  mapVariant,
+  reviewAuthor,
+} from './catalog.mapper';
 
 const cardInclude = {
   variants: true,
@@ -23,6 +30,8 @@ const cardInclude = {
 } satisfies Prisma.ProductInclude;
 
 type CardRow = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
+
+const REVIEWS_PAGE_SIZE = 6;
 
 @Injectable()
 export class CatalogService {
@@ -185,6 +194,75 @@ export class CatalogService {
       include: cardInclude,
     });
     return rows.map((p) => this.toCard(p, locale));
+  }
+
+  /** Active product cards for an explicit id list (favorites, search hits), in the given order. */
+  async byIds(ids: readonly string[], locale: Locale): Promise<ProductCardDto[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.product.findMany({
+      where: { id: { in: [...ids] }, status: 'ACTIVE' },
+      include: cardInclude,
+    });
+    const byId = new Map(rows.map((p) => [p.id, p]));
+    return ids.flatMap((id) => {
+      const p = byId.get(id);
+      return p ? [this.toCard(p, locale)] : [];
+    });
+  }
+
+  async bySlug(slug: string, locale: Locale): Promise<ProductCardDto | null> {
+    const p = await this.prisma.product.findFirst({
+      where: { slug, status: 'ACTIVE' },
+      include: cardInclude,
+    });
+    return p ? this.toCard(p, locale) : null;
+  }
+
+  /** Approved reviews, newest first; photos only with publication consent. */
+  async reviews(slug: string, page: number, locale: Locale): Promise<ProductReviewsDto> {
+    const product = await this.prisma.product.findFirst({
+      where: { slug, status: 'ACTIVE' },
+      select: { id: true, name: true },
+    });
+    if (!product) throw new DomainError('PRODUCT_NOT_FOUND');
+    const where = { productId: product.id, status: 'APPROVED' as const };
+    const [total, rows] = await Promise.all([
+      this.prisma.review.count({ where }),
+      this.prisma.review.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * REVIEWS_PAGE_SIZE,
+        take: REVIEWS_PAGE_SIZE,
+        include: { customer: { select: { name: true } } },
+      }),
+    ]);
+    const photoIds = rows.flatMap((r) => (r.photoConsent ? r.photoFileIds : []));
+    const files = photoIds.length
+      ? new Map(
+          (await this.prisma.file.findMany({ where: { id: { in: photoIds } } })).map((f) => [
+            f.id,
+            f,
+          ]),
+        )
+      : new Map<string, never>();
+    return {
+      items: rows.map((r) => ({
+        id: r.id,
+        author: reviewAuthor(r.customer.name, locale),
+        rating: r.rating,
+        text: r.text,
+        createdAt: r.createdAt.toISOString(),
+        photos: r.photoConsent
+          ? r.photoFileIds
+              .map((id) => this.files.image(files.get(id), product.name, locale))
+              .filter((i): i is NonNullable<typeof i> => i !== null)
+          : [],
+        reply: r.reply,
+      })),
+      page,
+      pageCount: Math.max(1, Math.ceil(total / REVIEWS_PAGE_SIZE)),
+      total,
+    };
   }
 
   async detail(slug: string, locale: Locale): Promise<ProductDetailDto> {

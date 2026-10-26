@@ -58,9 +58,9 @@ export interface HomeHowToDto {
 
 export interface HomeContentDto {
   /** Optional media blocks (admin-managed); missing → block degrades gracefully. */
-  hero?: HomeHeroDto | null;
-  howTo?: HomeHowToDto | null;
-  leadImage?: ImageDto | null;
+  hero: HomeHeroDto | null;
+  howTo: HomeHowToDto | null;
+  leadImage: ImageDto | null;
   selector: SelectorItemDto[];
   faq: { q: string; a: string }[];
   bestsellers: ProductCardDto[];

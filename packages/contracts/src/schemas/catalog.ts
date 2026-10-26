@@ -86,6 +86,31 @@ export interface ProductListDto {
   };
 }
 
+/** GET /v1/catalog/products/:slug/reviews — approved reviews only. */
+export interface ProductReviewDto {
+  id: string;
+  /** First name only (reviews are public). */
+  author: string;
+  rating: number;
+  text: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** Only photos the customer consented to publish. */
+  photos: ImageDto[];
+  reply: string | null;
+}
+
+export interface ProductReviewsDto {
+  items: ProductReviewDto[];
+  page: number;
+  pageCount: number;
+  total: number;
+}
+
+export const productReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(500).default(1),
+});
+
 export interface ProductDetailDto extends ProductCardDto {
   shortDesc: string;
   description: string;

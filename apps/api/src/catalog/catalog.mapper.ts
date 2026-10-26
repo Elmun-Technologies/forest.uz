@@ -114,3 +114,10 @@ export function mapProductCard(p: ProductRow, locale: Locale): ProductCardDto {
     seller: p.seller,
   };
 }
+
+const ANONYMOUS_AUTHOR = { uz: 'Xaridor', ru: 'Покупатель' } as const;
+
+/** Public reviewer label: first name only (full names are not public), else "Xaridor". */
+export function reviewAuthor(name: string | null, locale: Locale): string {
+  return name?.trim().split(/\s+/)[0] || ANONYMOUS_AUTHOR[locale];
+}

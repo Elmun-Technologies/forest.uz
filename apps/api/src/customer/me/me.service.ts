@@ -18,7 +18,7 @@ import type { z } from 'zod';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
 import { ConsentsService } from '../common/consents';
-import { ProductCards } from '../common/product-cards';
+import { CatalogService } from '../../catalog/catalog.service';
 
 type AddressInput = z.infer<typeof addressSchema>;
 
@@ -54,7 +54,7 @@ export class MeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly consents: ConsentsService,
-    private readonly cards: ProductCards,
+    private readonly catalog: CatalogService,
     private readonly settings: SettingsService,
   ) {}
 
@@ -170,7 +170,7 @@ export class MeService {
       where: { customerId },
       orderBy: { createdAt: 'desc' },
     });
-    return this.cards.byIds(
+    return this.catalog.byIds(
       rows.map((r) => r.productId),
       locale,
     );

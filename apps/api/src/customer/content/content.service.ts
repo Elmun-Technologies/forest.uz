@@ -4,7 +4,10 @@ import {
   type ContentPageDto,
   DomainError,
   type GalleryItemDto,
+  type HomeHeroDto,
+  type HomeHowToDto,
   type HomeContentDto,
+  type ImageDto,
   LEGAL_SLUGS,
   type Locale,
   PAGE_KINDS,
@@ -16,7 +19,7 @@ import {
   tiyinToSoumInt,
 } from '@forest/contracts';
 import { z } from 'zod';
-import { availableQty } from '../../catalog/catalog.mapper';
+import { availableQty, reviewAuthor } from '../../catalog/catalog.mapper';
 import { CatalogService } from '../../catalog/catalog.service';
 import { FilesService } from '../../files/files.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -28,7 +31,6 @@ const selectorItemsSchema = z.array(
 );
 const pageDataSchema = z.object({ subtitle: z.string().optional() }).passthrough();
 
-const ANONYMOUS_AUTHOR = { uz: 'Xaridor', ru: 'Покупатель' } as const;
 const LATEST_REVIEWS = 3;
 const GALLERY_MAX = 12;
 
@@ -54,14 +56,53 @@ export class ContentService {
 
   async home(locale: Locale): Promise<HomeContentDto> {
     const vars = await this.vars();
-    const [selector, faq, bestsellers, reviewsSummary, gallery] = await Promise.all([
+    const [media, selector, faq, bestsellers, reviewsSummary, gallery] = await Promise.all([
+      this.homeMedia(locale),
       this.selector(locale),
       this.homeFaq(locale, vars),
       this.catalog.bestsellers(locale),
       this.reviewsSummary(locale),
       this.gallery(locale),
     ]);
-    return { selector, faq, bestsellers, reviewsSummary, gallery };
+    return { ...media, selector, faq, bestsellers, reviewsSummary, gallery };
+  }
+
+  /** Hero slider, how-to video and lead photo from `home.media`; missing files hide the block. */
+  private async homeMedia(
+    locale: Locale,
+  ): Promise<{ hero: HomeHeroDto | null; howTo: HomeHowToDto | null; leadImage: ImageDto | null }> {
+    const m = await this.settings.get('home.media');
+    const keys = [m.hero?.beforeKey, m.hero?.afterKey, m.howTo?.posterKey, m.leadImage?.key].filter(
+      (k): k is string => !!k,
+    );
+    const files = new Map(
+      (await this.prisma.file.findMany({ where: { key: { in: keys } } })).map((f) => [f.key, f]),
+    );
+    const img = (key: string | null | undefined, alt: unknown) =>
+      key ? this.files.image(files.get(key), alt, locale) : null;
+
+    let hero: HomeHeroDto | null = null;
+    if (m.hero) {
+      const before = img(m.hero.beforeKey, m.hero.alt);
+      const after = img(m.hero.afterKey, m.hero.alt);
+      if (before && after) {
+        const product = m.hero.productSlug
+          ? await this.catalog.bySlug(m.hero.productSlug, locale)
+          : null;
+        hero = { before, after, product };
+      }
+    }
+    return {
+      hero,
+      howTo: m.howTo
+        ? {
+            videoUrl: m.howTo.videoUrl,
+            poster: img(m.howTo.posterKey, ''),
+            durationMinutes: m.howTo.durationMinutes,
+          }
+        : null,
+      leadImage: m.leadImage ? img(m.leadImage.key, m.leadImage.alt) : null,
+    };
   }
 
   /** Tiles priced live from current variant prices; a tile whose SKU no longer sells is hidden. */
@@ -149,7 +190,7 @@ export class ContentService {
         pct: Math.round(((groups.find((g) => g.rating === stars)?._count ?? 0) * 100) / agg._count),
       })),
       latest: latest.map((r) => ({
-        author: authorName(r.customer.name, locale),
+        author: reviewAuthor(r.customer.name, locale),
         city: null,
         text: r.text ?? '',
         productName: t(r.product.name, locale),
@@ -178,7 +219,7 @@ export class ContentService {
       return [
         {
           title: t(r.product.name, locale),
-          meta: authorName(r.customer.name, locale),
+          meta: reviewAuthor(r.customer.name, locale),
           before: r.beforeFileId
             ? this.files.image(files.get(r.beforeFileId), r.product.name, locale)
             : null,
@@ -256,9 +297,4 @@ export class ContentService {
     const s = pageDataSchema.safeParse(data ?? {});
     return s.success && s.data.subtitle ? fillText(s.data.subtitle, vars) : null;
   }
-}
-
-function authorName(name: string | null, locale: Locale): string {
-  // First name only: reviews are public, full names are not.
-  return name?.trim().split(/\s+/)[0] || ANONYMOUS_AUTHOR[locale];
 }
