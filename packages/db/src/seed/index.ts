@@ -373,6 +373,21 @@ async function seedIntegrations() {
   }
 }
 
+/**
+ * `--force` (dev reset): release every open reservation so repeated e2e runs don't drain the
+ * seeded stock (COD orders hold stock for 24 h). Orders themselves are kept.
+ */
+async function releaseReservations() {
+  if (!force) return;
+  const now = new Date();
+  const released = await prisma.reservation.updateMany({
+    where: { releasedAt: null },
+    data: { releasedAt: now },
+  });
+  await prisma.variant.updateMany({ where: { reserved: { gt: 0 } }, data: { reserved: 0 } });
+  console.log(`✓ reservations released: ${released.count}`);
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production' && !process.argv.includes('--allow-production')) {
     throw new Error('Refusing to seed production. Pass --allow-production if you really mean it.');
@@ -380,6 +395,7 @@ async function main() {
   const files = await seedFiles();
   await seedSettings();
   await seedCatalog(files);
+  await releaseReservations();
   await seedContent(files);
   await seedOwner();
   await seedIntegrations();

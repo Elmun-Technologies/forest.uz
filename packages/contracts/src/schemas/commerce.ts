@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { uzPhoneSchema } from './common';
 import type { ImageDto } from './catalog';
 import type { DeliveryStatus, OrderStatus, PaymentMethod, PaymentStatus } from '../order-state';
+import type { Locale } from '../locale';
 
 // ───────── Cart ─────────
 
@@ -135,6 +136,8 @@ export interface OrderItemDto {
 
 export interface OrderPublicDto {
   number: string;
+  /** Language the customer ordered in (tracking links open in it). */
+  locale: Locale;
   publicId: string;
   status: OrderStatus;
   paymentStatus: PaymentStatus;

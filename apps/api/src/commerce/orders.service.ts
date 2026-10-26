@@ -147,6 +147,7 @@ export class OrdersService {
         : null;
     return {
       number: o.number,
+      locale: o.locale,
       publicId: o.publicId,
       status: o.status,
       paymentStatus: payment?.status ?? 'PENDING',
