@@ -127,6 +127,8 @@ services:
       SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
       ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.localhost}
       API_DOMAIN: ${API_DOMAIN:-api.localhost}
+      # Space-separated CIDRs of the CDN in front (Cloudflare ranges in production).
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data

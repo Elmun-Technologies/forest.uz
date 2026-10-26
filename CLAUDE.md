@@ -174,13 +174,15 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Webhook handlers must be idempotent; return 200 quickly and process async.
 - Time zone: Asia/Tashkent for cut-offs and SLA; tests with fixed clock.
 - Don't cache personalized HTML/API at Cloudflare.
+- Next resolves `rewrites()` and edge-middleware env at **build** time: `API_INTERNAL_URL` must be a Docker build arg for the web image, not only runtime env.
+- Pages under `[locale]` (layout has `generateStaticParams`) that read cookies/searchParams need `export const dynamic = 'force-dynamic'`, else 500 `DYNAMIC_SERVER_USAGE` in production only. Always run e2e against a production build before closing a phase.
 - Never put `NODE_ENV` in `.env`: `next build` with NODE_ENV=development fails ("<Html> should not be imported…").
 - Running `pnpm install`/`turbo build` while `pnpm dev` runs can crash dev servers (packages rebuilt/relinked) — restart `pnpm dev`.
 - Don't `pkill -f <pattern>` with a pattern that appears in your own shell command (kills the shell); use `pkill -f "next-serve[r]"`.
 - Write NBSP as `'\u00A0'` in source (literal NBSP fails eslint no-irregular-whitespace). Money formatting already uses NBSP separators — tests compare with `\u00A0`.
 - Prisma: after schema edits run `pnpm db:generate` (client lives in packages/db/generated). Partition tables are in schema `event_parts` — never move them to `public`.
 - API integration test files share one seeded Testcontainers DB (settings, Integration rows) and must run sequentially: Vitest 3 ignores `fileParallelism` inside `projects`, so `apps/api/vitest.config.ts` also sets `poolOptions.forks.singleFork`. Tests that change shared rows restore them in `afterAll`.
-- Client IP (OTP/lead rate limits) = Express `trust proxy 1` → the last `X-Forwarded-For` hop. Correct only because Caddy overwrites XFF and Next's `/api` rewrite passes it through: never publish web :3000 or api :4000 beyond 127.0.0.1. Behind Cloudflare, read `CF-Connecting-IP` from trusted CF ranges (Phase 6).
+- Client IP (OTP/lead/checkout rate limits) = Express `trust proxy = TRUST_PROXY_HOPS` over `X-Forwarded-For`; Next's `/api` rewrite passes XFF through without adding a hop. 1 hop = Caddy only; 2 = Cloudflare → Caddy with Caddy `TRUSTED_PROXIES` = Cloudflare ranges (`docs/runbooks/deploy-network.md`). Never publish web :3000 / api :4000 beyond 127.0.0.1.
 - Docker Hub may rate-limit; `mirror.gcr.io/library/<image>` is a drop-in mirror.
 - Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 

@@ -11,6 +11,12 @@ const base64Key = z
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().default(4000),
+  /**
+   * Proxy hops in front of the API whose X-Forwarded-For entries are trusted (Express
+   * `trust proxy`). 1 = Caddy only (Caddy replaces untrusted XFF); 2 = Cloudflare → Caddy, with
+   * Caddy's `trusted_proxies` set to Cloudflare's ranges. Rate limits key on this client IP.
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
   APP_URL: z.url().default('http://localhost:3000'),
   ADMIN_URL: z.url().default('http://localhost:3001'),
   API_URL: z.url().default('http://localhost:4000'),

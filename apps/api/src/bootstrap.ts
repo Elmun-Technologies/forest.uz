@@ -11,7 +11,7 @@ import type { Env } from './config/env';
 export function configureApp(app: NestExpressApplication): INestApplication {
   const env = app.get<Env>(ENV);
   app.useLogger(app.get(Logger));
-  app.set('trust proxy', 1);
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.set('json replacer', jsonReplacer);
   app.disable('x-powered-by');
   app.use(
