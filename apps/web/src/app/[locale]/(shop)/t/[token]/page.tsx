@@ -88,7 +88,11 @@ export default async function TrackingPage({ params }: Props) {
         <div className="flex flex-col gap-2.5">
           <span className="text-[13px] text-muted">{t('linkNote')}</span>
           <h1 className="text-[30px] leading-[0.95] font-medium tracking-[-0.05em] sm:text-[36px] lg:text-[64px]">
-            {t('title', { number: o.number })}
+            {/* The order number must not wrap at its dash on narrow screens. */}
+            {t.rich('title', {
+              number: o.number,
+              num: (chunks) => <span className="whitespace-nowrap">{chunks}</span>,
+            })}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-6 rounded-lg bg-ink px-6 py-6 text-white lg:rounded-[28px] lg:px-8 lg:py-7">

@@ -170,11 +170,12 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Write NBSP as `'\u00A0'` in source (literal NBSP fails eslint no-irregular-whitespace). Money formatting already uses NBSP separators — tests compare with `\u00A0`.
 - Prisma: after schema edits run `pnpm db:generate` (client lives in packages/db/generated). Partition tables are in schema `event_parts` — never move them to `public`.
 - API integration test files share one seeded Testcontainers DB (settings, Integration rows) and must run sequentially: Vitest 3 ignores `fileParallelism` inside `projects`, so `apps/api/vitest.config.ts` also sets `poolOptions.forks.singleFork`. Tests that change shared rows restore them in `afterAll`.
+- Client IP (OTP/lead rate limits) = Express `trust proxy 1` → the last `X-Forwarded-For` hop. Correct only because Caddy overwrites XFF and Next's `/api` rewrite passes it through: never publish web :3000 or api :4000 beyond 127.0.0.1. Behind Cloudflare, read `CF-Connecting-IP` from trusted CF ranges (Phase 6).
 - Docker Hub may rate-limit; `mirror.gcr.io/library/<image>` is a drop-in mirror.
 - Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 
 ## 18. TODO / status
-Track phases in `docs/progress.md`. Current phase: **Phase 1 (Storefront) in progress** — API commerce/customer + Home/Catalog/Product done; Cart/Checkout/Order/Tracking/Login/Cabinet/Legal next.
+Track phases in `docs/progress.md`. Current phase: **Phase 1 (Storefront) — all pages built, closing (Lighthouse, review, report)**; Phase 2 started (Payme/Click done).
 
 ## 19. Known limitations
 BTS API docs unknown (manual mode fallback); COD fiscal provider TBD; real content/prices pending (see `docs/13-open-questions.md`).

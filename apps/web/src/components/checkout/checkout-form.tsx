@@ -897,11 +897,7 @@ function ShippingValue({ cart, locale }: { cart: CartDto; locale: 'uz' | 'ru' })
   const tc = useTranslations('common');
   const s = cart.totals.shippingSoum;
   if (s === null) return <>—</>;
-  return s === 0 ? (
-    <>{tc('freeShipping')}</>
-  ) : (
-    <Price soum={s} locale={locale} withCurrency={false} />
-  );
+  return s === 0 ? <>{tc('freeShipping')}</> : <Price soum={s} locale={locale} />;
 }
 
 function Totals({ cart, locale }: { cart: CartDto; locale: 'uz' | 'ru' }) {

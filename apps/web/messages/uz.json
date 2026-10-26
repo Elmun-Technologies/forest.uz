@@ -639,7 +639,7 @@
   },
   "track": {
     "metaTitle": "Buyurtmani kuzatish",
-    "title": "Buyurtma #{number}",
+    "title": "Buyurtma <num>#{number}</num>",
     "linkNote": "Kirishsiz ochiladi · havola SMS va botda",
     "etaCourier": "Kuryer yo'lda · taxminiy yetib kelish",
     "etaPromise": "Yetkazish muddati",
