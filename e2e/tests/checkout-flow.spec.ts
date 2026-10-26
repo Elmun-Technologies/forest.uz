@@ -6,14 +6,17 @@ import {
   placeOrder,
   quietOverlays,
   readOtp,
-  spreadOtpIp,
+  spreadClientIp,
   uniquePhone,
 } from './helpers';
 
 /** Navigations may hit a first-time route compile on the dev server. */
 const NAV = { timeout: 20_000 };
 
-test.beforeEach(async ({ context, baseURL }) => quietOverlays(context, baseURL));
+test.beforeEach(async ({ context, baseURL }) => {
+  await quietOverlays(context, baseURL);
+  await spreadClientIp(context);
+});
 
 test.describe('Phase 1 acceptance: browse → promo → COD → order → tracking', () => {
   test('home → catalog → filter → product → calculator → cart → SALOM10 → checkout COD → order → tracking', async ({
@@ -154,7 +157,6 @@ test.describe('account', () => {
     await expect(page).toHaveURL(/\/uz\/buyurtma\//, NAV);
     const number = (await page.getByTestId('order-number').innerText()).replace('№ ', '');
 
-    await spreadOtpIp(page);
     await page.goto('/uz/kabinet');
     await expect(page).toHaveURL(/\/uz\/kirish\?next=/, NAV);
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);

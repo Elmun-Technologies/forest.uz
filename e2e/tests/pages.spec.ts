@@ -5,13 +5,17 @@ import {
   noPlaceholders,
   placeOrder,
   quietOverlays,
+  spreadClientIp,
   uniquePhone,
 } from './helpers';
 
 /** Navigations may hit a first-time route compile on the dev server. */
 const NAV = { timeout: 20_000 };
 
-test.beforeEach(async ({ context, baseURL }) => quietOverlays(context, baseURL));
+test.beforeEach(async ({ context, baseURL }) => {
+  await quietOverlays(context, baseURL);
+  await spreadClientIp(context);
+});
 
 test.describe('RU locale', () => {
   test('cart, checkout, order and tracking work in Russian', async ({

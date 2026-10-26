@@ -32,18 +32,21 @@ export function uniquePhone(): string {
 }
 
 /**
- * Locally all browsers share one IP and the API allows 5 OTP sends per IP per hour; give each
- * send its own forwarded address (the dev stack trusts one proxy hop) so reruns don't collide.
+ * All test browsers share one IP, while the API rate-limits OTP sends (5/h per IP) and checkouts
+ * (10/min per IP). Give each such request its own forwarded address — the e2e stacks have no
+ * proxy in front, so the API's single trusted hop is the browser's X-Forwarded-For.
  */
-export async function spreadOtpIp(page: Page) {
-  await page.route('**/api/auth/otp/send', (route) =>
-    route.continue({
-      headers: {
-        ...route.request().headers(),
-        'x-forwarded-for': `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`,
-      },
-    }),
-  );
+const randomIp = () =>
+  `10.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
+
+export async function spreadClientIp(target: Page | BrowserContext) {
+  for (const path of ['**/api/auth/otp/send', '**/api/checkout/orders']) {
+    await target.route(path, (route) =>
+      route.continue({
+        headers: { ...route.request().headers(), 'x-forwarded-for': randomIp() },
+      }),
+    );
+  }
 }
 
 /** Latest OTP the fake SMS provider captured for a phone (dev outbox; never used by the UI). */
