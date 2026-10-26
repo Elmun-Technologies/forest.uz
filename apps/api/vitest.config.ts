@@ -18,7 +18,10 @@ export default defineConfig({
           include: ['test/**/*.int.test.ts'],
           testTimeout: 60_000,
           hookTimeout: 180_000,
+          // Suites share one seeded DB (settings, integration rows). `fileParallelism` alone is
+          // ignored inside `projects` in Vitest 3, so files also share a single fork → sequential.
           fileParallelism: false,
+          poolOptions: { forks: { singleFork: true } },
           globalSetup: ['test/global-setup.ts'],
         },
       },
