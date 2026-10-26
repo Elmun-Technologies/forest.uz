@@ -59,6 +59,7 @@ export function FloatingActions({ telegramBot }: { telegramBot: string | null })
             {count > 0 ? (
               <Link
                 href={routes.cart}
+                prefetch={false}
                 data-testid="mobile-cart-bar"
                 className="pointer-events-auto flex h-14 flex-1 items-center justify-between rounded-pill bg-ink pr-2 pl-[22px] text-[15px] font-semibold text-white"
               >

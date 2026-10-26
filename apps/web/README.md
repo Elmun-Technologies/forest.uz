@@ -87,3 +87,12 @@ should call `setCart` with every `CartDto` they receive so the header stays in s
 - Logos: `<Logo src={staticImport} className="h-5" />` (`src/components/ui/logo.tsx`).
   Product/stock photos always come from the API (S3).
 - Bottom sheets: `Sheet` (`src/components/ui/sheet.tsx`, Radix Dialog). Toasts: `useToast()`.
+
+## Performance rules (Lighthouse mobile ≥ 90, see CLAUDE.md §6)
+
+- Chrome/secondary links (header, footer, legal, breadcrumbs, locale switch) take `prefetch={false}`;
+  keep default prefetch only on the primary browse path (CTAs, category chips, product cards).
+- No storage/cookie reads in mount effects; use `onIdle(fn)` (`src/lib/idle.ts`) or read on demand.
+- Interaction-only UI (dialogs, sheets, popups, consent panel) loads via `next/dynamic` when needed.
+- Don't add `app/[locale]/not-found.tsx` (its tree ships in every page's RSC payload) and don't
+  preload the web font. CSS is inlined (`experimental.inlineCss`); messages are precompiled.

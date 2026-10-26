@@ -267,14 +267,18 @@ export default async function ProductPage({ params }: Props) {
           >
             <ol className="flex flex-wrap gap-1">
               <li>
-                <Link href={routes.home} className="hover:text-ink">
+                <Link href={routes.home} prefetch={false} className="hover:text-ink">
                   {tc('home')}
                 </Link>{' '}
                 /
               </li>
               {p.categorySlug && p.categoryName ? (
                 <li>
-                  <Link href={routes.category(p.categorySlug)} className="hover:text-ink">
+                  <Link
+                    href={routes.category(p.categorySlug)}
+                    prefetch={false}
+                    className="hover:text-ink"
+                  >
                     {p.categoryName}
                   </Link>{' '}
                   /

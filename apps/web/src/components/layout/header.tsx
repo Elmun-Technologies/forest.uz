@@ -26,7 +26,12 @@ export async function Header({ locale, phone, hours }: HeaderProps) {
     <header data-chrome-mobile className="sticky top-0 z-40 bg-canvas lg:static">
       {/* Desktop */}
       <div className="mx-auto hidden max-w-[1440px] items-center gap-4 px-6 py-4 lg:flex">
-        <Link href={routes.home} aria-label={t('homeLabel')} className="block w-[120px] shrink-0">
+        <Link
+          href={routes.home}
+          prefetch={false}
+          aria-label={t('homeLabel')}
+          className="block w-[120px] shrink-0"
+        >
           <Image src={logo} alt="Forest" width={120} sizes="120px" />
         </Link>
         <NavLinks className="ml-6" />
@@ -55,6 +60,7 @@ export async function Header({ locale, phone, hours }: HeaderProps) {
           </Suspense>
           <Link
             href={routes.account}
+            prefetch={false}
             aria-label={t('account')}
             title={t('account')}
             className="grid size-12 place-items-center rounded-pill bg-panel text-ink transition-colors hover:bg-sage-50"
@@ -68,11 +74,17 @@ export async function Header({ locale, phone, hours }: HeaderProps) {
       {/* Mobile */}
       <div className="flex items-center gap-2 px-4 py-3 lg:hidden">
         <MobileMenu locale={locale} phone={phone} hours={hours} />
-        <Link href={routes.home} aria-label={t('homeLabel')} className="mx-auto block w-24">
+        <Link
+          href={routes.home}
+          prefetch={false}
+          aria-label={t('homeLabel')}
+          className="mx-auto block w-24"
+        >
           <Image src={logo} alt="Forest" width={96} sizes="96px" />
         </Link>
         <Link
           href={routes.search}
+          prefetch={false}
           aria-label={t('search')}
           className="grid size-11 place-items-center rounded-pill bg-panel text-ink"
         >

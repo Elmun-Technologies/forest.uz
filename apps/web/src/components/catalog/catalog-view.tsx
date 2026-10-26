@@ -103,14 +103,14 @@ export async function CatalogView({
             <nav aria-label={tc('breadcrumb')} className="hidden text-[13px] text-muted lg:block">
               <ol className="flex flex-wrap gap-1">
                 <li>
-                  <Link href={routes.home} className="hover:text-ink">
+                  <Link href={routes.home} prefetch={false} className="hover:text-ink">
                     {tc('home')}
                   </Link>{' '}
                   /
                 </li>
                 {category ? (
                   <li>
-                    <Link href={routes.catalog} className="hover:text-ink">
+                    <Link href={routes.catalog} prefetch={false} className="hover:text-ink">
                       {t('title')}
                     </Link>{' '}
                     /

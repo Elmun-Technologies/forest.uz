@@ -38,7 +38,7 @@ export default function ConsentBanner() {
       </h2>
       <p className="leading-relaxed text-ink-2">
         {t('text')}{' '}
-        <Link href={routes.privacy} className="font-medium underline">
+        <Link href={routes.privacy} prefetch={false} className="font-medium underline">
           {t('privacy')}
         </Link>
       </p>

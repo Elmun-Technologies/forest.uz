@@ -48,9 +48,17 @@ export function LeadPopup({
   const quiet = quietRoutes.some((r) => pathname.startsWith(r));
 
   useEffect(() => {
-    if (quiet || suppressed()) return;
+    // No cookie/storage reads at mount (the first storage access of a page is a synchronous
+    // round-trip to the browser and would land in hydration): `show()` checks before opening and
+    // detaches the triggers for suppressed visitors.
+    if (quiet) return;
+    let detach = () => {};
     const show = () => {
-      if (!readConsent() || suppressed()) return false;
+      if (suppressed()) {
+        detach();
+        return false;
+      }
+      if (!readConsent()) return false;
       try {
         sessionStorage.setItem(SHOWN_KEY, '1');
       } catch {
@@ -68,7 +76,8 @@ export function LeadPopup({
         }
       };
       document.addEventListener('mouseout', onOut);
-      return () => document.removeEventListener('mouseout', onOut);
+      detach = () => document.removeEventListener('mouseout', onOut);
+      return detach;
     }
 
     let lastY = window.scrollY;
@@ -87,10 +96,11 @@ export function LeadPopup({
       if (show()) window.clearInterval(timer);
     }, MOBILE_DELAY_MS);
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
+    detach = () => {
       window.clearInterval(timer);
       window.removeEventListener('scroll', onScroll);
     };
+    return detach;
   }, [quiet]);
 
   if (!open) return null;

@@ -13,6 +13,7 @@ export function CartPill() {
   return (
     <Link
       href={routes.cart}
+      prefetch={false}
       aria-label={t('cartLabel', { count })}
       data-track="header_cart"
       className="inline-flex h-12 items-center gap-2.5 rounded-pill bg-ink pr-2 pl-5 text-sm font-semibold text-white transition-colors hover:bg-dark-3"
@@ -35,6 +36,7 @@ export function CartIconLink() {
   return (
     <Link
       href={routes.cart}
+      prefetch={false}
       aria-label={t('cartLabel', { count })}
       className="relative grid size-11 place-items-center rounded-pill bg-ink text-white"
     >

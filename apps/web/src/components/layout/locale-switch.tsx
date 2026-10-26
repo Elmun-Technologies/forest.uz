@@ -22,6 +22,7 @@ function Switch({ locale, href, className }: { locale: string; href: string; cla
           key={l.code}
           href={href}
           locale={l.code}
+          prefetch={false}
           hrefLang={l.code}
           lang={l.code}
           aria-label={l.name}

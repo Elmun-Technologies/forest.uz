@@ -2,7 +2,14 @@ import path from 'node:path';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
 
-const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+// Messages are precompiled at build time (ICU → compact AST), so the browser bundle ships the
+// format-only runtime instead of the ICU parser (`IntlMessageFormat`), and formatting is cheaper.
+const withNextIntl = createNextIntlPlugin({
+  requestConfig: './src/i18n/request.ts',
+  experimental: {
+    messages: { path: './messages', format: 'json', locales: 'infer', precompile: true },
+  },
+});
 const publicFiles = new URL(process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/forest-public');
 
 const config: NextConfig = {
@@ -12,6 +19,16 @@ const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['@forest/ui'],
+  // Metadata is resolved before the shell for every user agent instead of being streamed into
+  // <body> on dynamic pages (Next's default for non-bots): title, description and canonical are
+  // always in <head>, for every crawler and audit. The data is already fetched for the page.
+  htmlLimitedBots: /.*/,
+  experimental: {
+    // The (single, Tailwind) stylesheet is inlined as <style>, so the first frame doesn't wait for a
+    // CSS request that competes with the JS chunks. Otherwise hydration often starts before that
+    // frame is drawn and Chrome's paint holding delays first paint by ~1 s (see CLAUDE.md §6).
+    inlineCss: true,
+  },
   // Browser → API goes through the shop origin so session/cart cookies are first-party and
   // readable by SSR. Server components call API_INTERNAL_URL directly, forwarding cookies.
   async rewrites() {

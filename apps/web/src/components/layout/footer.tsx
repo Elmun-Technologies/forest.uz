@@ -60,7 +60,7 @@ export async function Footer({
                 {t('shop')}
               </h2>
               {categories.map((c) => (
-                <Link key={c.slug} href={routes.category(c.slug)} className={link}>
+                <Link prefetch={false} key={c.slug} href={routes.category(c.slug)} className={link}>
                   {c.name}
                 </Link>
               ))}
@@ -70,19 +70,19 @@ export async function Footer({
                 {t('help')}
               </h2>
               {pageReady.inspiration ? (
-                <Link href={routes.inspiration} className={link}>
+                <Link prefetch={false} href={routes.inspiration} className={link}>
                   {t('guide')}
                 </Link>
               ) : null}
               {express && regions ? (
-                <Link href={routes.deliveryPayment} className={link}>
+                <Link prefetch={false} href={routes.deliveryPayment} className={link}>
                   {t('delivery', { tashkent: express.promiseHours, regions: regions.promiseHours })}
                 </Link>
               ) : null}
-              <Link href={routes.account} className={link}>
+              <Link prefetch={false} href={routes.account} className={link}>
                 {t('tracking')}
               </Link>
-              <Link href={routes.returns} className={link}>
+              <Link prefetch={false} href={routes.returns} className={link}>
                 {t('returns')}
               </Link>
             </nav>
@@ -91,13 +91,13 @@ export async function Footer({
                 <h2 id="ftr-company" className={heading}>
                   {t('company')}
                 </h2>
-                <Link href={routes.brand} className={link}>
+                <Link prefetch={false} href={routes.brand} className={link}>
                   {t('brand')}
                 </Link>
-                <Link href={routes.brand} className={link}>
+                <Link prefetch={false} href={routes.brand} className={link}>
                   {t('craftsmen')}
                 </Link>
-                <Link href={routes.brand} className={link}>
+                <Link prefetch={false} href={routes.brand} className={link}>
                   {t('seller')}
                 </Link>
               </nav>
@@ -168,12 +168,12 @@ export async function Footer({
           </ul>
           <nav aria-label={t('offer')} className="flex flex-wrap gap-1">
             <span className="md:hidden">© {year} Forest ·</span>
-            <Link href={routes.offer} className={link}>
+            <Link prefetch={false} href={routes.offer} className={link}>
               <span className="md:hidden">{t('mobileLegal')}</span>
               <span className="hidden md:inline">{t('offer')}</span>
             </Link>
             <span aria-hidden>·</span>
-            <Link href={routes.privacy} className={link}>
+            <Link prefetch={false} href={routes.privacy} className={link}>
               <span className="md:hidden">{t('mobilePrivacy')}</span>
               <span className="hidden md:inline">{t('privacy')}</span>
             </Link>

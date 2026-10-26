@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { ClientApiError, clientApi } from './client-api';
 import { readCookie } from './consent';
+import { onIdle } from './idle';
 
 /**
  * Favourites store shared by every heart on the page. Guests keep ids in localStorage;
@@ -94,9 +95,8 @@ const getSnapshot = () => snapshot;
 
 export function useFavourite(productId: string): [boolean, () => void] {
   const s = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-  useEffect(() => {
-    void load();
-  }, []);
+  // Hearts render unfilled on the server anyway; reading the list can wait until hydration is done.
+  useEffect(() => onIdle(() => void load()), []);
   const flip = useCallback(() => void toggle(productId), [productId]);
   return [s.ids.has(productId), flip];
 }
