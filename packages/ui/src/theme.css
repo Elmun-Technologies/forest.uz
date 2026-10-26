@@ -1,0 +1,98 @@
+/*
+ * Forest design tokens (docs/11-design-system.md) as a Tailwind v4 theme.
+ * Apps: `@import "tailwindcss"; @import "@forest/ui/theme.css";` and `@source` the ui package.
+ * Never copy inline styles from design/source — use these tokens.
+ */
+@theme {
+  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+
+  /* Colour */
+  --color-forest: #334229;
+  --color-forest-700: #2a3722;
+  --color-ink: #141712;
+  --color-ink-2: #3f453b;
+  --color-canvas: #eeefea;
+  --color-panel: #ffffff;
+  --color-off: #f7f7f4;
+  --color-muted: #5e6459;
+  --color-subtle: #8d9586;
+  --color-line: #daddd3;
+  --color-line-soft: #eeefea;
+  --color-sage: #d5ddc8;
+  --color-sage-50: #f1f5ec;
+  --color-dark-2: #23271f;
+  --color-dark-3: #2e332a;
+  --color-on-dark: #ffffff;
+  --color-on-dark-muted: #c9cfc2;
+  --color-on-dark-subtle: #a9b39e;
+  --color-good: #1f6b35;
+  --color-good-bg: #e8f2ea;
+  --color-warn: #6b4e00;
+  --color-warn-bg: #fff4d6;
+  --color-critical: #8a1c12;
+  --color-critical-bg: #fbeae8;
+  --color-danger: #b42318;
+  --color-live: #3e8e4e;
+  --color-telegram: #2a6a9a;
+  --color-chart-1: #3a7d44;
+  --color-chart-2: #2f6db5;
+  --color-chart-3: #c9692c;
+  --color-chart-4: #8e5bb5;
+  --color-chart-5: #a3851f;
+
+  /* Radius */
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-md: 22px;
+  --radius-lg: 28px;
+  --radius-xl: 40px;
+  --radius-pill: 999px;
+
+  /* Type scale (desktop values; responsive sizes are applied per component) */
+  --text-overline: 12px;
+  --text-overline--letter-spacing: 0.08em;
+  --text-display: 96px;
+  --text-display--line-height: 0.95;
+  --text-display--letter-spacing: -0.05em;
+  --text-h1: 72px;
+  --text-h1--line-height: 1;
+  --text-h1--letter-spacing: -0.045em;
+  --text-h2: 48px;
+  --text-h2--line-height: 1.05;
+  --text-h2--letter-spacing: -0.04em;
+  --text-h3: 30px;
+  --text-h3--line-height: 1.15;
+  --text-h3--letter-spacing: -0.03em;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --shadow-float: 0 1px 2px rgb(20 23 18 / 0.06), 0 8px 24px rgb(20 23 18 / 0.08);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-forest);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
