@@ -54,6 +54,11 @@
       "msgpackr-extract",
       "protobufjs",
       "ssh2"
-    ]
+    ],
+    "overrides": {
+      "postcss@<8.5.23": "^8.5.23",
+      "multer@<2.5.0": "^2.5.0",
+      "deepmerge-ts@<8.0.0": "^8.0.0"
+    }
   }
 }

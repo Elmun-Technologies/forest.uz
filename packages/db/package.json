@@ -29,7 +29,8 @@
     "migrate:diff": "prisma migrate diff",
     "seed": "dotenv -e ../../.env -- tsx src/seed/index.ts",
     "reset": "dotenv -e ../../.env -- prisma migrate reset --force",
-    "test": "echo 'db: covered by api integration tests'"
+    "test": "echo 'db: covered by api integration tests'",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "6.19.3"
