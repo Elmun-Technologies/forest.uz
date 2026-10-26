@@ -1,6 +1,6 @@
-// Forest — initial data model (draft v1).
-// Move to packages/db/prisma/schema.prisma. Claude Code may refine, but must keep the
-// invariants documented in docs/04-data-model.md and docs/02-business-rules.md.
+// Forest — data model. Invariants: docs/04-data-model.md, docs/02-business-rules.md.
+// Raw SQL in migrations adds: Event monthly partitions, pg_trgm/unaccent, sequences for
+// Order.number / Customer.publicId, search index. Never edit applied migrations.
 // Money = BigInt tiyin (1 so'm = 100 tiyin). Localized text = Json { "uz": string, "ru": string }.
 
 generator client {
@@ -152,61 +152,69 @@ enum ConversationStatus {
 // ───────────────────────── Marketplace-ready seller ─────────────────────────
 
 model Seller {
-  id             String     @id @default(cuid())
-  slug           String     @unique
-  name           String
-  isOfficial     Boolean    @default(false)
-  commissionBps  Int? // v2: basis points
-  active         Boolean    @default(true)
-  createdAt      DateTime   @default(now())
-  products       Product[]
-  shipments      Shipment[]
+  id            String     @id @default(cuid())
+  slug          String     @unique
+  name          String
+  isOfficial    Boolean    @default(false)
+  commissionBps Int? // v2: basis points
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @db.Timestamptz(3)
+  products      Product[]
+  shipments     Shipment[]
 }
 
 // ───────────────────────── Catalog ─────────────────────────
 
 model Category {
-  id        String     @id @default(cuid())
-  slug      String     @unique
-  name      Json // {uz, ru}
-  seoText   Json? // {uz, ru} rich text block under catalog
-  parentId  String?
-  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children  Category[] @relation("CategoryTree")
-  sort      Int        @default(0)
-  products  ProductCategory[]
+  id       String            @id @default(cuid())
+  slug     String            @unique
+  name     Json // {uz, ru}
+  seoText  Json? // {uz, ru} rich text block under catalog
+  parentId String?
+  parent   Category?         @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]        @relation("CategoryTree")
+  sort     Int               @default(0)
+  imageId  String?
+  image    File?             @relation("CategoryImage", fields: [imageId], references: [id])
+  products ProductCategory[]
 }
 
 model Product {
-  id            String        @id @default(cuid())
-  slug          String        @unique
-  type          ProductType   @default(SIMPLE)
-  status        ProductStatus @default(DRAFT)
-  sellerId      String
-  seller        Seller        @relation(fields: [sellerId], references: [id])
-  name          Json // {uz, ru}
-  shortDesc     Json?
-  description   Json? // rich text per locale
-  howToApply    Json?
-  specs         Json? // [{key:{uz,ru}, value:{uz,ru}}]
-  badges        String[] // HIT, NEW, SALE
-  coverageM2PerL Decimal?     @db.Decimal(5, 2) // for calculator
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  type           ProductType       @default(SIMPLE)
+  status         ProductStatus     @default(DRAFT)
+  sellerId       String
+  seller         Seller            @relation(fields: [sellerId], references: [id])
+  name           Json // {uz, ru}
+  shortDesc      Json?
+  description    Json? // rich text per locale
+  howToApply     Json?
+  specs          Json? // [{key:{uz,ru}, value:{uz,ru}}]
+  badges         String[] // HIT, NEW, SALE
+  surfaces       String[] // wood, lacquer, metal, fabric — catalog filter
+  videoUrl       String?
+  popularity     Int               @default(0) // 30-day units sold, refreshed by job; default sort
+  searchText     String            @default("") // normalized uz+ru name/desc/synonyms (pg_trgm index)
+  coverageM2PerL Decimal?          @db.Decimal(5, 2) // for calculator
   dryTimeMinutes Int?
-  isBestseller  Boolean       @default(false)
+  isBestseller   Boolean           @default(false)
   bestsellerSort Int?
-  moyskladId    String?       @unique
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  variants      Variant[]
-  images        ProductImage[]
-  categories    ProductCategory[]
-  reviews       Review[]
-  bundleItems   BundleItem[]  @relation("BundleParent")
-  related       ProductRelation[] @relation("RelFrom")
-  relatedTo     ProductRelation[] @relation("RelTo")
-  waitlist      WaitlistEntry[]
+  moyskladId     String?           @unique
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+  variants       Variant[]
+  images         ProductImage[]
+  categories     ProductCategory[]
+  reviews        Review[]
+  bundleItems    BundleItem[]      @relation("BundleParent")
+  related        ProductRelation[] @relation("RelFrom")
+  relatedTo      ProductRelation[] @relation("RelTo")
+  waitlist       WaitlistEntry[]
 
   @@index([status, sellerId])
+  @@index([status, popularity])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model ProductCategory {
@@ -222,7 +230,7 @@ model ProductRelation {
   fromId String
   toId   String
   kind   String // CROSS_SELL | UPSELL | ALTERNATIVE
-  sort   Int    @default(0)
+  sort   Int     @default(0)
   from   Product @relation("RelFrom", fields: [fromId], references: [id], onDelete: Cascade)
   to     Product @relation("RelTo", fields: [toId], references: [id], onDelete: Cascade)
 
@@ -230,38 +238,40 @@ model ProductRelation {
 }
 
 model Variant {
-  id              String   @id @default(cuid())
-  productId       String
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku             String   @unique
-  label           Json // {uz:"1 L", ru:"1 л"} or color name
-  colorHex        String?
-  volumeMl        Int?
-  priceTiyin      BigInt
-  compareAtTiyin  BigInt?
-  ikpu            String? // MXIK code — required before ACTIVE
-  packageCode     String?
-  vatPercent      Int      @default(12)
-  barcode         String?
-  weightGrams     Int?
-  stock           Int      @default(0) // from MoySklad (available)
-  reserved        Int      @default(0) // our open reservations
-  lowStockAt      Int      @default(10)
-  moyskladId      String?  @unique
-  active          Boolean  @default(true)
-  sort            Int      @default(0)
-  updatedAt       DateTime @updatedAt
-  bundleOf        BundleItem[] @relation("BundleComponent")
-  orderItems      OrderItem[]
-  cartItems       CartItem[]
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String       @unique
+  label          Json // {uz:"1 L", ru:"1 л"} or color name
+  colorHex       String?
+  volumeMl       Int?
+  priceTiyin     BigInt
+  compareAtTiyin BigInt?
+  ikpu           String? // MXIK code — required before ACTIVE
+  packageCode    String?
+  vatPercent     Int          @default(12)
+  barcode        String?
+  weightGrams    Int?
+  stock          Int          @default(0) // from MoySklad (available)
+  reserved       Int          @default(0) // our open reservations
+  lowStockAt     Int          @default(10)
+  moyskladId     String?      @unique
+  active         Boolean      @default(true)
+  sort           Int          @default(0)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  bundleOf       BundleItem[] @relation("BundleComponent")
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+
+  @@index([productId])
 }
 
 model BundleItem {
-  bundleId    String
-  variantId   String
-  qty         Int     @default(1)
-  bundle      Product @relation("BundleParent", fields: [bundleId], references: [id], onDelete: Cascade)
-  variant     Variant @relation("BundleComponent", fields: [variantId], references: [id])
+  bundleId  String
+  variantId String
+  qty       Int     @default(1)
+  bundle    Product @relation("BundleParent", fields: [bundleId], references: [id], onDelete: Cascade)
+  variant   Variant @relation("BundleComponent", fields: [variantId], references: [id])
 
   @@id([bundleId, variantId])
 }
@@ -278,47 +288,49 @@ model ProductImage {
 }
 
 model WaitlistEntry {
-  id         String    @id @default(cuid())
+  id         String         @id @default(cuid())
   productId  String
   variantId  String?
-  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   customerId String?
   phone      String?
   channel    MessageChannel
-  notifiedAt DateTime?
-  createdAt  DateTime  @default(now())
+  notifiedAt DateTime?      @db.Timestamptz(3)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
 }
 
 // ───────────────────────── Customers & CRM ─────────────────────────
 
 model Customer {
-  id            String    @id @default(cuid())
-  publicId      String    @unique // C-10482
-  phone         String    @unique // E.164
-  name          String?
-  locale        Locale    @default(uz)
-  telegramId    BigInt?   @unique
+  id               String         @id @default(cuid())
+  publicId         String         @unique @default(dbgenerated("('C-'::text || nextval('customer_public_seq'::regclass))")) // C-10482
+  phone            String         @unique // E.164
+  name             String?
+  locale           Locale         @default(uz)
+  telegramId       BigInt?        @unique
   telegramUsername String?
-  tags          String[]
-  firstSeenAt   DateTime  @default(now())
-  firstTouch    Json? // {source, medium, campaign, content, term, clickId, landing, ts}
-  lastTouch     Json?
-  ordersCount   Int       @default(0)
-  ltvTiyin      BigInt    @default(0)
-  lastOrderAt   DateTime?
-  deletedAt     DateTime? // erasure request processed
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  addresses     Address[]
-  orders        Order[]
-  consents      Consent[]
-  visitors      Visitor[]
-  reviews       Review[]
-  carts         Cart[]
-  messages      Message[]
-  conversations Conversation[]
-  favorites     Favorite[]
-  notes         CustomerNote[]
+  tags             String[]
+  firstSeenAt      DateTime       @default(now()) @db.Timestamptz(3)
+  firstTouch       Json? // {source, medium, campaign, content, term, clickId, landing, ts}
+  lastTouch        Json?
+  ordersCount      Int            @default(0)
+  ltvTiyin         BigInt         @default(0)
+  lastOrderAt      DateTime?      @db.Timestamptz(3)
+  leadSource       String? // popup | selector | bot | checkout | footer ...
+  leadAt           DateTime?      @db.Timestamptz(3)
+  deletedAt        DateTime?      @db.Timestamptz(3) // erasure request processed
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+  addresses        Address[]
+  orders           Order[]
+  consents         Consent[]
+  visitors         Visitor[]
+  reviews          Review[]
+  carts            Cart[]
+  messages         Message[]
+  conversations    Conversation[]
+  favorites        Favorite[]
+  notes            CustomerNote[]
 }
 
 model Address {
@@ -340,7 +352,7 @@ model Consent {
   channel    ConsentChannel
   granted    Boolean
   source     String // checkout, popup, bot, cabinet
-  createdAt  DateTime       @default(now())
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
 
   @@index([customerId, channel, createdAt])
 }
@@ -349,7 +361,7 @@ model Favorite {
   customerId String
   productId  String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([customerId, productId])
 }
@@ -360,18 +372,18 @@ model CustomerNote {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   staffId    String
   text       String
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model OtpCode {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   phone     String
   codeHash  String
-  attempts  Int      @default(0)
-  expiresAt DateTime
-  usedAt    DateTime?
+  attempts  Int       @default(0)
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
   ip        String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([phone, createdAt])
 }
@@ -384,9 +396,10 @@ model Cart {
   customerId  String?
   customer    Customer?  @relation(fields: [customerId], references: [id])
   promoCode   String?
+  deviceHash  String?
   status      String     @default("ACTIVE") // ACTIVE | CONVERTED | ABANDONED_NOTIFIED
-  updatedAt   DateTime   @updatedAt
-  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
   items       CartItem[]
 
   @@index([customerId])
@@ -397,9 +410,9 @@ model CartItem {
   cartId    String
   variantId String
   qty       Int
-  cart      Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  variant   Variant @relation(fields: [variantId], references: [id])
-  addedAt   DateTime @default(now())
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant   Variant  @relation(fields: [variantId], references: [id])
+  addedAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([cartId, variantId])
 }
@@ -407,57 +420,61 @@ model CartItem {
 // ───────────────────────── Orders ─────────────────────────
 
 model Order {
-  id               String        @id @default(cuid())
-  number           String        @unique // F-10482
-  trackingToken    String        @unique
-  customerId       String
-  customer         Customer      @relation(fields: [customerId], references: [id])
-  status           OrderStatus   @default(NEW)
-  locale           Locale        @default(uz)
-  contactName      String
-  contactPhone     String
-  address          Json // snapshot {region, district, line, lat, lng}
-  comment          String?
-  subtotalTiyin    BigInt
-  discountTiyin    BigInt        @default(0)
-  shippingTiyin    BigInt        @default(0)
-  totalTiyin       BigInt
-  promoCode        String?
-  offerVersion     String
-  slaDueAt         DateTime? // 12h / 24h promise
-  attribution      Json? // {firstTouch, lastTouch, touches[], model results}
-  anonymousId      String?
-  sessionId        String?
-  source           String        @default("web") // web | bot | admin
-  cancelReason     String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  items            OrderItem[]
-  payments         Payment[]
-  shipments        Shipment[]
-  events           OrderEvent[]
-  reservations     Reservation[]
-  promoRedemption  PromoRedemption?
+  id              String           @id @default(cuid())
+  number          String           @unique @default(dbgenerated("('F-'::text || nextval('order_number_seq'::regclass))")) // F-10482
+  trackingToken   String           @unique
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  status          OrderStatus      @default(NEW)
+  locale          Locale           @default(uz)
+  contactName     String
+  contactPhone    String
+  address         Json // snapshot {region, district, line, lat, lng}
+  comment         String?
+  subtotalTiyin   BigInt
+  discountTiyin   BigInt           @default(0)
+  shippingTiyin   BigInt           @default(0)
+  totalTiyin      BigInt
+  promoCode       String?
+  paymentMethod   PaymentMethod
+  deliveryZone    String
+  carrier         DeliveryCarrier
+  offerVersion    String
+  slaDueAt        DateTime?        @db.Timestamptz(3) // 12h / 24h promise
+  attribution     Json? // {firstTouch, lastTouch, touches[], model results}
+  anonymousId     String?
+  sessionId       String?
+  source          String           @default("web") // web | bot | admin
+  cancelReason    String?
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+  items           OrderItem[]
+  payments        Payment[]
+  shipments       Shipment[]
+  events          OrderEvent[]
+  reservations    Reservation[]
+  promoRedemption PromoRedemption?
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
+  @@index([slaDueAt])
 }
 
 model OrderItem {
-  id           String  @id @default(cuid())
-  orderId      String
-  order        Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variantId    String
-  variant      Variant @relation(fields: [variantId], references: [id])
-  sellerId     String
-  nameSnapshot Json
-  sku          String
-  ikpu         String
-  packageCode  String?
-  vatPercent   Int
-  qty          Int
-  priceTiyin   BigInt
-  discountTiyin BigInt @default(0)
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId     String
+  variant       Variant @relation(fields: [variantId], references: [id])
+  sellerId      String
+  nameSnapshot  Json
+  sku           String
+  ikpu          String
+  packageCode   String?
+  vatPercent    Int
+  qty           Int
+  priceTiyin    BigInt
+  discountTiyin BigInt  @default(0)
 }
 
 model OrderEvent {
@@ -470,38 +487,41 @@ model OrderEvent {
   actorType ActorType
   actorId   String?
   data      Json?
-  createdAt DateTime  @default(now())
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([orderId, createdAt])
 }
 
 model Reservation {
-  id        String    @id @default(cuid())
-  orderId   String
-  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variantId String
-  qty       Int
-  expiresAt DateTime?
-  releasedAt DateTime?
+  id         String    @id @default(cuid())
+  orderId    String
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId  String
+  qty        Int
+  expiresAt  DateTime? @db.Timestamptz(3)
+  releasedAt DateTime? @db.Timestamptz(3)
+
+  @@index([variantId, releasedAt])
+  @@index([expiresAt, releasedAt])
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  orderId         String
-  order           Order         @relation(fields: [orderId], references: [id])
-  method          PaymentMethod
-  status          PaymentStatus
-  amountTiyin     BigInt
-  providerTxnId   String? // Payme transaction id / Click click_trans_id
-  providerState   Int? // Payme state 1,2,-1,-2
-  providerData    Json?
-  performedAt     DateTime?
-  cancelledAt     DateTime?
-  cancelReason    Int?
+  id               String        @id @default(cuid())
+  orderId          String
+  order            Order         @relation(fields: [orderId], references: [id])
+  method           PaymentMethod
+  status           PaymentStatus
+  amountTiyin      BigInt
+  providerTxnId    String? // Payme transaction id / Click click_trans_id
+  providerState    Int? // Payme state 1,2,-1,-2
+  providerData     Json?
+  performedAt      DateTime?     @db.Timestamptz(3)
+  cancelledAt      DateTime?     @db.Timestamptz(3)
+  cancelReason     Int?
   fiscalReceiptUrl String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  refunds         Refund[]
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
+  refunds          Refund[]
 
   @@unique([method, providerTxnId])
   @@index([orderId])
@@ -514,58 +534,58 @@ model Refund {
   amountTiyin BigInt
   reason      String
   staffId     String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model Shipment {
-  id             String          @id @default(cuid())
-  orderId        String
-  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  sellerId       String
-  seller         Seller          @relation(fields: [sellerId], references: [id])
-  carrier        DeliveryCarrier
-  status         DeliveryStatus  @default(NOT_CREATED)
-  externalId     String? // Yandex claim id / BTS waybill
-  trackNumber    String?
-  branch         Json? // BTS branch info
-  courier        Json? // name, phone, car, plate, eta
-  priceTiyin     BigInt          @default(0)
-  history        Json? // carrier tracking history
-  updatedAt      DateTime        @updatedAt
+  id          String          @id @default(cuid())
+  orderId     String
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId    String
+  seller      Seller          @relation(fields: [sellerId], references: [id])
+  carrier     DeliveryCarrier
+  status      DeliveryStatus  @default(NOT_CREATED)
+  externalId  String? // Yandex claim id / BTS waybill
+  trackNumber String?
+  branch      Json? // BTS branch info
+  courier     Json? // name, phone, car, plate, eta
+  priceTiyin  BigInt          @default(0)
+  history     Json? // carrier tracking history
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
 }
 
 // ───────────────────────── Promo ─────────────────────────
 
 model PromoCode {
-  id              String        @id @default(cuid())
-  code            String        @unique
-  type            PromoType
-  value           Int // percent or tiyin/100 depending on type
-  giftVariantId   String?
-  minCartTiyin    BigInt        @default(0)
-  audience        PromoAudience @default(ALL)
-  segmentId       String?
-  usageLimit      Int?
-  perCustomerLimit Int          @default(1)
-  startsAt        DateTime?
-  endsAt          DateTime?
-  utmSource       String?
-  active          Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  redemptions     PromoRedemption[]
+  id               String            @id @default(cuid())
+  code             String            @unique
+  type             PromoType
+  value            Int // percent or tiyin/100 depending on type
+  giftVariantId    String?
+  minCartTiyin     BigInt            @default(0)
+  audience         PromoAudience     @default(ALL)
+  segmentId        String?
+  usageLimit       Int?
+  perCustomerLimit Int               @default(1)
+  startsAt         DateTime?         @db.Timestamptz(3)
+  endsAt           DateTime?         @db.Timestamptz(3)
+  utmSource        String?
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  redemptions      PromoRedemption[]
 }
 
 model PromoRedemption {
-  id           String    @id @default(cuid())
-  promoId      String
-  promo        PromoCode @relation(fields: [promoId], references: [id])
-  orderId      String    @unique
-  order        Order     @relation(fields: [orderId], references: [id])
-  customerId   String
-  deviceHash   String?
+  id            String    @id @default(cuid())
+  promoId       String
+  promo         PromoCode @relation(fields: [promoId], references: [id])
+  orderId       String    @unique
+  order         Order     @relation(fields: [orderId], references: [id])
+  customerId    String
+  deviceHash    String?
   discountTiyin BigInt
-  suspicious   Boolean   @default(false)
-  createdAt    DateTime  @default(now())
+  suspicious    Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
 
   @@index([promoId, customerId])
 }
@@ -591,7 +611,7 @@ model Review {
   beforeFileId String?
   reply        String?
   moderatedBy  String?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
 
   @@unique([orderId, productId])
   @@index([productId, status])
@@ -603,8 +623,8 @@ model Visitor {
   anonymousId String    @id // first-party cookie fr_aid
   customerId  String?
   customer    Customer? @relation(fields: [customerId], references: [id])
-  firstSeenAt DateTime  @default(now())
-  lastSeenAt  DateTime  @default(now())
+  firstSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   firstTouch  Json?
   deviceHash  String?
 
@@ -612,31 +632,31 @@ model Visitor {
 }
 
 model Session {
-  id           String   @id // uuid from tracker
-  anonymousId  String
-  customerId   String?
-  startedAt    DateTime
-  endedAt      DateTime
-  landingPath  String
-  exitPath     String?
-  pageviews    Int      @default(0)
-  events       Int      @default(0)
-  durationSec  Int      @default(0)
-  bounced      Boolean  @default(true)
-  utm          Json? // source, medium, campaign, content, term
-  clickIds     Json? // fbclid, gclid, ttclid, yclid
-  referrer     String?
-  channel      String // paid_social, organic_search, telegram, direct, referral, email, sms...
-  device       String // mobile | desktop | tablet
-  os           String?
-  browser      String?
-  city         String?
-  region       String?
-  country      String?
-  converted    Boolean  @default(false)
-  orderId      String?
-  hasReplay    Boolean  @default(false)
-  replayKey    String? // object storage prefix
+  id          String   @id // uuid from tracker
+  anonymousId String
+  customerId  String?
+  startedAt   DateTime @db.Timestamptz(3)
+  endedAt     DateTime @db.Timestamptz(3)
+  landingPath String
+  exitPath    String?
+  pageviews   Int      @default(0)
+  events      Int      @default(0)
+  durationSec Int      @default(0)
+  bounced     Boolean  @default(true)
+  utm         Json? // source, medium, campaign, content, term
+  clickIds    Json? // fbclid, gclid, ttclid, yclid
+  referrer    String?
+  channel     String // paid_social, organic_search, telegram, direct, referral, email, sms...
+  device      String // mobile | desktop | tablet
+  os          String?
+  browser     String?
+  city        String?
+  region      String?
+  country     String?
+  converted   Boolean  @default(false)
+  orderId     String?
+  hasReplay   Boolean  @default(false)
+  replayKey   String? // object storage prefix
 
   @@index([startedAt])
   @@index([anonymousId, startedAt])
@@ -646,8 +666,8 @@ model Session {
 // NOTE: high-volume table. Create as PARTITION BY RANGE (ts) monthly via raw SQL migration;
 // Prisma model mirrors columns for typed reads. See docs/07-analytics-tracking.md.
 model Event {
-  id          String   @id // uuid v7, also used as event_id for ad-platform dedupe
-  ts          DateTime
+  id          String // uuid v7, also used as event_id for ad-platform dedupe
+  ts          DateTime @db.Timestamptz(3)
   sessionId   String
   anonymousId String
   customerId  String?
@@ -661,41 +681,43 @@ model Event {
   viewportW   Int?
   scrollDepth Int?
 
-  @@index([ts])
+  // Partition key must be part of the PK (PARTITION BY RANGE (ts)).
+  @@id([id, ts])
+  @@index([ts], type: Brin)
   @@index([name, ts])
   @@index([sessionId])
   @@index([path, name])
 }
 
 model AdSpendDaily {
-  date       DateTime @db.Date
-  platform   String // meta | google | tiktok | yandex
-  campaignId String
-  campaign   String
-  adset      String?
-  spendTiyin BigInt
+  date        DateTime @db.Date
+  platform    String // meta | google | tiktok | yandex
+  campaignId  String
+  campaign    String
+  adset       String?
+  spendTiyin  BigInt
   impressions Int
-  clicks     Int
+  clicks      Int
 
   @@id([date, platform, campaignId])
 }
 
 model Segment {
-  id          String   @id @default(cuid())
-  name        String
-  rules       Json // rule tree, see docs/08-admin-panel.md A8
-  autoMessage Json? // optional automation (template, delay, channel)
+  id           String          @id @default(cuid())
+  name         String
+  rules        Json // rule tree, see docs/08-admin-panel.md A8
+  autoMessage  Json? // optional automation (template, delay, channel)
   destinations String[] // meta, google, tiktok, yandex, telegram, sms
-  size        Int      @default(0)
-  refreshedAt DateTime?
-  active      Boolean  @default(true)
-  members     SegmentMember[]
+  size         Int             @default(0)
+  refreshedAt  DateTime?       @db.Timestamptz(3)
+  active       Boolean         @default(true)
+  members      SegmentMember[]
 }
 
 model SegmentMember {
   segmentId  String
   customerId String
-  addedAt    DateTime @default(now())
+  addedAt    DateTime @default(now()) @db.Timestamptz(3)
   segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
   @@id([segmentId, customerId])
@@ -704,14 +726,14 @@ model SegmentMember {
 // ───────────────────────── Messaging & bot ─────────────────────────
 
 model MessageTemplate {
-  id        String   @id @default(cuid())
-  key       String   @unique // lead_welcome, order_status_shipped, cart_abandoned_2h, review_request ...
-  body      Json // {uz, ru} with {ism},{mahsulot},{raqam},{kod},{link},{vaqt}
-  buttons   Json?
-  delayMin  Int      @default(0)
-  smsFallback Boolean @default(true)
-  active    Boolean  @default(true)
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  key         String   @unique // lead_welcome, order_status_shipped, cart_abandoned_2h, review_request ...
+  body        Json // {uz, ru} with {ism},{mahsulot},{raqam},{kod},{link},{vaqt}
+  buttons     Json?
+  delayMin    Int      @default(0)
+  smsFallback Boolean  @default(true)
+  active      Boolean  @default(true)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 }
 
 model Message {
@@ -725,22 +747,22 @@ model Message {
   marketing   Boolean        @default(false)
   providerId  String?
   error       String?
-  createdAt   DateTime       @default(now())
-  sentAt      DateTime?
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  sentAt      DateTime?      @db.Timestamptz(3)
 
   @@index([customerId, createdAt])
 }
 
 model Conversation {
-  id         String             @id @default(cuid())
-  customerId String?
-  customer   Customer?          @relation(fields: [customerId], references: [id])
+  id             String                @id @default(cuid())
+  customerId     String?
+  customer       Customer?             @relation(fields: [customerId], references: [id])
   telegramChatId BigInt
-  topic      String // advice | cart | status | review | other
-  status     ConversationStatus @default(NEW)
-  assigneeId String?
-  lastMessageAt DateTime        @default(now())
-  messages   ConversationMessage[]
+  topic          String // advice | cart | status | review | other
+  status         ConversationStatus    @default(NEW)
+  assigneeId     String?
+  lastMessageAt  DateTime              @default(now()) @db.Timestamptz(3)
+  messages       ConversationMessage[]
 
   @@index([status, lastMessageAt])
 }
@@ -753,7 +775,7 @@ model ConversationMessage {
   staffId        String?
   text           String?
   fileIds        String[]
-  createdAt      DateTime     @default(now())
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
 }
 
 // ───────────────────────── SEO & content ─────────────────────────
@@ -777,14 +799,14 @@ model Redirect {
   to        String
   code      Int      @default(301)
   hits      Int      @default(0)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model NotFoundLog {
-  path      String   @id
-  hits      Int      @default(1)
-  lastSeen  DateTime @default(now())
-  referrer  String?
+  path     String   @id
+  hits     Int      @default(1)
+  lastSeen DateTime @default(now()) @db.Timestamptz(3)
+  referrer String?
 }
 
 model SearchQueryLog {
@@ -792,7 +814,7 @@ model SearchQueryLog {
   query     String
   locale    Locale
   results   Int
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([results, createdAt])
 }
@@ -807,7 +829,8 @@ model Page {
   version   String?
   published Boolean  @default(false)
   coverId   String?
-  updatedAt DateTime @updatedAt
+  data      Json? // kind-specific: {category, durationSec, videoUrl, excerpt, sort}
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([kind, slug, locale])
 }
@@ -815,14 +838,14 @@ model Page {
 // ───────────────────────── Integrations, settings, staff ─────────────────────────
 
 model Integration {
-  key          String            @id // payme, click, yandex, bts, moysklad, eskiz, telegram, meta_capi, google_ads, gsc, ywm ...
-  status       IntegrationStatus @default(DISCONNECTED)
-  credentials  Bytes? // AES-256-GCM encrypted JSON
-  config       Json?
-  lastCheckAt  DateTime?
-  lastError    String?
-  updatedAt    DateTime          @updatedAt
-  logs         IntegrationLog[]
+  key         String            @id // payme, click, yandex, bts, moysklad, eskiz, telegram, meta_capi, google_ads, gsc, ywm ...
+  status      IntegrationStatus @default(DISCONNECTED)
+  credentials Bytes? // AES-256-GCM encrypted JSON
+  config      Json?
+  lastCheckAt DateTime?         @db.Timestamptz(3)
+  lastError   String?
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
+  logs        IntegrationLog[]
 }
 
 model IntegrationLog {
@@ -834,7 +857,7 @@ model IntegrationLog {
   ok             Boolean
   message        String
   payload        Json? // redacted
-  createdAt      DateTime    @default(now())
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
 
   @@index([integrationKey, createdAt])
 }
@@ -845,13 +868,13 @@ model WebhookEndpoint {
   events    String[] // order.created, order.paid, order.shipped, cart.abandoned, customer.created, stock.low
   secret    String // HMAC-SHA256 signing secret (encrypted at rest)
   active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model Setting {
   key       String   @id // delivery.zones, delivery.cutoff, store.info, legal.offerVersion, flags ...
   value     Json
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
   updatedBy String?
 }
 
@@ -863,9 +886,12 @@ model Staff {
   passwordHash String
   role         StaffRole
   totpSecret   Bytes? // encrypted
+  totpEnabled  Boolean   @default(false)
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime? @db.Timestamptz(3)
   active       Boolean   @default(true)
-  lastLoginAt  DateTime?
-  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model AuditLog {
@@ -877,19 +903,61 @@ model AuditLog {
   before    Json?
   after     Json?
   ip        String?
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([entity, entityId])
   @@index([createdAt])
 }
 
 model File {
-  id        String   @id @default(cuid())
-  key       String   @unique // object storage key
-  mime      String
-  size      Int
-  width     Int?
-  height    Int?
-  createdAt DateTime @default(now())
+  id            String         @id @default(cuid())
+  key           String         @unique // object storage key
+  isPublic      Boolean        @default(true) // false → private bucket, served via signed URL
+  mime          String
+  size          Int
+  width         Int?
+  height        Int?
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
   productImages ProductImage[]
+  categories    Category[]     @relation("CategoryImage")
+  selectorItems SelectorItem[]
+}
+
+// ───────────────────────── Storefront content ─────────────────────────
+
+/// "Nimani yangilaymiz?" quick selector tiles (Home). Admin-managed.
+model SelectorItem {
+  id               String   @id @default(cuid())
+  key              String   @unique // komod, shkaf, stol, oshxona, divan, kreslo
+  name             Json // {uz, ru}
+  kind             Json // {uz:"Mebel · bo'yoq", ru:"..."}
+  imageId          String?
+  image            File?    @relation(fields: [imageId], references: [id])
+  title            Json // recommendation title {uz, ru}
+  contents         Json // {uz, ru} what's inside
+  items            Json // [{sku, qty}] — priced live from variants
+  areaLabel        Json? // {uz:"≈ 4 m²"}
+  timeLabel        Json? // {uz:"3 soat"}
+  newItemPriceSoum Int? // "buy new" comparison; null → comparison row hidden
+  sort             Int      @default(0)
+  active           Boolean  @default(true)
+}
+
+/// Search synonyms (UZ Latin/Cyrillic, RU, common typos). Terms stored normalized.
+model SearchSynonym {
+  id       String   @id @default(cuid())
+  term     String   @unique
+  synonyms String[]
+}
+
+/// Idempotency keys for checkout/refund POSTs (24 h).
+model IdempotencyKey {
+  key         String   @id
+  scope       String
+  requestHash String
+  status      Int?
+  response    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
 }
