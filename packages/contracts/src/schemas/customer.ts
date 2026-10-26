@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { localeSchema } from '../locale';
+import { localeSchema } from './locale';
 
 /**
  * Customer-facing inputs/DTOs that are not part of cart/checkout: account (/me), search,

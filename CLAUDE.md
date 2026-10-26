@@ -76,6 +76,9 @@ Monorepo · separate admin app/domain · NestJS modules per domain · Postgres-f
 - 2026-10-26 — Catalog keeps `?page=n` pagination (crawlable, docs/01) instead of cursors; cursors are for admin/API lists.
 - 2026-10-26 — Legal draft pages are published (Payme/Click onboarding needs a public offer) but show a "draft, lawyer review pending" notice and hide rows with missing company data until `store.legal` is complete.
 - 2026-10-26 — Integration credentials: AES-256-GCM envelope `[v1][keyId:4][iv:12][tag:16][ct]`, AAD = integration key; key rotation via previous keys. Blank secret inputs keep the stored value.
+- 2026-10-26 — `@forest/contracts/core` = zod-free entry (domain helpers, enums, types). Client components import values only from `/core`; the main entry (zod schemas, ~27 KB gz) is for api/server code. Guarded by `core.test.ts`. Keeps product-page first-load JS under the 170 KB budget.
+- 2026-10-26 — Storefront marks identified visitors with a readable `fr_ident=1` cookie (set by middleware when the httpOnly `fr_session` exists) so client code can personalise without making pages uncacheable. It carries no identity.
+- 2026-10-26 — Storefront hides nav/footer links to pages that don't exist yet (`pageReady` in `apps/web/src/config/site.ts`) and hides any block without real data (reviews, gallery, ratings) instead of rendering design sample text.
 
 ## 7. Coding standards
 - TypeScript strict, no `any` (use `unknown` + zod). Small modules, SOLID, DRY, KISS; no premature abstraction except the integration adapters.
@@ -162,7 +165,7 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 
 ## 18. TODO / status
-Track phases in `docs/progress.md`. Current phase: **Phase 0 done → Phase 1 (Storefront) next**.
+Track phases in `docs/progress.md`. Current phase: **Phase 1 (Storefront) in progress** — API commerce/customer + Home/Catalog/Product done; Cart/Checkout/Order/Tracking/Login/Cabinet/Legal next.
 
 ## 19. Known limitations
 BTS API docs unknown (manual mode fallback); COD fiscal provider TBD; real content/prices pending (see `docs/13-open-questions.md`).

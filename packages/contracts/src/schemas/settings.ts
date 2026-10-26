@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { type DeliveryRule, deliveryZoneSchema } from '../delivery';
+import type { DeliveryRule } from '../delivery';
+import { deliveryZoneSchema } from './delivery';
 
 const hm = z.string().regex(/^\d{2}:\d{2}$/);
 const loc = z.object({ uz: z.string(), ru: z.string() });

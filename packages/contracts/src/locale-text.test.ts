@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { localeFromAcceptLanguage, localizedSchema, t } from './locale';
+import { localeFromAcceptLanguage, t } from './locale';
+import { localizedSchema } from './schemas/locale';
 import { containsPlaceholder, cyrillicToLatin, normalizeSearch, slugify } from './text';
 
 describe('locale', () => {

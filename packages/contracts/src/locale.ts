@@ -1,23 +1,13 @@
-import { z } from 'zod';
-
 export const LOCALES = ['uz', 'ru'] as const;
 export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = 'uz';
-
-export const localeSchema = z.enum(LOCALES);
 
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && (LOCALES as readonly string[]).includes(value);
 }
 
 /** Localized text stored as JSON `{ uz, ru }`. Both keys optional at rest; uz is the source copy. */
-export const localizedSchema = z.object({
-  uz: z.string(),
-  ru: z.string().optional().default(''),
-});
 export type Localized = { uz: string; ru?: string | undefined };
-
-export const localizedRequiredSchema = z.object({ uz: z.string().min(1), ru: z.string().min(1) });
 
 /** Resolve localized value with fallback uz → ru → ''. Accepts unknown JSON from the DB. */
 export function t(value: unknown, locale: Locale): string {
