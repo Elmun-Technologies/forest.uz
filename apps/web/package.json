@@ -11,6 +11,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@fontsource-variable/montserrat": "^5.3.0",
     "@forest/contracts": "workspace:*",
     "@forest/ui": "workspace:*",
     "next": "15.5.28",

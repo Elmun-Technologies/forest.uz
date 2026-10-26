@@ -4,7 +4,10 @@
 // Money = BigInt tiyin (1 so'm = 100 tiyin). Localized text = Json { "uz": string, "ru": string }.
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // Generated inside the package so deployed images ship a ready client (no generate at runtime).
+  output        = "../generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
 }
 
 datasource db {

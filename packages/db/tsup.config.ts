@@ -7,5 +7,6 @@ export default defineConfig((options) => ({
   dts: true,
   sourcemap: true,
   clean: !options.watch,
-  external: ['@prisma/client', '.prisma/client'],
+  // The generated client resolves its query engine relative to itself — never bundle it.
+  external: [/generated\/client/],
 }));

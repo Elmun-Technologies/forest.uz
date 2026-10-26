@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import argon2 from 'argon2';
 import { normalizeSearch, normalizeUzPhone } from '@forest/contracts';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '../../generated/client';
 import {
   alternatives,
   categories,

@@ -4,7 +4,7 @@
  * Never copy inline styles from design/source — use these tokens.
  */
 @theme {
-  --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Montserrat Variable', ui-sans-serif, system-ui, sans-serif;
 
   /* Colour */
   --color-forest: #334229;
