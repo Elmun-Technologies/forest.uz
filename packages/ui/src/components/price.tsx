@@ -1,4 +1,4 @@
-import { formatAmount, soumToTiyin } from '@forest/contracts';
+import { formatAmount, soumToTiyin } from '@forest/contracts/core';
 import { cn } from '../cn';
 
 export interface PriceProps {

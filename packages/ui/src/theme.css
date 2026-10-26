@@ -96,3 +96,27 @@
 @utility tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* Before/after slider: the native range thumb is invisible; the visual handle is a sibling. */
+@layer components {
+  .ba-range::-webkit-slider-runnable-track {
+    background: transparent;
+  }
+  .ba-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: transparent;
+  }
+  .ba-range::-moz-range-thumb {
+    width: 64px;
+    height: 64px;
+    border: 0;
+    background: transparent;
+  }
+  .ba-range::-moz-range-track {
+    background: transparent;
+  }
+}

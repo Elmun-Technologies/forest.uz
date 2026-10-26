@@ -24,18 +24,25 @@ export interface PhoneInputProps extends Omit<
   /** 9 local digits (without +998). */
   value: string;
   onValueChange: (digits: string) => void;
+  /** Extra classes for the `<input>` (wrapper gets `className`), e.g. pill variants. */
+  inputClassName?: string;
+  /** Extra classes for the `+998` prefix. */
+  prefixClassName?: string;
 }
 
 /** `+998` prefix + masked local part. Emits raw digits; E.164 is built server-side by zod. */
 export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function PhoneInput(
-  { value, onValueChange, className, ...rest },
+  { value, onValueChange, className, inputClassName, prefixClassName, ...rest },
   ref,
 ) {
   return (
     <div className={cn('relative flex items-center', className)}>
       <span
         aria-hidden
-        className="pointer-events-none absolute left-4 text-[15px] font-medium text-muted"
+        className={cn(
+          'pointer-events-none absolute left-4 text-[15px] font-medium text-muted',
+          prefixClassName,
+        )}
       >
         +998
       </span>
@@ -46,7 +53,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
         autoComplete="tel-national"
         placeholder="90 123 45 67"
         data-private
-        className={cn(inputClasses, 'pl-[68px] tabular')}
+        className={cn(inputClasses, 'pl-[68px] tabular', inputClassName)}
         value={formatLocalDigits(value)}
         onChange={(e) => onValueChange(toLocalDigits(e.target.value))}
         {...rest}
