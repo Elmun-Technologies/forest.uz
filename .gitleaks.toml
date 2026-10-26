@@ -3,7 +3,7 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "test fixtures"
 paths = [
   '''(^|/)[^/]+\.(test|int\.test|spec)\.tsx?$''',
