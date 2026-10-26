@@ -13,6 +13,10 @@ import { apiGet } from '@/lib/api';
 import { getMe, getMyAddresses } from '@/lib/customer';
 import { formatWhen } from '@/lib/format';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 const ACTIVE = new Set(['NEW', 'CONFIRMED', 'PACKING', 'READY', 'HANDED_TO_COURIER']);
 
 export default async function AccountPage({ params }: { params: Promise<{ locale: Locale }> }) {

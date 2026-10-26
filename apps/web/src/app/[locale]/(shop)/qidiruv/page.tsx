@@ -8,6 +8,10 @@ import { ProductCard } from '@/components/product/product-card';
 import { apiGetOptional } from '@/lib/api';
 import { alternates } from '@/lib/seo';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 type Props = {
   params: Promise<{ locale: Locale }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;

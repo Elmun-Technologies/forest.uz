@@ -3,6 +3,10 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ProductCard } from '@/components/product/product-card';
 import { apiGet } from '@/lib/api';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 export default async function FavoritesPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   setRequestLocale(locale);

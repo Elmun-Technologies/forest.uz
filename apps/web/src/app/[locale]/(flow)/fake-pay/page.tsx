@@ -10,6 +10,10 @@ import { Logo } from '@/components/ui/logo';
 import { redirect } from '@/i18n/navigation';
 import { ApiError, apiGet, apiRequest } from '@/lib/api';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 type Props = {
   params: Promise<{ locale: Locale }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;

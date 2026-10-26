@@ -4,6 +4,10 @@ import { ClientMessages } from '@/components/client-messages';
 import { ProfileForm } from '@/components/account/profile-form';
 import { getMe } from '@/lib/customer';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 export default async function SettingsPage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   setRequestLocale(locale);

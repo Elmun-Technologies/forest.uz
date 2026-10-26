@@ -14,6 +14,10 @@ import { ApiError, apiGet } from '@/lib/api';
 import { getHomeContent } from '@/lib/data';
 import { formatWhen, placeName } from '@/lib/format';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 type Props = { params: Promise<{ locale: Locale; token: string }> };
 
 async function loadTracking(token: string, locale: Locale): Promise<TrackingDto> {

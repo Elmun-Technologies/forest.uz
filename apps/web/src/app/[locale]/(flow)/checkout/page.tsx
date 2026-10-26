@@ -10,6 +10,10 @@ import { getMe, getMyAddresses } from '@/lib/customer';
 import { getSettings } from '@/lib/data';
 import { alternates } from '@/lib/seo';
 
+// Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
+// and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
+export const dynamic = 'force-dynamic';
+
 type Props = { params: Promise<{ locale: Locale }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
