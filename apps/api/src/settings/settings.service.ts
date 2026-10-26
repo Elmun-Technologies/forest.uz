@@ -44,12 +44,13 @@ export class SettingsService {
   }
 
   async publicSettings(): Promise<PublicSettingsDto> {
-    const [store, zones, rules, seo, flags] = await Promise.all([
+    const [store, zones, rules, seo, flags, returns] = await Promise.all([
       this.get('store.info'),
       this.get('delivery.zones'),
       this.get('delivery.rules'),
       this.get('seo.verification'),
       this.get('flags'),
+      this.get('returns.rules'),
     ]);
     const legalComplete = Object.values(store.legal).every(
       (v) => typeof v === 'string' && v.length > 0,
@@ -79,10 +80,12 @@ export class SettingsService {
             freeFromSoum: z.freeFromSoum,
             promiseHours: z.rule.promiseHours,
             cutoff: z.rule.cutoff ?? null,
+            rule: z.rule,
           })),
         codMaxSoum: rules.codMaxSoum,
       },
       seo,
+      returns: { returnDays: returns.returnDays },
       flags,
     };
   }

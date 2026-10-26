@@ -52,6 +52,7 @@ export class CatalogService {
       name: t(c.name, locale),
       productCount: c._count.products,
       image: this.files.image(c.image, c.name, locale),
+      seoText: c.seoText ? t(c.seoText, locale) || null : null,
     }));
   }
 

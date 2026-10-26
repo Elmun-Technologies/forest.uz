@@ -1,5 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp } from './app';
 
 describe('catalog + settings API (integration)', () => {
@@ -72,10 +73,26 @@ describe('catalog + settings API (integration)', () => {
         v.available,
         v.lowStock,
       ]),
-    ).toEqual([
-      ['0,5 л', 22, false],
-      ['1 л', 41, false],
-      ['2,5 л', 6, true],
+    ).toEqual(
+      // Other suites reserve stock in the shared DB, so expectations come from the live rows.
+      (
+        await app.get(PrismaService).variant.findMany({
+          where: { product: { slug: 'chalk-white' }, active: true },
+          orderBy: { sort: 'asc' },
+        })
+      ).map((v) => {
+        const available = Math.max(v.stock - v.reserved, 0);
+        return [
+          (v.label as { ru: string }).ru,
+          available,
+          available > 0 && available < v.lowStockAt,
+        ];
+      }),
+    );
+    expect(res.body.variants.map((v: { label: string }) => v.label)).toEqual([
+      '0,5 л',
+      '1 л',
+      '2,5 л',
     ]);
     expect(res.body.rating).toBeNull();
     expect(res.body.coverageM2PerL).toBe(11);
