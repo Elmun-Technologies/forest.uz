@@ -341,6 +341,7 @@ model Address {
   id         String   @id @default(cuid())
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String? // "Uy", "Dacha"
   region     String
   district   String?
   line       String
@@ -426,6 +427,8 @@ model CartItem {
 model Order {
   id              String           @id @default(cuid())
   number          String           @unique @default(dbgenerated("('F-'::text || nextval('order_number_seq'::regclass))")) // F-10482
+  /// Unguessable id for the "order received" URL (number is sequential, never used in URLs).
+  publicId        String           @unique
   trackingToken   String           @unique
   customerId      String
   customer        Customer         @relation(fields: [customerId], references: [id])
@@ -931,20 +934,20 @@ model File {
 
 /// "Nimani yangilaymiz?" quick selector tiles (Home). Admin-managed.
 model SelectorItem {
-  id               String   @id @default(cuid())
-  key              String   @unique // komod, shkaf, stol, oshxona, divan, kreslo
+  id               String  @id @default(cuid())
+  key              String  @unique // komod, shkaf, stol, oshxona, divan, kreslo
   name             Json // {uz, ru}
   kind             Json // {uz:"Mebel · bo'yoq", ru:"..."}
   imageId          String?
-  image            File?    @relation(fields: [imageId], references: [id])
+  image            File?   @relation(fields: [imageId], references: [id])
   title            Json // recommendation title {uz, ru}
   contents         Json // {uz, ru} what's inside
   items            Json // [{sku, qty}] — priced live from variants
   areaLabel        Json? // {uz:"≈ 4 m²"}
   timeLabel        Json? // {uz:"3 soat"}
   newItemPriceSoum Int? // "buy new" comparison; null → comparison row hidden
-  sort             Int      @default(0)
-  active           Boolean  @default(true)
+  sort             Int     @default(0)
+  active           Boolean @default(true)
 }
 
 /// Search synonyms (UZ Latin/Cyrillic, RU, common typos). Terms stored normalized.

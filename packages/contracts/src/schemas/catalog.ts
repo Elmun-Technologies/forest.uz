@@ -19,7 +19,8 @@ export const productListQuerySchema = z.object({
   brand: csv,
   priceMin: z.coerce.number().int().nonnegative().optional(),
   priceMax: z.coerce.number().int().nonnegative().optional(),
-  onSale: z.coerce.boolean().optional(),
+  // stringbool: '?onSale=false' must mean false (z.coerce.boolean would make it true).
+  onSale: z.stringbool().optional(),
   sort: z.enum(PRODUCT_SORTS).default('popular'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(60).default(24),

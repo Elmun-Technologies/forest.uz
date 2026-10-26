@@ -66,6 +66,15 @@ describe('computeDeliveryPromise (Asia/Tashkent)', () => {
     expect(toTashkentParts(p.deadline)).toMatchObject({ day: 27, hour: 20, minute: 15 });
   });
 
+  it('rolls a no-cut-off (BTS) deadline off non-working days', () => {
+    // Saturday 10:00 + 24 h = Sunday 10:00 → BTS off on Sunday → Monday 10:00.
+    const p = computeDeliveryPromise(fromTashkent(2026, 10, 24, 10, 0), {
+      promiseHours: 24,
+      workDays: [1, 2, 3, 4, 5, 6],
+    });
+    expect(toTashkentParts(p.deadline)).toMatchObject({ day: 26, hour: 10, weekday: 1 });
+  });
+
   it('throws on empty work days', () => {
     expect(() =>
       computeDeliveryPromise(fromTashkent(2026, 10, 26, 19), { ...tashkentExpress, workDays: [] }),

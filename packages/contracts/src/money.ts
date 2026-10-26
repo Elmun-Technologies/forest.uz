@@ -2,6 +2,8 @@
  * Money is stored and computed as integer tiyin (1 so'm = 100 tiyin) in `bigint`.
  * Public API responses expose whole so'm as `number` (UZS amounts stay far below 2^53).
  */
+import { DomainError } from './errors';
+
 export type Tiyin = bigint;
 
 export const TIYIN_PER_SOUM = 100n;
@@ -24,8 +26,9 @@ export function tiyinToSoumInt(tiyin: Tiyin): number {
   return Math.round(tiyinToSoum(tiyin));
 }
 
-/** Rounds half-up to a whole so'm (prices are displayed without decimals). */
+/** Rounds half away from zero to a whole so'm (prices are displayed without decimals). */
 export function roundToSoum(tiyin: Tiyin): Tiyin {
+  if (tiyin < 0n) return -roundToSoum(-tiyin);
   const rem = tiyin % TIYIN_PER_SOUM;
   const base = tiyin - rem;
   return rem * 2n >= TIYIN_PER_SOUM ? base + TIYIN_PER_SOUM : base;
@@ -33,7 +36,9 @@ export function roundToSoum(tiyin: Tiyin): Tiyin {
 
 /** `pct` percent of `amount`, rounded half-up to a whole so'm. */
 export function percentOf(amount: Tiyin, pct: number): Tiyin {
-  if (pct < 0 || pct > 100) throw new RangeError('pct must be within 0..100');
+  // Admin-entered values reach here (promo editor) → domain error, not a 500.
+  if (!Number.isFinite(pct) || pct < 0 || pct > 100)
+    throw new DomainError('VALIDATION_FAILED', { pct });
   // Work in basis points to keep fractional percents exact.
   const bps = BigInt(Math.round(pct * 100));
   return roundToSoum((amount * bps) / 10_000n);
@@ -74,7 +79,9 @@ export function formatCompactSoum(tiyin: Tiyin, locale: 'uz' | 'ru' = 'uz'): str
   const soum = tiyinToSoum(tiyin);
   const units = locale === 'ru' ? { m: 'млн', b: 'млрд' } : { m: 'mln', b: 'mlrd' };
   const fmt = (n: number) => n.toFixed(1).replace('.', ',').replace(/,0$/, '');
-  if (Math.abs(soum) >= 1e9) return `${fmt(soum / 1e9)}${NBSP}${units.b}`;
-  if (Math.abs(soum) >= 1e6) return `${fmt(soum / 1e6)}${NBSP}${units.m}`;
+  // Compare on the rounded millions so 999 960 000 renders "1 mlrd", not "1000 mln".
+  const millions = Math.round(Math.abs(soum) / 1e5) / 10;
+  if (millions >= 1000) return `${fmt(soum / 1e9)}${NBSP}${units.b}`;
+  if (millions >= 1) return `${fmt(soum / 1e6)}${NBSP}${units.m}`;
   return formatAmount(tiyin);
 }

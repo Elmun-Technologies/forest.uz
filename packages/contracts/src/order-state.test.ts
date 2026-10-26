@@ -32,6 +32,9 @@ describe('order state machine', () => {
     expect(canTransitionOrder('NEW', 'DELIVERED')).toBe(false);
     expect(canTransitionOrder('CANCELLED', 'NEW')).toBe(false);
     expect(canTransitionOrder('HANDED_TO_COURIER', 'CANCELLED')).toBe(false);
+    // A parcel refused at the door is returned, it can never end up COMPLETED.
+    expect(canTransitionOrder('HANDED_TO_COURIER', 'RETURNED')).toBe(true);
+    expect(canTransitionOrder('HANDED_TO_COURIER', 'RETURN_REQUESTED')).toBe(false);
     expect(() => assertOrderTransition('RETURNED', 'COMPLETED')).toThrow(DomainError);
     try {
       assertOrderTransition('NEW', 'COMPLETED');

@@ -122,49 +122,51 @@ export function priceCart(input: PricingInput): PricingResult {
     } else if (p.type === 'FREE_SHIPPING') {
       freeShipping = true;
       promo = { status: 'applied', code: p.code, type: p.type, discountTiyin: 0n, capped: false };
-    } else {
-      let raw: Tiyin;
-      if (p.type === 'PERCENT') raw = percentOf(base, p.value) - bundleSavings;
-      else if (p.type === 'FIXED') raw = soumToTiyin(p.value) - bundleSavings;
-      else raw = p.gift ? p.gift.unitPriceTiyin : 0n;
-      raw = raw > subtotal ? subtotal : raw;
-
-      if (raw <= 0n) {
+    } else if (p.type === 'GIFT') {
+      // A gift is all-or-nothing: never stacked with kit savings and never partially charged
+      // when it would break the margin guard.
+      const giftValue = p.gift?.unitPriceTiyin ?? 0n;
+      if (!p.gift || giftValue <= 0n || bundleSavings > 0n || giftValue > guardCap) {
         promo = { status: 'rejected', code: p.code, reason: 'PROMO_NO_BENEFIT' };
       } else {
-        const room = guardCap - bundleSavings;
-        const capped = raw > room;
-        discount = roundToSoum(capped ? (room > 0n ? room : 0n) : raw);
-        if (discount <= 0n) {
-          promo = { status: 'rejected', code: p.code, reason: 'PROMO_NO_BENEFIT' };
-          discount = 0n;
-        } else {
-          if (p.type === 'GIFT' && p.gift) {
-            lines.push({
-              variantId: p.gift.variantId,
-              qty: 1,
-              unitPriceTiyin: p.gift.unitPriceTiyin,
-              compareAtTiyin: null,
-              isBundle: false,
-              lineTotalTiyin: p.gift.unitPriceTiyin,
-              discountTiyin: discount,
-              isGift: true,
-            });
-          } else {
-            const shares = allocate(
-              discount,
-              lines.map((l) => l.lineTotalTiyin),
-            );
-            lines.forEach((l, i) => (l.discountTiyin = shares[i] ?? 0n));
-          }
-          promo = {
-            status: 'applied',
-            code: p.code,
-            type: p.type,
-            discountTiyin: discount,
-            capped,
-          };
-        }
+        discount = giftValue;
+        lines.push({
+          variantId: p.gift.variantId,
+          qty: 1,
+          unitPriceTiyin: giftValue,
+          compareAtTiyin: null,
+          isBundle: false,
+          lineTotalTiyin: giftValue,
+          discountTiyin: giftValue,
+          isGift: true,
+        });
+        promo = {
+          status: 'applied',
+          code: p.code,
+          type: p.type,
+          discountTiyin: discount,
+          capped: false,
+        };
+      }
+    } else {
+      let raw =
+        p.type === 'PERCENT'
+          ? percentOf(base, p.value) - bundleSavings
+          : soumToTiyin(p.value) - bundleSavings;
+      raw = raw > subtotal ? subtotal : raw;
+      const room = guardCap - bundleSavings;
+      const capped = raw > room;
+      discount = raw <= 0n ? 0n : roundToSoum(capped ? (room > 0n ? room : 0n) : raw);
+      if (discount <= 0n) {
+        promo = { status: 'rejected', code: p.code, reason: 'PROMO_NO_BENEFIT' };
+        discount = 0n;
+      } else {
+        const shares = allocate(
+          discount,
+          lines.map((l) => l.lineTotalTiyin),
+        );
+        lines.forEach((l, i) => (l.discountTiyin = shares[i] ?? 0n));
+        promo = { status: 'applied', code: p.code, type: p.type, discountTiyin: discount, capped };
       }
     }
   }

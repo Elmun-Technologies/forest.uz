@@ -13,3 +13,4 @@ export * from './schemas/common';
 export * from './schemas/settings';
 export * from './schemas/catalog';
 export * from './schemas/content';
+export * from './schemas/commerce';

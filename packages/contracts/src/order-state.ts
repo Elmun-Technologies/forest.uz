@@ -46,8 +46,8 @@ const ORDER_EDGES: Record<OrderStatus, readonly OrderStatus[]> = {
   CONFIRMED: ['PACKING', 'CANCELLED'],
   PACKING: ['READY', 'CANCELLED'],
   READY: ['HANDED_TO_COURIER', 'CANCELLED'],
-  // A refused hand-over at the door becomes a return.
-  HANDED_TO_COURIER: ['DELIVERED', 'RETURN_REQUESTED'],
+  // Refused at the door → parcel goes back to the warehouse (never "completed").
+  HANDED_TO_COURIER: ['DELIVERED', 'RETURNED'],
   DELIVERED: ['COMPLETED', 'RETURN_REQUESTED'],
   COMPLETED: ['RETURN_REQUESTED'],
   CANCELLED: [],

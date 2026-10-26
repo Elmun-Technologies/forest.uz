@@ -168,6 +168,35 @@ describe('priceCart', () => {
     expect(r.subtotalTiyin).toBe(s(946_000));
   });
 
+  it('gift is never partially charged or stacked with a kit', () => {
+    const capped = priceCart({
+      lines: [{ ...brush, unitPriceTiyin: s(100_000) }],
+      promo: {
+        code: 'GIFT',
+        type: 'GIFT',
+        value: 0,
+        minCartTiyin: 0n,
+        gift: { variantId: 'x', unitPriceTiyin: s(50_000) },
+      },
+      maxDiscountPct: 15,
+    });
+    expect(capped.promo).toMatchObject({ status: 'rejected', reason: 'PROMO_NO_BENEFIT' });
+    expect(capped.totalTiyin).toBe(s(100_000));
+    const withKit = priceCart({
+      lines: [kit, chalk],
+      promo: {
+        code: 'GIFT',
+        type: 'GIFT',
+        value: 0,
+        minCartTiyin: 0n,
+        gift: { variantId: 'x', unitPriceTiyin: s(10_000) },
+      },
+      maxDiscountPct: 15,
+    });
+    expect(withKit.promo).toMatchObject({ status: 'rejected', reason: 'PROMO_NO_BENEFIT' });
+    expect(withKit.lines.some((l) => l.isGift)).toBe(false);
+  });
+
   it('rejects invalid quantity and empty cart is zero', () => {
     expect(() => priceCart({ lines: [{ ...chalk, qty: 0 }], maxDiscountPct: 15 })).toThrow(
       DomainError,

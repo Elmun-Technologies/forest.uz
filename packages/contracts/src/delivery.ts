@@ -80,7 +80,12 @@ export function computeDeliveryPromise(start: Date, rule: DeliveryRule): Deliver
     if (byHours.getTime() > sameDayEnd.getTime()) return { deadline: sameDayEnd, kind: 'SAME_DAY' };
     return { deadline: byHours, kind: 'SAME_DAY' };
   }
-  return { deadline: byHours, kind: 'WITHIN_HOURS' };
+  // Carriers without a cut-off (BTS) still don't deliver on their days off: roll forward whole days.
+  let deadline = byHours;
+  for (let i = 0; i < 7 && !workDays.includes(toTashkentParts(deadline).weekday); i++) {
+    deadline = new Date(deadline.getTime() + 86_400_000);
+  }
+  return { deadline, kind: 'WITHIN_HOURS' };
 }
 
 /** Milliseconds left until deadline (negative = late). */

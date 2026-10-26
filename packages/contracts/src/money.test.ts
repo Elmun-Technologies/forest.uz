@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DomainError } from './errors';
 import {
   formatAmount,
   formatCompactSoum,
@@ -25,7 +26,9 @@ describe('money', () => {
     expect(() => soumToTiyin(Number.NaN)).toThrow(RangeError);
   });
 
-  it('rounds half-up to whole so’m', () => {
+  it('rounds half away from zero to whole so’m', () => {
+    expect(roundToSoum(-160n)).toBe(-200n);
+    expect(roundToSoum(-149n)).toBe(-100n);
     expect(roundToSoum(149n)).toBe(100n);
     expect(roundToSoum(150n)).toBe(200n);
     expect(roundToSoum(200n)).toBe(200n);
@@ -35,7 +38,8 @@ describe('money', () => {
     expect(percentOf(soumToTiyin(578_000), 10)).toBe(soumToTiyin(57_800));
     expect(percentOf(soumToTiyin(100_001), 15)).toBe(soumToTiyin(15_000));
     expect(percentOf(soumToTiyin(1_000), 12.5)).toBe(soumToTiyin(125));
-    expect(() => percentOf(1n, 101)).toThrow(RangeError);
+    expect(() => percentOf(1n, 101)).toThrow(DomainError);
+    expect(() => percentOf(1n, Number.NaN)).toThrow(DomainError);
   });
 
   it('formats for display', () => {
@@ -47,6 +51,8 @@ describe('money', () => {
     expect(formatCompactSoum(soumToTiyin(562_100_000))).toBe(`562,1${NB}mln`);
     expect(formatCompactSoum(soumToTiyin(2_000_000_000), 'ru')).toBe(`2${NB}млрд`);
     expect(formatCompactSoum(soumToTiyin(5_000))).toBe(`5${NB}000`);
+    expect(formatCompactSoum(soumToTiyin(999_960_000))).toBe(`1${NB}mlrd`);
+    expect(formatCompactSoum(soumToTiyin(950_000_000))).toBe(`950${NB}mln`);
   });
 
   it('aggregates', () => {

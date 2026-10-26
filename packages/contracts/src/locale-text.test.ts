@@ -47,3 +47,12 @@ describe('text', () => {
     expect(containsPlaceholder('Real text')).toBe(false);
   });
 });
+
+describe('catalog query schema', () => {
+  it('parses onSale strictly', async () => {
+    const { productListQuerySchema } = await import('./schemas/catalog');
+    expect(productListQuerySchema.parse({ onSale: 'false' }).onSale).toBe(false);
+    expect(productListQuerySchema.parse({ onSale: 'true' }).onSale).toBe(true);
+    expect(productListQuerySchema.parse({}).onSale).toBeUndefined();
+  });
+});
