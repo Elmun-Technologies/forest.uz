@@ -1,16 +1,42 @@
 # Progress
 
-Current phase: **Phase 0 — done** (pending first green CI run on GitHub) → next: Phase 1 Storefront.
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — in progress** (Payme/Click done).
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0 Foundation | done | see report below |
-| 1 Storefront | pending | |
-| 2 Payments/delivery/SMS/auth | pending | |
+| 1 Storefront | done | see report below; Product perf 89 (target 90) |
+| 2 Payments/delivery/SMS/auth | in progress | Payme + Click done; Eskiz, Yandex Delivery, BTS, Telegram login, fiscal next |
 | 3 Admin core | pending | |
 | 4 Analytics/heatmaps/audiences/SEO | pending | |
 | 5 Bot/automations/content | pending | |
 | 6 Hardening & launch | pending | |
+
+## Phase 1 — Storefront (2026-10-26)
+
+### Built
+- **API (NestJS):** anonymous cookie cart + merge on login, live pricing via the shared engine, delivery quote per zone, idempotent checkout (one transaction: customer lock, promo, COD limit, IKPU snapshots, atomic stock reservation, consents), order lifecycle service (state machines + OrderEvent), order/tracking read models with PII masking, reservation expiry and 15-min payment reminder jobs; customer OTP auth (sessions in Redis, rotation), `/me` (orders, addresses, favourites, consents, export/deletion request), leads + waitlist, search (pg_trgm, Latin↔Cyrillic, synonyms, zero-result log), CMS/legal content blocks, SEO feeds (sitemap data, redirects, 404 log), product reviews list, admin-managed home media.
+- **Storefront (Next.js 15, UZ/RU, 1440 + 390):** layout (top bar, header, footer, consent banner, exit-intent lead popup, Telegram/cart bars), Home, Catalog (filters, sort, `?page=`), Product (gallery, variants, buy box, calculator, waitlist, reviews), Search, Cart, Checkout (COD + fake Payme/Click), fake-pay, Order received, Tracking `/t/<token>` (order language), Login (OTP), Cabinet (orders, addresses, favourites, notifications, settings), Legal pages (draft notice), edge states, sitemap.xml/robots.txt, JSON-LD, noindex on private pages.
+- **packages:** `@forest/contracts/core` zod-free entry for browser bundles; `@forest/ui` Rating, Stepper, BeforeAfter.
+
+### Verified
+- CI green on GitHub incl. Playwright e2e on the docker-compose production images (run 19).
+- Locally against a production build: e2e 43/43 storefront tests (desktop + 390; acceptance flow home → catalog → filter → product → calculator → cart → SALOM10 → COD → order → tracking; fake Payme/Click; OTP login → cabinet; RU; legal; edge states; `[placeholder]` guard).
+- API: 88 integration (Testcontainers) + 53 unit; contracts 58 (94.7 % lines); ui 8.
+- Lighthouse mobile (production build, median of 5): Home 91 / 100 / 100 / 100, Catalog 91 / 98 / 100 / 100, Product **89** / 96 / 100 / 100 (perf / a11y / BP / SEO). Sandbox runs vary ±6; re-measure with PageSpeed Insights after deploy.
+- First-load JS: Home 145 kB, Catalog 156 kB, Product 150 kB (budget 170).
+- Visual comparison of every page at 1440/390 with `design/screens` (screenshots reviewed); deviations listed in `apps/web/README.md` / below.
+
+### Independent review — fixed
+High: provider resolved before the order is written; cancelled orders no longer burn promo limits; checkout rate limits + open-COD cap. Medium: real `fr_aid` device rule, OTP per-phone caps + daily lock, tracking link in SMS bodies, pay-again race (lock order). Low: paid status vs retries, one checkout per cart, cart leak across customers, consent dedupe, FREE_SHIPPING vs kits, payment reminder, zombie orders on reseed, dev endpoints in production. Plus production-only bugs found while closing the phase: 500s on dynamic pages, CI typecheck, web image baking `localhost` API (Turbo env + Docker build arg), AVIF encoder hang, client IP behind Cloudflare.
+
+### Mocked / not yet real
+- All integrations run on fake providers locally; Payme/Click real adapters exist (Phase 2) but need credentials.
+- Product photos, hero before/after and lead photo are stock placeholders; IKPU codes are placeholders; app icon is derived from the logo.
+- Hidden until data/API exists: reviews/ratings (no reviews yet), Telegram login, repeat order, courier phone/map, "buy new" price comparison, Ilhom/Brend pages.
+
+### Owner action needed
+- Real photos (products, before/after), real prices/stock, IKPU + package codes; review RU strings in `apps/web/messages/RU_REVIEW.md`; open questions in `docs/13-open-questions.md` (incl. 28–36 for payments).
 
 ## Phase 0 — Foundation (2026-10-26)
 

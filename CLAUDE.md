@@ -194,7 +194,7 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 
 ## 18. TODO / status
-Track phases in `docs/progress.md`. Current phase: **Phase 1 (Storefront) — all pages built, closing (Lighthouse, review, report)**; Phase 2 started (Payme/Click done).
+Track phases in `docs/progress.md`. Current phase: **Phase 1 done** (Product Lighthouse perf 89 vs 90 target — re-measure after deploy); **Phase 2 in progress** — Payme/Click done; next Eskiz SMS, Yandex Delivery, BTS, Telegram login, fiscal (provider docs hosts must be allowed in the environment network policy).
 
 ## 19. Known limitations
 BTS API docs unknown (manual mode fallback); COD fiscal provider TBD; real content/prices pending (see `docs/13-open-questions.md`).
