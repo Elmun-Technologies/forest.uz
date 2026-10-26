@@ -6,8 +6,10 @@ import type { ReactNode } from 'react';
 import { routing } from '@/i18n/routing';
 import '../globals.css';
 
+// No build-time prerender: pages need live API data (prices, stock), so they render on first
+// request and are cached via fetch revalidation (ISR). Builds must never depend on a running API.
 export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
+  return [];
 }
 
 export async function generateMetadata({

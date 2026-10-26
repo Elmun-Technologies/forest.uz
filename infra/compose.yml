@@ -12,7 +12,8 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: forest
-      POSTGRES_PASSWORD: forest
+      # Dev default; production sets POSTGRES_PASSWORD (and DATABASE_URL) in the server's .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forest}
       POSTGRES_DB: forest
     ports: ['127.0.0.1:5432:5432']
     volumes: [pgdata:/var/lib/postgresql/data]
@@ -36,7 +37,7 @@ services:
   # S3-compatible object storage for local dev (MinIO no longer ships public images).
   # Dev-only credentials live in seaweedfs/s3.json; production uses a UZ-hosted S3 provider.
   storage:
-    image: chrislusf/seaweedfs:latest
+    image: chrislusf/seaweedfs:4.50
     command:
       [
         'server',
@@ -57,7 +58,7 @@ services:
       retries: 30
 
   mailpit:
-    image: axllent/mailpit:latest
+    image: axllent/mailpit:v1.32.0
     ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
     healthcheck:
       test: ['CMD', '/mailpit', 'readyz']
@@ -70,7 +71,7 @@ services:
     profiles: [apps]
     build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: migrate }
     environment:
-      DATABASE_URL: postgresql://forest:forest@postgres:5432/forest
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
     depends_on:
       postgres: { condition: service_healthy }
 
@@ -78,8 +79,9 @@ services:
     <<: *app-env
     profiles: [apps]
     build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: runtime }
+    ports: ['127.0.0.1:4000:4000']
     environment:
-      DATABASE_URL: postgresql://forest:forest@postgres:5432/forest
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://storage:8333
     depends_on:
@@ -94,6 +96,7 @@ services:
       context: ..
       dockerfile: infra/docker/next.Dockerfile
       args: { APP: web, S3_PUBLIC_URL: '${S3_PUBLIC_URL:-http://localhost:9000/forest-public}' }
+    ports: ['127.0.0.1:3000:3000']
     environment:
       PORT: 3000
       API_INTERNAL_URL: http://api:4000
@@ -106,6 +109,7 @@ services:
       context: ..
       dockerfile: infra/docker/next.Dockerfile
       args: { APP: admin }
+    ports: ['127.0.0.1:3001:3001']
     environment:
       PORT: 3001
       API_INTERNAL_URL: http://api:4000

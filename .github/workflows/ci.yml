@@ -66,7 +66,7 @@ jobs:
       - run: pnpm --filter @forest/api test:integration
 
   e2e:
-    name: E2E smoke (Playwright, desktop + 390px)
+    name: E2E smoke on docker compose images (desktop + 390px)
     runs-on: ubuntu-latest
     needs: [checks]
     steps:
@@ -75,42 +75,34 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: Prepare .env (CI-only throwaway secrets)
+      - name: Prepare .env (CI-only throwaway secrets, fake providers allowed)
         run: |
           cp .env.example .env
           sed -i "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
           sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
-      - run: pnpm infra:up
+          sed -i "s|^ALLOW_FAKE_PROVIDERS=.*|ALLOW_FAKE_PROVIDERS=true|" .env
+      # Builds the production images (validates Dockerfiles) and runs migrate → api, web, admin, caddy.
+      - run: docker compose -f infra/compose.yml --profile apps up -d --build
       - run: pnpm exec turbo run build --filter=@forest/contracts --filter=@forest/db
-      - run: pnpm db:deploy && pnpm db:seed
-      - run: pnpm exec turbo run build --filter=@forest/api --filter=@forest/web --filter=@forest/admin
-      - name: Start apps (production mode)
+      - name: Seed (from host, against the compose database)
         run: |
-          (cd apps/api && pnpm exec dotenv -e ../../.env -- node dist/main.js > /tmp/api.log 2>&1 &)
-          (cd apps/web && pnpm exec dotenv -e ../../.env -- pnpm start > /tmp/web.log 2>&1 &)
-          (cd apps/admin && pnpm exec dotenv -e ../../.env -- pnpm start > /tmp/admin.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf localhost:4000/ready && break; sleep 3; done
+          pnpm db:seed
+      - name: Wait for web and admin
+        run: |
           for i in $(seq 1 60); do
-            curl -sf localhost:4000/ready && curl -sf -o /dev/null localhost:3000/uz && curl -sf -o /dev/null localhost:3001 && exit 0
-            sleep 2
+            curl -sf -o /dev/null localhost:3000/uz && curl -sf -o /dev/null localhost:3001 && exit 0
+            sleep 3
           done
-          cat /tmp/api.log /tmp/web.log /tmp/admin.log; exit 1
+          exit 1
       - run: pnpm --filter @forest/e2e exec playwright install --with-deps chromium
       - run: pnpm e2e
         env: { CI: 'true' }
+      - if: failure()
+        run: docker compose -f infra/compose.yml --profile apps logs --no-color --tail 200
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: e2e/playwright-report
           retention-days: 7
-
-  docker:
-    name: Docker images build
-    runs-on: ubuntu-latest
-    needs: [checks]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - run: docker build -f infra/docker/api.Dockerfile -t forest-api .
-      - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=web -t forest-web .
-      - run: docker build -f infra/docker/next.Dockerfile --build-arg APP=admin -t forest-admin .
