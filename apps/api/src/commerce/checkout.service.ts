@@ -298,7 +298,14 @@ export class CheckoutService {
       throw new DomainError('PAYMENT_NOT_RETRYABLE');
     if (payment.status !== 'PENDING') assertPaymentTransition(payment.status, 'PENDING');
     await this.prisma.$transaction(async (tx) => {
-      await tx.payment.update({ where: { id: payment.id }, data: { method, status: 'PENDING' } });
+      // A row already bound to a provider transaction keeps its history (Payme CheckTransaction /
+      // GetStatement must still find it by method + id): the retry starts a fresh row instead.
+      if (payment.providerTxnId)
+        await tx.payment.create({
+          data: { orderId: order.id, method, status: 'PENDING', amountTiyin: payment.amountTiyin },
+        });
+      else
+        await tx.payment.update({ where: { id: payment.id }, data: { method, status: 'PENDING' } });
       await tx.order.update({ where: { id: order.id }, data: { paymentMethod: method } });
       await tx.orderEvent.create({
         data: {

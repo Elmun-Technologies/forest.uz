@@ -3,7 +3,9 @@ import {
   assertOrderTransition,
   assertPaymentTransition,
   computeDeliveryPromise,
+  DomainError,
   type OrderStatus,
+  type PaymentMethod,
   type PaymentStatus,
 } from '@forest/contracts';
 import type { ActorType, Prisma } from '@forest/db';
@@ -17,6 +19,31 @@ type Tx = Prisma.TransactionClient;
 export interface Actor {
   type: ActorType;
   id?: string | null;
+}
+
+/**
+ * Refunds are possible before the parcel leaves (the order is cancelled and stock released) and
+ * after it came back / was cancelled; never while it is with the courier or delivered and kept —
+ * those go through a return first (docs/02).
+ */
+const REFUNDABLE_ORDER: readonly OrderStatus[] = [
+  'NEW',
+  'CONFIRMED',
+  'PACKING',
+  'READY',
+  'CANCELLED',
+  'RETURN_REQUESTED',
+  'RETURNED',
+];
+const CANCEL_ON_FULL_REFUND: readonly OrderStatus[] = ['NEW', 'CONFIRMED', 'PACKING', 'READY'];
+
+export function orderAllowsRefund(status: OrderStatus): boolean {
+  return REFUNDABLE_ORDER.includes(status);
+}
+
+export interface ProviderTxnData {
+  providerState: number;
+  providerData?: Prisma.InputJsonValue;
 }
 
 /**
@@ -104,6 +131,15 @@ export class OrderLifecycleService {
     return zone ? computeDeliveryPromise(start, zone.rule).deadline : null;
   }
 
+  /** Row lock: duplicate/concurrent provider callbacks must be processed one at a time. */
+  async lockPayment(tx: Tx, paymentId: string): Promise<void> {
+    await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${paymentId} FOR UPDATE`;
+  }
+
+  async lockOrder(tx: Tx, orderId: string): Promise<void> {
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
+  }
+
   /**
    * Online payment confirmed by the provider webhook (the only source of truth for "paid").
    * Idempotent: a second call for an already PAID payment is a no-op.
@@ -115,38 +151,212 @@ export class OrderLifecycleService {
     now = new Date(),
   ): Promise<void> {
     const orderId = await this.prisma.$transaction(async (tx) => {
-      // Row lock: duplicate/concurrent provider callbacks must be processed one at a time.
-      await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${paymentId} FOR UPDATE`;
-      const p = await tx.payment.findUniqueOrThrow({
+      // Same lock order as the provider webhooks (order → payment): no deadlocks between them.
+      const { orderId: owner } = await tx.payment.findUniqueOrThrow({
         where: { id: paymentId },
-        include: { order: { select: { status: true } } },
+        select: { orderId: true },
       });
-      if (p.status === 'PAID') return null;
-      await this.setPaymentStatus(tx, paymentId, 'PAID', actor, {
-        performedAt: now,
+      await this.lockOrder(tx, owner);
+      await this.lockPayment(tx, paymentId);
+      return this.markPaidInTx(tx, paymentId, actor, {
+        now,
         ...(providerTxnId ? { providerTxnId } : {}),
       });
-      if (p.order.status === 'NEW') {
-        await this.transition(tx, p.orderId, 'CONFIRMED', actor);
-        await this.reservations.confirm(tx, p.orderId);
-        await tx.order.update({
-          where: { id: p.orderId },
-          data: { slaDueAt: await this.slaDueAt(tx, p.orderId, now) },
-        });
-      }
-      return p.orderId;
     });
-    if (orderId) await this.notifications.orderStatus(orderId, 'order_paid');
+    if (orderId) await this.notifyPaid(orderId);
+  }
+
+  /**
+   * markPaid inside the caller's transaction; the caller must hold the payment row lock
+   * (`lockPayment`). Returns the order id when the payment became PAID now, null if it already
+   * was. Call `notifyPaid` after commit.
+   */
+  async markPaidInTx(
+    tx: Tx,
+    paymentId: string,
+    actor: Actor,
+    opts: { now: Date; providerTxnId?: string } & Partial<ProviderTxnData>,
+  ): Promise<string | null> {
+    const p = await tx.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+      include: { order: { select: { status: true } } },
+    });
+    if (p.status === 'PAID') return null;
+    await this.setPaymentStatus(tx, paymentId, 'PAID', actor, {
+      performedAt: opts.now,
+      ...(opts.providerTxnId ? { providerTxnId: opts.providerTxnId } : {}),
+      ...(opts.providerState !== undefined ? { providerState: opts.providerState } : {}),
+      ...(opts.providerData !== undefined ? { providerData: opts.providerData } : {}),
+    });
+    if (p.order.status === 'NEW') {
+      await this.transition(tx, p.orderId, 'CONFIRMED', actor);
+      await this.reservations.confirm(tx, p.orderId);
+      await tx.order.update({
+        where: { id: p.orderId },
+        data: { slaDueAt: await this.slaDueAt(tx, p.orderId, opts.now) },
+      });
+    }
+    return p.orderId;
+  }
+
+  /** Never throws (NotificationsService swallows errors), so webhooks may fire and forget. */
+  async notifyPaid(orderId: string): Promise<void> {
+    await this.notifications.orderStatus(orderId, 'order_paid');
   }
 
   async markFailed(paymentId: string, actor: Actor, reason?: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT "id" FROM "Payment" WHERE "id" = ${paymentId} FOR UPDATE`;
-      const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
-      if (p.status !== 'PENDING') return;
-      await this.setPaymentStatus(tx, paymentId, 'FAILED', actor, {
+      await this.lockPayment(tx, paymentId);
+      await this.failAttemptInTx(tx, paymentId, actor, {
         providerData: reason ? { reason } : undefined,
       });
+    });
+  }
+
+  /**
+   * A provider attempt failed or was cancelled before money moved: PENDING → FAILED (customer may
+   * retry while the reservation lives). Provider fields are updated even when the payment already
+   * left PENDING (e.g. EXPIRED by the reservation job), so provider status queries stay exact.
+   */
+  async failAttemptInTx(
+    tx: Tx,
+    paymentId: string,
+    actor: Actor,
+    extra: Prisma.PaymentUpdateInput,
+  ): Promise<void> {
+    const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+    if (p.status === 'PENDING') await this.setPaymentStatus(tx, paymentId, 'FAILED', actor, extra);
+    else if (Object.keys(extra).length)
+      await tx.payment.update({ where: { id: paymentId }, data: extra });
+  }
+
+  /**
+   * Binds a new provider transaction (Payme CreateTransaction / Click Prepare) to a payment row.
+   * The order's latest online row is reused while no provider transaction is attached to it;
+   * otherwise a new row is created, so every provider transaction keeps its own exact history.
+   * Caller holds the order lock and has checked that the order is payable.
+   */
+  async attachProviderTxnInTx(
+    tx: Tx,
+    orderId: string,
+    method: Exclude<PaymentMethod, 'COD'>,
+    providerTxnId: string,
+    data: ProviderTxnData,
+    actor: Actor,
+  ): Promise<string> {
+    const order = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      include: { payments: { orderBy: { createdAt: 'desc' }, take: 1 } },
+    });
+    const latest = order.payments[0];
+    const reusable =
+      latest &&
+      latest.method !== 'COD' &&
+      !latest.providerTxnId &&
+      (latest.status === 'PENDING' || latest.status === 'FAILED');
+    const fields = {
+      method,
+      providerTxnId,
+      providerState: data.providerState,
+      providerData: data.providerData,
+    };
+    let paymentId: string;
+    if (reusable) {
+      if (latest.status !== 'PENDING') assertPaymentTransition(latest.status, 'PENDING');
+      await tx.payment.update({ where: { id: latest.id }, data: { ...fields, status: 'PENDING' } });
+      paymentId = latest.id;
+    } else {
+      const created = await tx.payment.create({
+        data: { ...fields, orderId, status: 'PENDING', amountTiyin: order.totalTiyin },
+      });
+      paymentId = created.id;
+    }
+    if (order.paymentMethod !== method)
+      await tx.order.update({ where: { id: orderId }, data: { paymentMethod: method } });
+    await tx.orderEvent.create({
+      data: {
+        orderId,
+        type: 'PAYMENT_ATTEMPT',
+        to: 'PENDING',
+        actorType: actor.type,
+        actorId: actor.id ?? null,
+        data: { method, paymentId },
+      },
+    });
+    return paymentId;
+  }
+
+  /**
+   * Refund of a PAID payment (Payme cancel after perform, or a manual Click/COD refund).
+   * Full refund before shipping cancels the order and releases its stock. Caller holds the
+   * payment lock. Throws REFUND_NOT_ALLOWED / REFUND_AMOUNT_INVALID.
+   */
+  async refundInTx(
+    tx: Tx,
+    paymentId: string,
+    actor: Actor,
+    input: {
+      amountTiyin: bigint;
+      reason: string;
+      /** Staff id, or `provider:<key>` for provider-initiated refunds. */
+      refundedBy: string;
+      extra?: Prisma.PaymentUpdateInput;
+    },
+  ): Promise<{ refundId: string; full: boolean }> {
+    const p = await tx.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+      include: { refunds: true, order: { select: { id: true, status: true } } },
+    });
+    if (p.status !== 'PAID' && p.status !== 'PARTIALLY_REFUNDED')
+      throw new DomainError('REFUND_NOT_ALLOWED', { paymentStatus: p.status });
+    if (!orderAllowsRefund(p.order.status))
+      throw new DomainError('REFUND_NOT_ALLOWED', { orderStatus: p.order.status });
+    const refunded = p.refunds.reduce((sum, r) => sum + r.amountTiyin, 0n);
+    const remaining = p.amountTiyin - refunded;
+    if (input.amountTiyin <= 0n || input.amountTiyin > remaining)
+      throw new DomainError('REFUND_AMOUNT_INVALID', { remainingTiyin: remaining.toString() });
+    const full = input.amountTiyin === remaining;
+    const refund = await tx.refund.create({
+      data: {
+        paymentId,
+        amountTiyin: input.amountTiyin,
+        reason: input.reason,
+        staffId: input.refundedBy,
+      },
+    });
+    await this.setPaymentStatus(
+      tx,
+      paymentId,
+      full ? 'REFUNDED' : 'PARTIALLY_REFUNDED',
+      actor,
+      input.extra,
+    );
+    if (full && CANCEL_ON_FULL_REFUND.includes(p.order.status)) {
+      await this.reservations.release(tx, p.order.id);
+      await this.transition(tx, p.order.id, 'CANCELLED', actor, { reason: 'refunded' });
+    }
+    return { refundId: refund.id, full };
+  }
+
+  /**
+   * Admin refund record for Click (reversal is done in the Click cabinet — docs/runbooks/payments)
+   * and COD. Payme refunds are initiated in the Payme cabinet and arrive as CancelTransaction.
+   * RBAC (Owner/Manager) is enforced by the admin controller (Phase 3).
+   */
+  async recordManualRefund(
+    paymentId: string,
+    input: { amountTiyin: bigint; reason: string; staffId: string },
+  ): Promise<{ refundId: string; full: boolean }> {
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockPayment(tx, paymentId);
+      const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
+      if (p.method === 'PAYME') throw new DomainError('REFUND_VIA_PROVIDER_CABINET');
+      return this.refundInTx(
+        tx,
+        paymentId,
+        { type: 'STAFF', id: input.staffId },
+        { amountTiyin: input.amountTiyin, reason: input.reason, refundedBy: input.staffId },
+      );
     });
   }
 

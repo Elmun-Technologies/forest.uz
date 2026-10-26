@@ -5,8 +5,13 @@ import { inject } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 
-/** Boots the real AppModule against the Testcontainers DB/Redis. */
-export async function createTestApp(): Promise<NestExpressApplication> {
+/**
+ * Boots the real AppModule against the Testcontainers DB/Redis. `env` overrides the defaults
+ * (e.g. PROVIDERS_MODE=sandbox to exercise real provider adapters).
+ */
+export async function createTestApp(
+  env: Record<string, string> = {},
+): Promise<NestExpressApplication> {
   Object.assign(process.env, {
     NODE_ENV: 'test',
     LOG_LEVEL: 'warn',
@@ -17,6 +22,7 @@ export async function createTestApp(): Promise<NestExpressApplication> {
     PROVIDERS_MODE: 'fake',
     DEV_ENDPOINTS: 'true',
     S3_PUBLIC_URL: 'http://cdn.test/forest-public',
+    ...env,
   });
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({

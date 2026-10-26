@@ -22,6 +22,7 @@ import {
 } from '@forest/contracts';
 import type { Request, Response } from 'express';
 import { z, type ZodType } from 'zod';
+import { paymeParseErrorResponse } from '../integrations/providers/payme';
 import { maskPhonesInText } from './redact';
 
 export function requestLocale(req: Request): Locale {
@@ -69,6 +70,16 @@ export class ApiExceptionFilter implements ExceptionFilter {
     let status = 500;
     let body: ApiErrorBody;
 
+    // Payme speaks JSON-RPC even about bodies that aren't JSON. Nest turns body-parser failures
+    // into BadRequestException before any controller runs, and the Payme controller has no
+    // pipes, so a 400 on that route can only be a parse error.
+    if (
+      exception instanceof BadRequestException &&
+      req.originalUrl.split('?')[0] === '/v1/webhooks/payme'
+    ) {
+      res.status(200).json(paymeParseErrorResponse());
+      return;
+    }
     if (exception instanceof DomainError) {
       status = exception.httpStatus;
       body = {

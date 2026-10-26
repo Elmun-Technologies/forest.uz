@@ -40,3 +40,15 @@ Build with configurable defaults and clearly marked placeholders; list any new q
 25. Store phone `+998 99 820 22 77` and `info@forest.uz` appear in the design without brackets — are they real?
 26. Selector "buy new" comparison prices (`[yangi divan narxi]` etc.) — please provide typical new-item prices, otherwise the comparison row stays hidden.
 27. Kits: are kits pre-packed boxes with their own stock in MoySklad (current assumption), or should availability be computed from component stock?
+
+## Found during Phase 2 — payments (details & sources: `docs/runbooks/payments.md`)
+Implemented from the providers' official GitHub templates; these points could not be verified there.
+28. **Payme checkout link** format (`checkout.paycom.uz/<base64 m=…;ac.order_id=…;a=…;c=…;l=…>`) and test host `test.paycom.uz` — please confirm with Payme (or from their docs).
+29. **Payme fiscal receipt `detail`** exact field names (`receipt_type`, items `title/price/count/code/package_code/vat_percent/discount`, `shipping`), per-unit vs line price, and the IKPU/VAT to use for the delivery line. Until confirmed it can be switched off per cashbox (`fiscalDetail=off`) — but then Payme issues no fiscal receipt.
+30. **Payme sandbox expectations**: `perform_time/cancel_time = 0` (template returns null), `-32700` for bad JSON, and whether "already paid / another transaction in progress" must be `-31008` (template) or `-31050…-31099`. Run the full sandbox scenario list on the test cashbox.
+31. **Payme IP addresses** for the optional allowlist (not published in the repos); enabling it also requires trusting Cloudflare's `CF-Connecting-IP` (Phase 6).
+32. **Payme cashbox settings**: account field named `order_id` (string, value `F-10482`), endpoint `https://<API_DOMAIN>/v1/webhooks/payme`; merchant id, live key and test key.
+33. **Click payment link** `my.click.uz/services/pay?service_id&merchant_id&amount&transaction_param&return_url` (official repo shows only the legacy POST form) and whether integer `merchant_prepare_id` = order-number digits is acceptable.
+34. **Click fiscalization** of online payments (how IKPU per item reaches Click's fiscal receipt) — ask the Click manager.
+35. **Click refunds**: is the Merchant API reversal's `payment_id` the `click_trans_id` from Prepare/Complete? Until confirmed, Click refunds are done in the Click cabinet and recorded manually.
+36. **Click credentials**: service_id, merchant_id, merchant_user_id, secret key (test service first); Prepare/Complete URLs `https://<API_DOMAIN>/v1/webhooks/click/prepare|complete`.

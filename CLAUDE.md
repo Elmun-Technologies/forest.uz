@@ -76,9 +76,17 @@ Monorepo · separate admin app/domain · NestJS modules per domain · Postgres-f
 - 2026-10-26 — Catalog keeps `?page=n` pagination (crawlable, docs/01) instead of cursors; cursors are for admin/API lists.
 - 2026-10-26 — Legal draft pages are published (Payme/Click onboarding needs a public offer) but show a "draft, lawyer review pending" notice and hide rows with missing company data until `store.legal` is complete.
 - 2026-10-26 — Integration credentials: AES-256-GCM envelope `[v1][keyId:4][iv:12][tag:16][ct]`, AAD = integration key; key rotation via previous keys. Blank secret inputs keep the stored value.
+- 2026-10-26 — Storefront frames as route groups: `[locale]/(shop)` (header/footer) and `[locale]/(flow)` (checkout, login, fake-pay with their own minimal headers). Cart's compact mobile header hides the global one via CSS `:has([data-mobile-flow])` — no JS.
+- 2026-10-26 — `/t/<token>` stays locale-less for SMS: middleware rewrites to `/{locale}/t/<token>` (fr_locale cookie → the order's language via `/track/:token` → Accept-Language).
+- 2026-10-26 — `/fake-pay` is gated by probing the API's fake callback (ORDER_NOT_FOUND = fake mode) rather than a build flag; its `return` param is ignored (no open redirect).
+- 2026-10-26 — Unknown/removed URLs go through `notFoundWithRedirect` (admin redirect lookup → else 404 logged for the SEO center).
 - 2026-10-26 — `@forest/contracts/core` = zod-free entry (domain helpers, enums, types). Client components import values only from `/core`; the main entry (zod schemas, ~27 KB gz) is for api/server code. Guarded by `core.test.ts`. Keeps product-page first-load JS under the 170 KB budget.
 - 2026-10-26 — Storefront marks identified visitors with a readable `fr_ident=1` cookie (set by middleware when the httpOnly `fr_session` exists) so client code can personalise without making pages uncacheable. It carries no identity.
 - 2026-10-26 — Storefront hides nav/footer links to pages that don't exist yet (`pageReady` in `apps/web/src/config/site.ts`) and hides any block without real data (reviews, gallery, ratings) instead of rendering design sample text.
+- 2026-10-26 — Payme/Click: protocol source of truth = the providers' official GitHub templates (pinned commits in `docs/runbooks/payments.md`), since their doc sites are unreachable from dev. Account value everywhere = `Order.number` (`F-10482`): Payme `account.order_id`, Click `merchant_trans_id`. Click `merchant_prepare_id`/`merchant_confirm_id` = the order number's digits (Click expects an integer; our ids are cuids).
+- 2026-10-26 — One `Payment` row per provider transaction (`providerTxnId` unique per method). The checkout's PENDING row is bound to the first Payme/Click transaction; a later attempt after a cancelled/failed one gets a new row, so `CheckTransaction`/`GetStatement` still report old transactions exactly. Payme state lives in `providerState` (1/2/-1/-2), Click in `providerState` 0 prepared / 1 completed / -1 cancelled; Payme times in `providerData` (ms).
+- 2026-10-26 — Webhooks authenticate only against the encrypted credentials of a CONNECTED integration (Payme Basic `Paycom:<key>` — test key in `mode=test`; Click md5 `sign_string`), independent of `PROVIDERS_MODE`. Payme `ChangePassword` rewrites the stored key (audited).
+- 2026-10-26 — Payme cancel of a created transaction (-1) marks the payment FAILED but keeps the order NEW (customer may retry until the reservation expires) — unlike the template, which cancels the order. Cancel of a performed transaction (-2) = refund: payment REFUNDED + `Refund` row; the order is cancelled and stock released if not yet handed to a courier, refused (-31007) once handed over/delivered. Payme refunds are provider-initiated (cabinet → CancelTransaction); Click/COD refunds are recorded manually (`OrderLifecycleService.recordManualRefund`).
 
 ## 7. Coding standards
 - TypeScript strict, no `any` (use `unknown` + zod). Small modules, SOLID, DRY, KISS; no premature abstraction except the integration adapters.
@@ -147,7 +155,7 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 
 ## 17. Known pitfalls
 - Payme amounts are in **tiyin**; Click amounts in **so'm** (decimal) — convert at adapter boundary only.
-- Payme expects exact JSON-RPC error shapes and state codes; run their sandbox test suite.
+- Payme expects exact JSON-RPC error shapes and state codes; run their sandbox test suite. Payme/Click webhooks always answer HTTP 200 with the provider's envelope (`@HttpCode(200)`); `ApiExceptionFilter` turns any 400 on `/v1/webhooks/payme` into JSON-RPC `-32700` — never add pipes/validation to that route. Protocol notes: `docs/runbooks/payments.md`.
 - MoySklad requires gzip and has strict rate limits — queue + backoff.
 - Eskiz SMS texts must be pre-approved templates; dynamic content only in allowed slots.
 - Uzbek apostrophes (o', g') break naive slugify/search — use the shared `slugify` and search normalization (Latin↔Cyrillic, ʻ’' variants).
@@ -161,6 +169,7 @@ Docker Compose on UZ-hosted VPS (db, redis, minio, api, web, admin, caddy) + Clo
 - Don't `pkill -f <pattern>` with a pattern that appears in your own shell command (kills the shell); use `pkill -f "next-serve[r]"`.
 - Write NBSP as `'\u00A0'` in source (literal NBSP fails eslint no-irregular-whitespace). Money formatting already uses NBSP separators — tests compare with `\u00A0`.
 - Prisma: after schema edits run `pnpm db:generate` (client lives in packages/db/generated). Partition tables are in schema `event_parts` — never move them to `public`.
+- API integration test files share one seeded Testcontainers DB (settings, Integration rows) and must run sequentially: Vitest 3 ignores `fileParallelism` inside `projects`, so `apps/api/vitest.config.ts` also sets `poolOptions.forks.singleFork`. Tests that change shared rows restore them in `afterAll`.
 - Docker Hub may rate-limit; `mirror.gcr.io/library/<image>` is a drop-in mirror.
 - Design sample data contradicts itself (e.g. 550 200 checkout total vs 500 000 free-delivery rule): docs/02 rules win; keep logic in settings.
 

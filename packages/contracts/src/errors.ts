@@ -156,6 +156,21 @@ export const ERROR_MESSAGES = {
     uz: "Bu buyurtma uchun to'lovni qayta boshlab bo'lmaydi.",
     ru: 'Оплату этого заказа нельзя начать заново.',
   },
+  REFUND_AMOUNT_INVALID: {
+    http: 400,
+    uz: "Qaytariladigan summa noto'g'ri: u 0 dan katta va to'langan qoldiqdan oshmasligi kerak.",
+    ru: 'Неверная сумма возврата: она должна быть больше 0 и не больше оплаченного остатка.',
+  },
+  REFUND_NOT_ALLOWED: {
+    http: 409,
+    uz: "Bu to'lovni hozir qaytarib bo'lmaydi. Buyurtma holatini tekshiring.",
+    ru: 'Этот платёж сейчас нельзя вернуть. Проверьте статус заказа.',
+  },
+  REFUND_VIA_PROVIDER_CABINET: {
+    http: 409,
+    uz: "Payme to'lovi Payme kabinetida bekor qilinadi — qaytarish avtomatik qayd etiladi.",
+    ru: 'Платёж Payme отменяется в кабинете Payme — возврат будет записан автоматически.',
+  },
   COD_DISABLED: {
     http: 400,
     uz: "Hozircha faqat onlayn to'lov mavjud.",

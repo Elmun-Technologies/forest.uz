@@ -11,6 +11,7 @@ import { FilesModule } from './files/files.service';
 import { HealthModule } from './health/health.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { JobsModule } from './jobs/jobs.module';
+import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.service';
 import { RedisModule } from './redis/redis.module';
 import { SettingsModule } from './settings/settings.module';
@@ -53,6 +54,7 @@ import { SettingsModule } from './settings/settings.module';
     CatalogModule,
     CommerceModule,
     CustomerModule,
+    PaymentsModule,
     JobsModule,
   ],
 })

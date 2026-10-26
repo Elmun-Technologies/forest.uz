@@ -16,6 +16,8 @@ import {
   FakePaymentProvider,
   FakeSmsProvider,
 } from './providers/fake';
+import { ClickPaymentProvider } from './providers/click';
+import { paymeAuthKey, PaymePaymentProvider } from './providers/payme';
 import type {
   AdSignalProvider,
   AiProvider,
@@ -73,20 +75,23 @@ export class IntegrationsService {
     return this.env.PROVIDERS_MODE === 'fake';
   }
 
-  private async real<T>(key: string, resolve: () => T | null): Promise<T> {
+  private async real<T>(
+    key: string,
+    resolve: (credentials: Record<string, string>) => T | null,
+  ): Promise<T> {
     const def = getDefinition(key);
-    const row = await this.prisma.integration.findUnique({
-      where: { key },
-      select: { status: true },
-    });
-    const adapter = def?.implemented && row?.status === 'CONNECTED' ? resolve() : null;
+    const credentials = def?.implemented ? await this.connectedCredentials(key) : null;
+    const adapter = credentials ? resolve(credentials) : null;
     if (!adapter) throw new DomainError('INTEGRATION_NOT_CONFIGURED', { integration: key });
     return adapter;
   }
 
   // Real adapters plug into the resolvers below as they land (Phase 2+).
   async payment(key: 'payme' | 'click'): Promise<PaymentProvider> {
-    return this.fakeMode ? this.fakes[key] : this.real<PaymentProvider>(key, () => null);
+    if (this.fakeMode) return this.fakes[key];
+    return this.real<PaymentProvider>(key, (c) =>
+      key === 'payme' ? new PaymePaymentProvider(c) : new ClickPaymentProvider(c),
+    );
   }
 
   async delivery(key: 'yandex_delivery' | 'bts'): Promise<DeliveryProvider> {
@@ -167,7 +172,7 @@ export class IntegrationsService {
     const missing = def.fields.filter((f) => f.required && !merged[f.key]).map((f) => f.key);
     if (missing.length) throw new DomainError('VALIDATION_FAILED', { missing }, missing[0]);
 
-    const health = await this.test(key);
+    const health = await this.test(key, merged);
     await this.prisma.$transaction([
       this.prisma.integration.upsert({
         where: { key },
@@ -219,11 +224,25 @@ export class IntegrationsService {
     ]);
   }
 
-  async test(key: string): Promise<HealthResult> {
+  async test(key: string, credentials?: Record<string, string>): Promise<HealthResult> {
     const def = getDefinition(key);
     if (!def) return { ok: false, message: 'unknown integration' };
     if (this.fakeMode) {
       return { ok: true, message: 'fake mode: credentials saved, no external call made' };
+    }
+    const creds = credentials ?? (await this.credentials(key));
+    // Payme/Click are inbound protocols (they call us): there is no outbound endpoint to ping, so
+    // the check is that what the webhook needs is present. The provider's sandbox run is the
+    // real test (docs/runbooks/payments.md).
+    if (key === 'payme') {
+      return creds.merchantId && paymeAuthKey(creds)
+        ? { ok: true, message: `ready: set ${def.webhookPath} as the cashbox endpoint` }
+        : { ok: false, message: 'merchantId and the key for the selected mode are required' };
+    }
+    if (key === 'click') {
+      return creds.serviceId && creds.merchantId && creds.secretKey
+        ? { ok: true, message: `ready: set ${def.webhookPath}/prepare and /complete in Click` }
+        : { ok: false, message: 'serviceId, merchantId and secretKey are required' };
     }
     return { ok: false, message: 'adapter not implemented yet' };
   }
@@ -232,6 +251,43 @@ export class IntegrationsService {
   async credentials(key: string): Promise<Record<string, string>> {
     const row = await this.prisma.integration.findUnique({ where: { key } });
     return row?.credentials ? this.decrypt(key, row.credentials) : {};
+  }
+
+  /**
+   * Credentials of a CONNECTED integration, else null. Inbound webhooks authenticate against
+   * these regardless of PROVIDERS_MODE: a provider can only reach us with the shared secret.
+   */
+  async connectedCredentials(key: string): Promise<Record<string, string> | null> {
+    const row = await this.prisma.integration.findUnique({ where: { key } });
+    if (row?.status !== 'CONNECTED' || !row.credentials) return null;
+    const creds = this.decrypt(key, row.credentials);
+    return Object.keys(creds).length ? creds : null;
+  }
+
+  /**
+   * Provider-initiated secret change (Payme `ChangePassword`). Audited like an Owner edit, with
+   * the provider as actor and masked values only.
+   */
+  async rotateSecret(key: string, field: string, value: string, actor: string): Promise<void> {
+    const def = getDefinition(key);
+    if (!def) throw new DomainError('NOT_FOUND');
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "key" FROM "Integration" WHERE "key" = ${key} FOR UPDATE`;
+      const row = await tx.integration.findUniqueOrThrow({ where: { key } });
+      const previous = row.credentials ? this.decrypt(key, row.credentials) : {};
+      const next = { ...previous, [field]: value };
+      await tx.integration.update({ where: { key }, data: { credentials: this.seal(next, key) } });
+      await tx.auditLog.create({
+        data: {
+          staffId: null,
+          action: 'integration.secret_rotated',
+          entity: 'Integration',
+          entityId: key,
+          before: this.maskFields(def, previous),
+          after: { ...this.maskFields(def, next), actor },
+        },
+      });
+    });
   }
 
   async log(

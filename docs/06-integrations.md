@@ -26,6 +26,7 @@ Payme · Click · COD · Yandex Delivery · BTS · MoySklad · Fiscal (OFD) · I
 ## Payments
 
 ### Payme — Merchant API (we are the server)
+> Implemented (Phase 2). The verified protocol details, pinned official sources, deviations and unverified points are in `docs/runbooks/payments.md` — it supersedes the notes below for Payme and Click.
 - Payme calls `POST /webhooks/payme` with JSON-RPC 2.0. Auth: `Authorization: Basic base64("Paycom:<merchant key>")`. Wrong auth → error `-32504`. Optionally restrict by Payme IPs.
 - Methods to implement: `CheckPerformTransaction`, `CreateTransaction`, `PerformTransaction`, `CancelTransaction`, `CheckTransaction`, `GetStatement` (+ `ChangePassword` if required).
 - Account field: `order_id` (our `Order.id` or number — pick one, be consistent). Amount in **tiyin**.
