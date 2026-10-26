@@ -27,7 +27,7 @@ test.describe('@smoke foundation', () => {
       await page.goto(`/${locale}`);
       await expect(page.locator('html')).toHaveAttribute('lang', locale);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      await expect(page.locator('#bestsellers + ul > li')).toHaveCount(4);
+      await expect(page.getByTestId('bestsellers').locator('> li')).toHaveCount(4);
       // Design placeholders must never reach the page.
       expect(await page.locator('body').innerText()).not.toMatch(/\[[^\]\n]{1,40}\]/);
     });

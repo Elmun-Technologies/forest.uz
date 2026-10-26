@@ -1,69 +1,145 @@
-import type { Locale, ProductCardDto, PublicSettingsDto } from '@forest/contracts';
-import { Badge, Panel, Price } from '@forest/ui';
-import Image from 'next/image';
+import type { Locale, ProductCardDto } from '@forest/contracts';
+import { formatUzPhone } from '@forest/contracts/core';
+import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { apiGet } from '@/lib/api';
+import { ClientMessages } from '@/components/client-messages';
+import { JsonLd } from '@/components/json-ld';
+import { Hero } from '@/components/home/hero';
+import { LeadSection } from '@/components/home/lead-section';
+import { QuickSelector } from '@/components/home/quick-selector';
+import {
+  Bestsellers,
+  DeliveryPayment,
+  FactStrip,
+  Gallery,
+  HowToAndFaq,
+  renderableFaq,
+  ReviewsSummary,
+  sectionTitle,
+} from '@/components/home/sections';
+import { telegramUrl } from '@/config/site';
+import { apiGetOptional } from '@/lib/api';
+import { getHomeContent, getSettings } from '@/lib/data';
+import { absoluteUrl, alternates, siteUrl } from '@/lib/seo';
 
-/**
- * Phase 0 foundation page: proves the stack end-to-end (web → api → db seed → object storage).
- * Replaced by the full Home screen (design/screens/Main.png) in Phase 1.
- */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'meta' });
+  return {
+    title: { absolute: t('title') },
+    description: t('description'),
+    alternates: alternates(locale, '/'),
+    openGraph: { title: t('title'), description: t('description'), url: absoluteUrl(locale, '/') },
+  };
+}
+
 export default async function HomePage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const t = await getTranslations('home');
-  const [products, settings] = await Promise.all([
-    apiGet<ProductCardDto[]>('/catalog/bestsellers', locale),
-    apiGet<PublicSettingsDto>('/settings/public', locale),
+  const [content, settings, t] = await Promise.all([
+    getHomeContent(locale),
+    getSettings(locale),
+    getTranslations('home.selector'),
   ]);
-  const express = settings.delivery.zones.find((z) => z.carrier === 'YANDEX');
+  // Until GET /content/home exists the page still sells: bestsellers come from the catalog.
+  const bestsellers =
+    content?.bestsellers ??
+    (await apiGetOptional<ProductCardDto[]>('/catalog/bestsellers', locale)) ??
+    [];
+  const faq = renderableFaq(content?.faq ?? []);
+  const store = settings?.store;
+  const tg = store ? telegramUrl(store.telegramBot, 'home') : null;
 
   return (
-    <main className="mx-auto flex max-w-[1392px] flex-col gap-6 px-4 py-8 md:px-6">
-      <Panel radius="xl" className="flex flex-col gap-4 p-8 md:p-12">
-        <h1 className="text-[44px] leading-[0.95] font-medium tracking-[-0.05em] md:text-display">
-          {t('title')}
-        </h1>
-        {express ? (
-          <p className="text-muted">
-            {express.name[locale]} · {express.etaLabel[locale]}
-          </p>
+    <ClientMessages namespaces={['home']}>
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pt-0 lg:gap-6 lg:px-6 lg:pt-2">
+        {store ? (
+          <JsonLd
+            data={{
+              '@context': 'https://schema.org',
+              '@type': 'Organization',
+              name: store.name,
+              url: `${siteUrl()}/${locale}`,
+              logo: `${siteUrl()}/brand/forest-logo-green.png`,
+              email: store.email,
+              telephone: formatUzPhone(store.phone),
+              contactPoint: {
+                '@type': 'ContactPoint',
+                telephone: store.phone,
+                contactType: 'customer service',
+                availableLanguage: ['uz', 'ru'],
+                areaServed: 'UZ',
+              },
+              sameAs: [
+                telegramUrl(store.telegramBot),
+                ...(store.instagram ? [store.instagram] : []),
+              ],
+            }}
+          />
         ) : null}
-      </Panel>
-      <section aria-labelledby="bestsellers" className="flex flex-col gap-4">
-        <h2 id="bestsellers" className="text-[30px] font-medium tracking-[-0.04em] md:text-h2">
-          {t('bestsellers')}
-        </h2>
-        <ul className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {products.map((p) => (
-            <li key={p.id}>
-              <Panel radius="md" className="flex h-full flex-col gap-3 p-3">
-                {p.image ? (
-                  <Image
-                    src={p.image.url}
-                    alt={p.image.alt}
-                    width={p.image.width ?? 800}
-                    height={p.image.height ?? 800}
-                    sizes="(min-width: 768px) 25vw, 50vw"
-                    className="aspect-square w-full rounded-sm object-cover"
-                  />
-                ) : null}
-                {p.discountPct ? <Badge tone="light">−{p.discountPct}%</Badge> : null}
-                <span className="text-overline font-semibold tracking-[0.08em] text-muted uppercase">
-                  {p.categoryName}
+        {faq.length > 0 ? (
+          <JsonLd
+            data={{
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: faq.map((f) => ({
+                '@type': 'Question',
+                name: f.q,
+                acceptedAnswer: { '@type': 'Answer', text: f.a },
+              })),
+            }}
+          />
+        ) : null}
+
+        <Hero
+          locale={locale}
+          hero={content?.hero ?? null}
+          reviews={content?.reviewsSummary ?? null}
+          settings={settings}
+          hasSelector={Boolean(content && content.selector.length > 0)}
+          fallbackImage={
+            content?.selector.find((s) => s.key === 'divan')?.image ??
+            content?.selector.find((s) => s.image)?.image ??
+            bestsellers.find((p) => p.image)?.image ??
+            null
+          }
+        />
+        <FactStrip />
+
+        {content && content.selector.length > 0 ? (
+          <section
+            id="tanlash"
+            aria-labelledby="selector-title"
+            className="flex scroll-mt-4 flex-col gap-3.5 rounded-[28px] bg-panel px-3.5 pt-[22px] pb-3.5 lg:mt-6 lg:gap-8 lg:rounded-xl lg:p-12"
+          >
+            <div className="flex flex-col gap-4 px-1 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between lg:border-b lg:border-line lg:px-0 lg:pb-7">
+              <div className="flex flex-col gap-1.5 lg:gap-3">
+                <span className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase lg:text-[13px]">
+                  {t('overline')}
                 </span>
-                <span className="font-semibold">{p.name}</span>
-                <Price
-                  className="mt-auto font-bold"
-                  soum={p.priceFromSoum}
-                  from={p.hasPriceRange}
-                  locale={locale}
-                />
-              </Panel>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </main>
+                <h2 id="selector-title" className={`${sectionTitle} text-[30px] leading-[1.05]`}>
+                  {t('title')}
+                </h2>
+              </div>
+              <p className="hidden max-w-[400px] text-base leading-relaxed text-muted lg:block">
+                {t('text')}
+              </p>
+            </div>
+            <QuickSelector items={content.selector} />
+          </section>
+        ) : null}
+
+        <Gallery items={content?.gallery ?? []} />
+        <ReviewsSummary summary={content?.reviewsSummary ?? null} />
+        <Bestsellers products={bestsellers} locale={locale} />
+        <HowToAndFaq howTo={content?.howTo ?? null} faq={faq} />
+        <DeliveryPayment settings={settings} locale={locale} />
+        <LeadSection image={content?.leadImage ?? null} telegramUrl={tg} />
+      </div>
+    </ClientMessages>
   );
 }
