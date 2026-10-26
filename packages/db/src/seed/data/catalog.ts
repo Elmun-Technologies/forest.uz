@@ -75,6 +75,8 @@ export interface SeedProduct {
   type: 'SIMPLE' | 'BUNDLE';
   category: string;
   name: L;
+  /** Card subtitle override; omitted → built from variants ("0,5 L · 1 L · 2,5 L"). */
+  subtitle?: L;
   shortDesc: L;
   description: L;
   howToApply?: L;
@@ -354,6 +356,7 @@ export const products: SeedProduct[] = [
     type: 'SIMPLE',
     category: 'aksessuarlar',
     name: { uz: "Oval 40 cho'tka", ru: 'Кисть Oval 40' },
+    subtitle: { uz: '40 mm, aralash tola', ru: '40 мм, смешанный ворс' },
     shortDesc: {
       uz: '40 mm, aralash tola. Iz qoldirmaydi.',
       ru: '40 мм, смешанный ворс. Не оставляет полос.',
@@ -383,6 +386,7 @@ export const products: SeedProduct[] = [
     type: 'SIMPLE',
     category: 'aksessuarlar',
     name: { uz: 'Mikrofibra valik 10 sm', ru: 'Валик из микрофибры 10 см' },
+    subtitle: { uz: 'Ruchka bilan', ru: 'С ручкой' },
     shortDesc: {
       uz: 'Ruchka bilan. Silliq sirt uchun.',
       ru: 'С ручкой. Для гладких поверхностей.',
@@ -414,6 +418,7 @@ export const products: SeedProduct[] = [
     type: 'BUNDLE',
     category: 'toplamlar',
     name: { uz: "Mebel yangilash to'plami", ru: 'Набор для обновления мебели' },
+    subtitle: { uz: "Bo'yoq 1 L, mum, cho'tka", ru: 'Краска 1 л, воск, кисть' },
     shortDesc: {
       uz: "Bo'yoq 1 L, mum va cho'tka — komod uchun hammasi bir qutida.",
       ru: 'Краска 1 л, воск и кисть — всё для комода в одной коробке.',
@@ -458,6 +463,7 @@ export const products: SeedProduct[] = [
     type: 'BUNDLE',
     category: 'toplamlar',
     name: { uz: "Divan yangilash to'plami", ru: 'Набор для обновления дивана' },
+    subtitle: { uz: 'Tozalovchi + 3 sprey', ru: 'Очиститель + 3 спрея' },
     shortDesc: {
       uz: "Mato tozalovchi 500 ml va 3 ta mato bo'yog'i spreyi, rangini o'zingiz tanlaysiz.",
       ru: 'Очиститель для ткани 500 мл и 3 спрея-краски, цвет выбираете сами.',

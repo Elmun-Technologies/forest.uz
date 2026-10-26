@@ -93,6 +93,7 @@ CREATE TABLE "Product" (
     "status" "ProductStatus" NOT NULL DEFAULT 'DRAFT',
     "sellerId" TEXT NOT NULL,
     "name" JSONB NOT NULL,
+    "subtitle" JSONB,
     "shortDesc" JSONB,
     "description" JSONB,
     "howToApply" JSONB,

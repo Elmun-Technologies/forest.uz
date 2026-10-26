@@ -53,7 +53,7 @@ export function sumTiyin(values: Iterable<Tiyin>): Tiyin {
   return total;
 }
 
-const NBSP = ' ';
+const NBSP = '\u00A0';
 const CURRENCY = { uz: "so'm", ru: 'сум' } as const;
 
 /** Formats as `329 000` (no currency). Thousands separated by non-breaking spaces. */

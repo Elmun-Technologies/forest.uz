@@ -1,10 +1,11 @@
 import { defineConfig } from 'tsup';
 
-export default defineConfig({
+// Keep dist during watch so running apps don't crash on rebuild.
+export default defineConfig((options) => ({
   entry: ['src/index.ts'],
   format: ['esm', 'cjs'],
   dts: true,
   sourcemap: true,
-  clean: true,
+  clean: !options.watch,
   external: ['@prisma/client', '.prisma/client'],
-});
+}));

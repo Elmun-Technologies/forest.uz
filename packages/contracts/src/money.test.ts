@@ -13,7 +13,7 @@ import {
   tiyinToSoumInt,
 } from './money';
 
-const NB = ' ';
+const NB = '\u00A0';
 
 describe('money', () => {
   it('converts so’m and tiyin exactly', () => {

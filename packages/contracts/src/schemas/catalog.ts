@@ -87,3 +87,22 @@ export interface ProductListDto {
     price: { minSoum: number; maxSoum: number };
   };
 }
+
+export interface ProductDetailDto extends ProductCardDto {
+  shortDesc: string;
+  description: string;
+  howToApply: string[];
+  specs: { key: string; value: string }[];
+  surfaces: string[];
+  coverageM2PerL: number | null;
+  dryTimeMinutes: number | null;
+  videoUrl: string | null;
+  images: ImageDto[];
+  variants: VariantDto[];
+  /** Kit contents (BUNDLE only). */
+  components: { productSlug: string; name: string; variantLabel: string; qty: number }[];
+  rating: { average: number; count: number } | null;
+  related: ProductCardDto[];
+  upsell: ProductCardDto[];
+  alternatives: ProductCardDto[];
+}

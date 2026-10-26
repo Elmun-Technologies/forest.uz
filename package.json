@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "dev:apps": "turbo run dev --parallel --filter=@forest/web --filter=@forest/admin --filter=@forest/api",
+    "dev:apps": "turbo run dev --parallel --filter=@forest/web --filter=@forest/admin --filter=@forest/api --filter=@forest/contracts",
     "infra:up": "docker compose -f infra/compose.yml up -d --wait postgres redis storage mailpit",
     "infra:down": "docker compose -f infra/compose.yml down",
     "build": "turbo run build",

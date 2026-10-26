@@ -187,6 +187,7 @@ model Product {
   sellerId       String
   seller         Seller            @relation(fields: [sellerId], references: [id])
   name           Json // {uz, ru}
+  subtitle       Json? // card line override {uz, ru}; auto-built from variants when null
   shortDesc      Json?
   description    Json? // rich text per locale
   howToApply     Json?

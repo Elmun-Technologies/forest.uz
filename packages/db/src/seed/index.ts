@@ -141,6 +141,7 @@ async function seedCatalog(files: Map<string, string>) {
       status: 'ACTIVE' as const,
       sellerId: seller.id,
       name: json(p.name),
+      subtitle: p.subtitle ? json(p.subtitle) : Prisma.JsonNull,
       shortDesc: json(p.shortDesc),
       description: json(p.description),
       howToApply: p.howToApply ? json(p.howToApply) : Prisma.JsonNull,
