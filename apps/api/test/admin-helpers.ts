@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { AdminMeDto, StaffRole } from '@forest/contracts';
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
+import { Test, type TestingModuleBuilder } from '@nestjs/testing';
 import argon2 from 'argon2';
 import request from 'supertest';
 import { inject } from 'vitest';
@@ -18,6 +18,8 @@ import { nextTestIp } from './app';
 export async function createAdminTestApp(
   extraModules: (new () => unknown)[] = [],
   env: Record<string, string> = {},
+  /** Provider overrides (e.g. an in-memory object store instead of S3). */
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
 ): Promise<NestExpressApplication> {
   Object.assign(process.env, {
     NODE_ENV: 'test',
@@ -31,9 +33,9 @@ export async function createAdminTestApp(
     S3_PUBLIC_URL: 'http://cdn.test/forest-public',
     ...env,
   });
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule, ...extraModules],
-  }).compile();
+  const moduleRef = await configure(
+    Test.createTestingModule({ imports: [AppModule, ...extraModules] }),
+  ).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     rawBody: true,
     logger: false,
@@ -99,7 +101,7 @@ export class AdminClient {
   }
 
   async send(
-    method: 'post' | 'patch' | 'delete',
+    method: 'post' | 'patch' | 'put' | 'delete',
     path: string,
     body?: object,
     opts: { csrf?: string | null } = {},

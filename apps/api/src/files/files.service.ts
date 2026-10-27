@@ -1,5 +1,10 @@
 import { Global, Inject, Injectable, Module } from '@nestjs/common';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { ImageDto, Locale } from '@forest/contracts';
 import { t } from '@forest/contracts';
@@ -59,6 +64,15 @@ export class FilesService {
         Body: body,
         ContentType: contentType,
         ...(isPublic ? { CacheControl: 'public, max-age=31536000, immutable' } : {}),
+      }),
+    );
+  }
+
+  async remove(key: string, isPublic: boolean): Promise<void> {
+    await this.s3.send(
+      new DeleteObjectCommand({
+        Bucket: isPublic ? this.env.S3_BUCKET_PUBLIC : this.env.S3_BUCKET_PRIVATE,
+        Key: key,
       }),
     );
   }
