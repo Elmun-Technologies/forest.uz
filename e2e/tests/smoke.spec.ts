@@ -33,9 +33,11 @@ test.describe('@smoke foundation', () => {
     });
   }
 
-  test('admin shell boots and reaches the api', async ({ page }) => {
+  test('admin boots to the login page and reaches the api', async ({ page }) => {
     await page.goto(ADMIN);
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-    await expect(page.getByText('ulangan')).toBeVisible();
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole('heading', { name: 'Kirish' })).toBeVisible();
+    // Same-origin `/api/*` rewrite → API (CSRF bootstrap is public).
+    expect((await page.request.get(`${ADMIN}/api/admin/auth/csrf`)).ok()).toBe(true);
   });
 });
