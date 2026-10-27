@@ -1,3 +1,8 @@
+import { ADMIN_CATALOG_ERROR_MESSAGES } from './admin-catalog-errors';
+import { ADMIN_CRM_ERROR_MESSAGES } from './admin-crm-errors';
+import { ADMIN_MOYSKLAD_ERROR_MESSAGES } from './admin-moysklad-errors';
+import { ADMIN_ORDERS_ERROR_MESSAGES } from './admin-orders-errors';
+
 /**
  * Admin error codes, merged into `ERROR_MESSAGES` (errors.ts). Kept apart so the admin area grows
  * without touching the shared catalogue. The admin UI is Uzbek; `ru` keeps the shape uniform.
@@ -69,4 +74,8 @@ export const ADMIN_ERROR_MESSAGES = {
     uz: 'Bu xodim taklifni allaqachon qabul qilgan.',
     ru: 'Этот сотрудник уже принял приглашение.',
   },
+  ...ADMIN_CATALOG_ERROR_MESSAGES,
+  ...ADMIN_CRM_ERROR_MESSAGES,
+  ...ADMIN_ORDERS_ERROR_MESSAGES,
+  ...ADMIN_MOYSKLAD_ERROR_MESSAGES,
 } as const satisfies Record<string, { http: number; uz: string; ru: string }>;

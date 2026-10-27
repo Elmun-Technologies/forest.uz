@@ -51,14 +51,14 @@ export const NAV: NavGroup[] = [
       {
         id: 'orders',
         label: 'Buyurtmalar',
-        href: null,
+        href: '/orders',
         icon: 'M6 7h12l-1 13H7L6 7zM9 7a3 3 0 0 1 6 0',
         permissions: ['orders.view'],
       },
       {
         id: 'customers',
         label: 'Mijozlar',
-        href: null,
+        href: '/customers',
         icon: 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21c1-4 4-6 7-6s6 2 7 6M17 11a3 3 0 1 0 0-6M22 20c-.6-2.5-2-4-4-4.6',
         permissions: ['customers.view'],
       },
@@ -84,21 +84,21 @@ export const NAV: NavGroup[] = [
       {
         id: 'products',
         label: 'Mahsulotlar',
-        href: null,
+        href: '/products',
         icon: 'M21 8 12 3 3 8v8l9 5 9-5zM3 8l9 5 9-5M12 13v8',
         permissions: ['products.view'],
       },
       {
         id: 'stock',
         label: 'MoySklad',
-        href: null,
+        href: '/moysklad',
         icon: 'M3 21V9l9-6 9 6v12M7 21v-8h10v8M7 17h10',
         permissions: ['moysklad.sync'],
       },
       {
         id: 'reviews',
         label: 'Sharhlar va fotolar',
-        href: null,
+        href: '/reviews',
         icon: 'm12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z',
         permissions: ['reviews.view'],
       },
@@ -110,7 +110,7 @@ export const NAV: NavGroup[] = [
       {
         id: 'promo',
         label: 'Promo-kodlar',
-        href: null,
+        href: '/promo',
         icon: 'M3 12V4h8l10 10-8 8L3 12zM7.5 7.5h.01',
         permissions: ['promo.edit'],
       },
@@ -124,7 +124,7 @@ export const NAV: NavGroup[] = [
       {
         id: 'integrations',
         label: 'Integratsiyalar',
-        href: null,
+        href: '/integrations',
         icon: 'M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5',
         permissions: ['integrations.view'],
       },
@@ -151,6 +151,8 @@ export function navFor(role: StaffRole): NavGroup[] {
 export const SETTINGS_TABS: { href: string; label: string; permissions: readonly Permission[] }[] =
   [
     { href: '/settings/staff', label: 'Xodimlar', permissions: ['settings.staff'] },
+    { href: '/settings/delivery', label: 'Yetkazish', permissions: ['settings.delivery'] },
+    { href: '/settings/store', label: "Do'kon", permissions: ['settings.store'] },
     { href: '/settings/audit', label: 'Faoliyat jurnali', permissions: ['audit.view'] },
   ];
 

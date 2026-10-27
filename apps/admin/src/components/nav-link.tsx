@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { NavItem } from '../lib/nav';
 import { Icon } from './icon';
+import { OrdersBadge } from './orders/orders-badge';
+import { ReviewsBadge } from './reviews/reviews-badge';
 
 const base =
   'flex items-center gap-3 rounded-sm px-3 py-[11px] text-sm font-medium transition-colors';
@@ -39,6 +41,9 @@ export function NavLink({ item }: { item: NavItem }) {
     >
       <Icon d={item.icon} />
       <span className="flex-1">{item.label}</span>
+      {/* Live count of orders needing action (docs/08 sidebar). */}
+      {item.id === 'orders' ? <OrdersBadge active={active} /> : null}
+      {item.id === 'reviews' ? <ReviewsBadge active={active} /> : null}
     </Link>
   );
 }
