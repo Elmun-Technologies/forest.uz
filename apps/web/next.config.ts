@@ -4,11 +4,18 @@ import createNextIntlPlugin from 'next-intl/plugin';
 
 // Messages are precompiled at build time (ICU → compact AST), so the browser bundle ships the
 // format-only runtime instead of the ICU parser (`IntlMessageFormat`), and formatting is cheaper.
+// Production builds only: with next-intl 4 on Next 15 the catalog loader exists for webpack builds,
+// but `next dev --turbopack` refuses it ("requires Next.js 16"). Dev keeps the runtime parser;
+// rendered text is identical.
 const withNextIntl = createNextIntlPlugin({
   requestConfig: './src/i18n/request.ts',
-  experimental: {
-    messages: { path: './messages', format: 'json', locales: 'infer', precompile: true },
-  },
+  ...(process.env.NODE_ENV === 'production'
+    ? {
+        experimental: {
+          messages: { path: './messages', format: 'json', locales: 'infer', precompile: true },
+        },
+      }
+    : {}),
 });
 const publicFiles = new URL(process.env.S3_PUBLIC_URL ?? 'http://localhost:9000/forest-public');
 
