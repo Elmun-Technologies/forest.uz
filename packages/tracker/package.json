@@ -20,7 +20,7 @@
     "build": "tsup && node scripts/emit.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts",
-    "test": "pnpm run build && vitest run"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@forest/config": "workspace:*",
