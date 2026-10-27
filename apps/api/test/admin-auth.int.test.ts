@@ -148,6 +148,11 @@ describe('admin auth (integration)', () => {
           where: { action: 'staff.login_locked', entityId: staff.id },
         }),
       ).toBe(1);
+      const failed = await prisma.auditLog.findMany({
+        where: { action: 'staff.login_failed', entityId: staff.id },
+      });
+      expect(failed).toHaveLength(ADMIN_AUTH_POLICY.maxFailures);
+      expect(JSON.stringify(failed.map((f) => f.after))).not.toContain('wrong-password');
       // Lock expired → the right password works and the counter is clean.
       await prisma.staff.update({
         where: { id: staff.id },

@@ -1,10 +1,15 @@
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger, type OnApplicationBootstrap } from '@nestjs/common';
 import type { Job, Queue } from 'bullmq';
+import type { Prisma } from '@forest/db';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const MAINTENANCE_QUEUE = 'maintenance';
 const ENSURE_PARTITIONS = 'events.partitions.ensure';
+const PRUNE_RETENTION = 'retention.prune';
+
+/** docs/04 + docs/14: raw events 13 months; IntegrationLog 90 days, failures 180 days (ASVS F-05/F-16). */
+export const RETENTION = { eventMonths: 13, integrationLogDays: 90, integrationLogFailedDays: 180 };
 
 /**
  * Keeps monthly Event partitions created ahead of time (docs/04) and alerts when rows leak into
@@ -31,6 +36,37 @@ export class MaintenanceService implements OnApplicationBootstrap {
       { pattern: '10 3 * * *', tz: 'Asia/Tashkent' },
       { name: ENSURE_PARTITIONS },
     );
+    await this.queue.upsertJobScheduler(
+      PRUNE_RETENTION,
+      { pattern: '30 3 * * *', tz: 'Asia/Tashkent' },
+      { name: PRUNE_RETENTION },
+    );
+  }
+
+  /** Drops raw-event partitions past the retention window and old integration log rows. */
+  async pruneRetention(
+    now = new Date(),
+  ): Promise<{ droppedPartitions: number; integrationLogs: number }> {
+    // DROP of a partition needs the same ACCESS EXCLUSIVE lock as creating one: same bounded wait.
+    const droppedPartitions = await this.withPartitionLock(async (tx) => {
+      const [row] = await tx.$queryRaw<{ n: number }[]>`
+        SELECT drop_old_event_partitions(${RETENTION.eventMonths}::int) AS n`;
+      return Number(row?.n ?? 0);
+    });
+    const day = 86_400_000;
+    const okBefore = new Date(now.getTime() - RETENTION.integrationLogDays * day);
+    const failedBefore = new Date(now.getTime() - RETENTION.integrationLogFailedDays * day);
+    const { count: integrationLogs } = await this.prisma.integrationLog.deleteMany({
+      where: {
+        OR: [{ ok: true, createdAt: { lt: okBefore } }, { createdAt: { lt: failedBefore } }],
+      },
+    });
+    if (droppedPartitions > 0 || integrationLogs > 0) {
+      this.logger.log(
+        `Retention: ${droppedPartitions} event partitions, ${integrationLogs} integration logs removed`,
+      );
+    }
+    return { droppedPartitions, integrationLogs };
   }
 
   async ensureEventPartitions(monthsAhead = 3): Promise<{ defaultRows: number }> {
@@ -56,13 +92,18 @@ export class MaintenanceService implements OnApplicationBootstrap {
    * retries with backoff, boot just logs).
    */
   private async createPartitions(monthsAhead: number): Promise<void> {
+    await this.withPartitionLock(async (tx) => {
+      await tx.$executeRaw`SELECT ensure_event_partitions(${monthsAhead}::int)`;
+    });
+  }
+
+  private async withPartitionLock<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {
-        await this.prisma.$transaction(async (tx) => {
+        return await this.prisma.$transaction(async (tx) => {
           await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '${PARTITION_LOCK_TIMEOUT}'`);
-          await tx.$executeRaw`SELECT ensure_event_partitions(${monthsAhead}::int)`;
+          return fn(tx);
         });
-        return;
       } catch (e) {
         if (!isLockTimeout(e) || attempt >= PARTITION_LOCK_ATTEMPTS) throw e;
         this.logger.warn(`Event partitions: lock busy (attempt ${attempt}), retrying`);
@@ -89,6 +130,7 @@ export class MaintenanceProcessor extends WorkerHost {
 
   async process(job: Job): Promise<unknown> {
     if (job.name === ENSURE_PARTITIONS) return this.maintenance.ensureEventPartitions();
+    if (job.name === PRUNE_RETENTION) return this.maintenance.pruneRetention();
     return undefined;
   }
 }
