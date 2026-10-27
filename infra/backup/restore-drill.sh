@@ -155,3 +155,4 @@ if grep -Eq '\|\s+f\s+\|' <<<"$result"; then
   die "sanity check failed — see $report"
 fi
 log "drill passed — report $report"
+heartbeat restore-drill

@@ -116,6 +116,8 @@ services:
       # The /api rewrite is baked at build time (CLAUDE.md §17), like web.
       args:
         APP: admin
+        # The admin CSP (next.config.ts) is baked with the public bucket origin.
+        S3_PUBLIC_URL: '${S3_PUBLIC_URL:-http://localhost:9000/forest-public}'
         API_INTERNAL_URL: http://api:4000
     ports: ['127.0.0.1:3001:3001']
     environment:

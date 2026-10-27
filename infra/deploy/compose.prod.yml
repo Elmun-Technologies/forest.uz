@@ -156,6 +156,9 @@ services:
     networks: [internal, egress]
     environment:
       FOREST_RELEASE: ${FOREST_TAG}
+    # Node serves on one core: scale out (Caddy balances over all replicas, infra/Caddyfile).
+    # Rule of thumb from the k6 smoke: ~20-25 storefront pages/s per replica (dynamic product pages).
+    scale: ${WEB_REPLICAS:-2}
     healthcheck:
       # /t.js is a static route handler: cheap, no API call, proves the server answers.
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/t.js || exit 1']
@@ -165,7 +168,7 @@ services:
       start_period: 20s
     deploy:
       resources:
-        limits: { cpus: '1.5', memory: 1g }
+        limits: { cpus: '1.0', memory: 768m }
 
   admin:
     <<: *prod

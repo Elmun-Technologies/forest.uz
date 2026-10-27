@@ -31,6 +31,7 @@ case "${1:-backup}" in
     [[ "$type" == full ]] && pbr verify
     mkdir -p "$BACKUP_DIR"
     date -u +%Y-%m-%dT%H:%M:%SZ >"$BACKUP_DIR/PGBACKREST_LAST_SUCCESS"
+    heartbeat pgbackrest
     ;;
   full | diff) pbr --type="$1" backup ;;
   check) pbr check ;;

@@ -57,6 +57,15 @@ _run_exit_hooks() {
 trap _run_exit_hooks EXIT
 trap_alert() { ALERT_JOB="$1"; }
 
+# Uptime Kuma push monitor (CLAUDE.md §6 "Uptime + ops alerts"): OPS_HEARTBEAT_URL_<JOB> in
+# .env.ops, e.g. OPS_HEARTBEAT_URL_BACKUP_DB for job backup-db. A missed beat alerts in Kuma, so
+# a timer that silently stops running is noticed too.
+heartbeat() {
+  local var="OPS_HEARTBEAT_URL_$(tr 'a-z-' 'A-Z_' <<<"$1")"
+  [[ -n "${!var:-}" ]] || return 0
+  curl -fsS --max-time 10 -o /dev/null "${!var}?status=up&msg=ok" || log "heartbeat $1 failed"
+}
+
 # Container id of a compose service of $COMPOSE_PROJECT (works for the dev and the prod project).
 service_container() {
   local id

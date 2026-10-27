@@ -44,6 +44,9 @@ preflight() {
     errors+=("APP_ENCRYPTION_KEY must be 32 random bytes, base64")
   v="$(ev SESSION_SECRET)"
   [[ ${#v} -ge 32 && "$v" != generate* ]] || errors+=("SESSION_SECRET must be ≥ 32 random chars")
+  v="$(ev WEB_REVALIDATE_SECRET)"
+  [[ ${#v} -ge 32 && "$v" != generate* ]] ||
+    errors+=("WEB_REVALIDATE_SECRET must be ≥ 32 random chars (api ↔ web signed calls fail closed without it)")
   [[ -n "$(ev POSTGRES_PASSWORD)" && "$(ev POSTGRES_PASSWORD)" != forest ]] ||
     errors+=("POSTGRES_PASSWORD must be set (not the dev default)")
   [[ -n "$(ev FOREST_APP_DB_PASSWORD)" ]] || errors+=("FOREST_APP_DB_PASSWORD must be set (API database role)")

@@ -51,3 +51,4 @@ find "$BACKUP_DIR/pg" -name 'forest-*.dump*' -mtime +"${BACKUP_LOCAL_DAYS:-7}" -
 # Last-success marker for the uptime monitor / restore drill (age check).
 date -u +%Y-%m-%dT%H:%M:%SZ >"$BACKUP_DIR/pg/LAST_SUCCESS"
 log "done"
+heartbeat backup-db

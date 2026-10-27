@@ -66,7 +66,18 @@
 	respond /api/revalidate 404
 	# Dev endpoints never go through the edge (they 404 in production anyway: DEV_ENDPOINTS off).
 	respond /api/dev/* 404
-	reverse_proxy web:3000
+	# One Node process uses one core: production runs WEB_REPLICAS storefront containers
+	# (compose.prod.yml) and Caddy spreads requests over every address `web` resolves to.
+	reverse_proxy {
+		dynamic a {
+			name web
+			port 3000
+			refresh 10s
+		}
+		lb_policy least_conn
+		lb_try_duration 5s
+		fail_duration 30s
+	}
 }
 
 # ── Admin ─────────────────────────────────────────────────────────────────────────────────────
@@ -89,6 +100,12 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
 		Cross-Origin-Opener-Policy same-origin
 		X-Robots-Tag "noindex, nofollow"
+	}
+	# Admin API answers carry PII and staff data: never cacheable unless the API says otherwise
+	# (`?` = only when the upstream set no Cache-Control; ASVS 8.2.1, docs/security/asvs-l2.md).
+	header /api/* {
+		defer
+		?Cache-Control "no-store"
 	}
 	respond /api/dev/* 404
 	reverse_proxy admin:3001

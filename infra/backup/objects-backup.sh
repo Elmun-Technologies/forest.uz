@@ -37,3 +37,4 @@ rclone_run delete bcrypt:objects/history --min-age "${BACKUP_REMOTE_DAYS:-30}d"
 rclone_run rmdirs bcrypt:objects/history --leave-root
 date -u +%Y-%m-%dT%H:%M:%SZ >"$BACKUP_DIR/OBJECTS_LAST_SUCCESS"
 log "done"
+heartbeat backup-objects
