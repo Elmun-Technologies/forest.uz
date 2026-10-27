@@ -67,6 +67,39 @@ const PAYMENT_EDGES: Record<PaymentStatus, readonly PaymentStatus[]> = {
   REFUNDED: [],
 };
 
+/**
+ * Carrier delivery status (docs/02). Forward-only; carriers' polling may skip states. FAILED is an
+ * attempt that can be retried (re-created claim, redelivery, parcel left at a branch);
+ * DELIVERED and RETURNED are final.
+ */
+const DELIVERY_EDGES: Record<DeliveryStatus, readonly DeliveryStatus[]> = {
+  NOT_CREATED: ['CREATED'],
+  CREATED: ['COURIER_ASSIGNED', 'PICKED_UP', 'IN_TRANSIT', 'AT_BRANCH', 'DELIVERED', 'FAILED'],
+  COURIER_ASSIGNED: ['PICKED_UP', 'IN_TRANSIT', 'AT_BRANCH', 'DELIVERED', 'FAILED'],
+  PICKED_UP: ['IN_TRANSIT', 'AT_BRANCH', 'DELIVERED', 'FAILED'],
+  IN_TRANSIT: ['AT_BRANCH', 'DELIVERED', 'FAILED'],
+  // Not collected from the branch within the storage period → back to the warehouse.
+  AT_BRANCH: ['DELIVERED', 'FAILED', 'RETURNED'],
+  FAILED: ['CREATED', 'IN_TRANSIT', 'AT_BRANCH', 'DELIVERED', 'RETURNED'],
+  DELIVERED: [],
+  RETURNED: [],
+};
+
+export function allowedDeliveryTransitions(from: DeliveryStatus): readonly DeliveryStatus[] {
+  return DELIVERY_EDGES[from];
+}
+
+/** Same status is not a transition (callers treat it as a no-op update). */
+export function canTransitionDelivery(from: DeliveryStatus, to: DeliveryStatus): boolean {
+  return DELIVERY_EDGES[from].includes(to);
+}
+
+export function assertDeliveryTransition(from: DeliveryStatus, to: DeliveryStatus): void {
+  if (!canTransitionDelivery(from, to)) {
+    throw new DomainError('DELIVERY_INVALID_TRANSITION', { from, to });
+  }
+}
+
 export function allowedOrderTransitions(from: OrderStatus): readonly OrderStatus[] {
   return ORDER_EDGES[from];
 }

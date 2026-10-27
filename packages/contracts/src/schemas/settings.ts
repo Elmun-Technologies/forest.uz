@@ -124,4 +124,6 @@ export interface PublicSettingsDto {
   /** From `returns.rules` (hero trust row "14 kun qaytarish"). */
   returns: { returnDays: number };
   flags: { marketplace: boolean; cod: boolean; bnpl: boolean };
+  /** `telegramBot`: bot username for the Telegram Login Widget; null = login widget unavailable. */
+  auth: { telegramBot: string | null };
 }

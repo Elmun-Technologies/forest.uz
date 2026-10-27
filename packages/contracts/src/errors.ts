@@ -95,6 +95,26 @@ export const ERROR_MESSAGES = {
     uz: "To'lov holatini bunday o'zgartirib bo'lmaydi.",
     ru: 'Нельзя изменить статус оплаты таким образом.',
   },
+  DELIVERY_INVALID_TRANSITION: {
+    http: 409,
+    uz: "Yetkazish holatini bunday o'zgartirib bo'lmaydi.",
+    ru: 'Нельзя изменить статус доставки таким образом.',
+  },
+  SHIPMENT_ORDER_NOT_READY: {
+    http: 409,
+    uz: "Buyurtma hali tasdiqlanmagan yoki bekor qilingan — jo'natib bo'lmaydi.",
+    ru: 'Заказ ещё не подтверждён или отменён — отправить его нельзя.',
+  },
+  SHIPMENT_CARRIER_MISMATCH: {
+    http: 409,
+    uz: "Bu buyurtma boshqa yetkazib beruvchi orqali jo'natiladi.",
+    ru: 'Этот заказ отправляется другой службой доставки.',
+  },
+  FISCAL_RECEIPT_REQUIRED: {
+    http: 409,
+    uz: 'Buyurtmani yopish uchun fiskal chek kerak. Avval chek raqami yoki havolasini kiriting.',
+    ru: 'Чтобы закрыть заказ, нужен фискальный чек. Сначала укажите номер или ссылку чека.',
+  },
   ADDRESS_LOCKED: {
     http: 409,
     uz: "Buyurtma kuryerga topshirilgan — manzilni operator orqali o'zgartiring.",
@@ -201,10 +221,55 @@ export const ERROR_MESSAGES = {
     uz: "So'rov kaliti yo'q.",
     ru: 'Отсутствует ключ идемпотентности.',
   },
+  TELEGRAM_AUTH_INVALID: {
+    http: 401,
+    uz: "Telegram orqali kirishni tasdiqlab bo'lmadi. Qayta urinib ko'ring yoki telefon raqam bilan kiring.",
+    ru: 'Не удалось подтвердить вход через Telegram. Попробуйте ещё раз или войдите по номеру телефона.',
+  },
+  TELEGRAM_AUTH_EXPIRED: {
+    http: 401,
+    uz: "Telegram ma'lumotlari eskirgan. «Telegram orqali kirish» tugmasini qayta bosing.",
+    ru: 'Данные Telegram устарели. Нажмите «Войти через Telegram» ещё раз.',
+  },
+  TELEGRAM_ALREADY_LINKED: {
+    http: 409,
+    uz: "Bu Telegram akkaunt boshqa mijozga ulangan. Operator bilan bog'laning.",
+    ru: 'Этот аккаунт Telegram привязан к другому клиенту. Свяжитесь с оператором.',
+  },
   INTEGRATION_NOT_CONFIGURED: {
     http: 503,
     uz: 'Xizmat hali ulanmagan.',
     ru: 'Сервис ещё не подключён.',
+  },
+  DELIVERY_CLAIM_NOT_READY: {
+    http: 409,
+    uz: "Yandex hali narxni hisoblamadi yoki taklif eskirdi. Bir daqiqadan keyin qayta urinib ko'ring.",
+    ru: 'Яндекс ещё не рассчитал заявку или предложение устарело. Попробуйте через минуту.',
+  },
+  DELIVERY_TEST_MODE: {
+    http: 409,
+    uz: "Test rejimida kuryer chaqirilmaydi. Integratsiyani «live» rejimiga o'tkazing.",
+    ru: 'В тестовом режиме курьер не вызывается. Переключите интеграцию в режим «live».',
+  },
+  DELIVERY_COD_UNSUPPORTED: {
+    http: 409,
+    uz: "Naqd to'lovli buyurtmalar uchun Yandex kuryeri yoqilmagan.",
+    ru: 'Курьер Яндекса для заказов с оплатой при получении не включён.',
+  },
+  DELIVERY_CANCEL_UNAVAILABLE: {
+    http: 409,
+    uz: "Kuryer chaqiruvini endi bekor qilib bo'lmaydi — Yandex qo'llab-quvvatlash xizmatiga murojaat qiling.",
+    ru: 'Вызов курьера уже нельзя отменить — обратитесь в поддержку Яндекса.',
+  },
+  DELIVERY_CANCEL_PAID: {
+    http: 409,
+    uz: "Bekor qilish pullik. Tasdiqlasangiz, to'lov bilan bekor qilinadi.",
+    ru: 'Отмена платная. Подтвердите, чтобы отменить с оплатой.',
+  },
+  DELIVERY_PROVIDER_ERROR: {
+    http: 502,
+    uz: "Yetkazish xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
+    ru: 'Служба доставки не ответила. Попробуйте чуть позже.',
   },
   INTERNAL: {
     http: 500,

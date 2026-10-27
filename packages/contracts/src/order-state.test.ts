@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DomainError, errorMessage } from './errors';
 import {
+  allowedDeliveryTransitions,
+  assertDeliveryTransition,
+  canTransitionDelivery,
+  DELIVERY_STATUSES,
   allowedOrderTransitions,
   assertOrderTransition,
   assertPaymentTransition,
@@ -76,5 +80,25 @@ describe('order state machine', () => {
   it('localizes error messages with variables', () => {
     expect(errorMessage('PROMO_MIN_CART', 'uz', { min: "300 000 so'm" })).toContain("300 000 so'm");
     expect(errorMessage('PROMO_MIN_CART', 'ru')).toContain('{min}');
+  });
+
+  it('delivery status only moves forward; FAILED can be retried', () => {
+    expect(canTransitionDelivery('NOT_CREATED', 'CREATED')).toBe(true);
+    expect(canTransitionDelivery('NOT_CREATED', 'DELIVERED')).toBe(false);
+    // Polling may skip states.
+    expect(canTransitionDelivery('CREATED', 'DELIVERED')).toBe(true);
+    expect(canTransitionDelivery('PICKED_UP', 'AT_BRANCH')).toBe(true);
+    expect(canTransitionDelivery('IN_TRANSIT', 'PICKED_UP')).toBe(false);
+    expect(canTransitionDelivery('AT_BRANCH', 'RETURNED')).toBe(true);
+    expect(canTransitionDelivery('FAILED', 'CREATED')).toBe(true);
+    expect(canTransitionDelivery('FAILED', 'DELIVERED')).toBe(true);
+    expect(canTransitionDelivery('IN_TRANSIT', 'IN_TRANSIT')).toBe(false);
+    for (const s of DELIVERY_STATUSES) {
+      expect(canTransitionDelivery(s, 'NOT_CREATED')).toBe(false);
+      expect(canTransitionDelivery('DELIVERED', s)).toBe(false);
+    }
+    expect(allowedDeliveryTransitions('RETURNED')).toEqual([]);
+    expect(() => assertDeliveryTransition('DELIVERED', 'FAILED')).toThrow(DomainError);
+    expect(() => assertDeliveryTransition('CREATED', 'PICKED_UP')).not.toThrow();
   });
 });

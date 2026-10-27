@@ -57,3 +57,25 @@ describe('catalog query schema', () => {
     expect(productListQuerySchema.parse({}).onSale).toBeUndefined();
   });
 });
+
+describe('telegram login payload schema', () => {
+  const hash = 'a'.repeat(64);
+  it('keeps every field (they are all signed) and checks the required ones', async () => {
+    const { telegramAuthSchema } = await import('./schemas/commerce');
+    const ok = telegramAuthSchema.safeParse({
+      id: 123456789,
+      first_name: 'Malika',
+      username: 'malika',
+      auth_date: 1761530000,
+      hash,
+      new_field: 'x',
+    });
+    expect(ok.success && ok.data.new_field).toBe('x');
+    expect(telegramAuthSchema.safeParse({ id: 1, auth_date: 1, hash: 'zz' }).success).toBe(false);
+    expect(telegramAuthSchema.safeParse({ id: 'abc', auth_date: 1, hash }).success).toBe(false);
+    expect(telegramAuthSchema.safeParse({ id: 1, hash }).success).toBe(false);
+    expect(
+      telegramAuthSchema.safeParse({ id: 1, auth_date: 1, hash, 'Bad-Key': 'x' }).success,
+    ).toBe(false);
+  });
+});

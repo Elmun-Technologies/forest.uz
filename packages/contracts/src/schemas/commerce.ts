@@ -74,6 +74,9 @@ export interface CartDto {
 export const quoteQuerySchema = z.object({
   region: z.string().min(1),
   district: z.string().optional(),
+  /** Customer's map pin: enables the live carrier quote where a zone has it on. */
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
 export interface DeliveryOptionDto {
@@ -172,9 +175,16 @@ export interface TrackingDto extends OrderPublicDto {
     etaFrom: string | null;
     etaTo: string | null;
     distanceKm: number | null;
+    /**
+     * Carrier's forwarded number to call the courier (Yandex: temporary, may need `phoneExt`).
+     * Full only for the order owner (signed-in customer or the browser that placed the order),
+     * masked otherwise; null when unknown or expired.
+     */
+    phone: string | null;
+    phoneExt: string | null;
   } | null;
   carrierRef: string | null;
-  history: { at: string; place: string; note: string }[];
+  history: { at: string; place: string; note: string; status?: DeliveryStatus }[];
   canChangeAddress: boolean;
 }
 
@@ -191,11 +201,27 @@ export const otpVerifySchema = z.object({
   code: z.string().regex(/^\d{4}$/),
 });
 
+/**
+ * Telegram Login Widget payload (`id, first_name, last_name, username, photo_url, auth_date,
+ * hash`). Any extra field Telegram adds is kept: every received field except `hash` is part of
+ * the signed data-check-string, so dropping unknown ones would break verification.
+ */
+export const telegramAuthSchema = z
+  .record(z.string().regex(/^[a-z_]{1,32}$/), z.union([z.string().max(1024), z.number()]))
+  .refine((v) => Object.keys(v).length <= 20, { path: ['hash'] })
+  .refine((v) => typeof v.hash === 'string' && /^[0-9a-f]{64}$/.test(v.hash), { path: ['hash'] })
+  .refine((v) => /^\d{1,20}$/.test(String(v.id ?? '')), { path: ['id'] })
+  .refine((v) => /^\d{1,12}$/.test(String(v.auth_date ?? '')), { path: ['auth_date'] });
+export type TelegramAuthInput = z.infer<typeof telegramAuthSchema>;
+
 export interface MeDto {
   id: string;
   publicId: string;
   name: string | null;
-  phone: string;
+  /** Null for a customer who signed in with Telegram and never gave a phone. */
+  phone: string | null;
+  /** Telegram account linked (login widget or bot). */
+  telegram: { username: string | null } | null;
   locale: 'uz' | 'ru';
   customerSince: string;
   consents: { smsMarketing: boolean; telegram: boolean; adsMatching: boolean };

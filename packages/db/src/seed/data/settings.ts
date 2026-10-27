@@ -42,6 +42,8 @@ export const settings: { [K in SettingKey]: SettingValue<K> } = {
         afterCutoffBy: '12:00',
         workDays: allWeek,
       },
+      // Yandex check-price instead of priceSoum when coordinates are known (CLAUDE.md §6).
+      liveQuote: false,
       active: true,
       sort: 1,
     },

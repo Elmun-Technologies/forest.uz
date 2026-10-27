@@ -308,7 +308,8 @@ model WaitlistEntry {
 model Customer {
   id               String         @id @default(cuid())
   publicId         String         @unique @default(dbgenerated("('C-'::text || nextval('customer_public_seq'::regclass))")) // C-10482
-  phone            String         @unique // E.164
+  /// E.164. Null for a Telegram-login customer who never gave a phone (CLAUDE.md §6).
+  phone            String?        @unique
   name             String?
   locale           Locale         @default(uz)
   telegramId       BigInt?        @unique
@@ -461,6 +462,7 @@ model Order {
   events          OrderEvent[]
   reservations    Reservation[]
   promoRedemption PromoRedemption?
+  fiscalReceipts  FiscalReceipt[]
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
@@ -545,20 +547,52 @@ model Refund {
 }
 
 model Shipment {
-  id          String          @id @default(cuid())
-  orderId     String
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  sellerId    String
-  seller      Seller          @relation(fields: [sellerId], references: [id])
-  carrier     DeliveryCarrier
-  status      DeliveryStatus  @default(NOT_CREATED)
-  externalId  String? // Yandex claim id / BTS waybill
-  trackNumber String?
-  branch      Json? // BTS branch info
-  courier     Json? // name, phone, car, plate, eta
-  priceTiyin  BigInt          @default(0)
-  history     Json? // carrier tracking history
-  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+  id             String          @id @default(cuid())
+  orderId        String
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId       String
+  seller         Seller          @relation(fields: [sellerId], references: [id])
+  carrier        DeliveryCarrier
+  status         DeliveryStatus  @default(NOT_CREATED)
+  externalId     String? // Yandex claim id / BTS waybill
+  trackNumber    String?
+  branch         Json? // BTS branch info
+  courier        Json? // name, phone, car, plate, eta
+  priceTiyin     BigInt          @default(0)
+  history        Json? // carrier tracking history
+  /// Raw carrier status (Yandex claim status, e.g. `pickuped`); `status` is our mapping of it.
+  providerStatus String?
+  /// Carrier bookkeeping: Yandex claim version, updated_ts, request ids of every attempt, cost.
+  providerData   Json?
+  acceptedAt     DateTime?       @db.Timestamptz(3)
+  /// Polling: last successful sync, next due time (also the lease between job runs), errors in a row.
+  syncedAt       DateTime?       @db.Timestamptz(3)
+  nextSyncAt     DateTime?       @db.Timestamptz(3)
+  syncFailures   Int             @default(0)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([carrier, externalId])
+  @@index([orderId])
+  @@index([carrier, nextSyncAt])
+}
+
+/// Fiscal receipt evidence for an order (docs/06 Fiscal). `provider` = manual (operator entry),
+/// fiscal_ofd, or the payment provider that issued it. One per order and kind (SALE / REFUND).
+model FiscalReceipt {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId     String?
+  kind          String   @default("SALE") // SALE | REFUND
+  provider      String // manual | fiscal_ofd | payme | click
+  receiptNumber String?
+  url           String?
+  staffId       String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([orderId, kind])
 }
 
 // ───────────────────────── Promo ─────────────────────────
@@ -756,8 +790,10 @@ model Message {
   error       String?
   createdAt   DateTime       @default(now()) @db.Timestamptz(3)
   sentAt      DateTime?      @db.Timestamptz(3)
+  deliveredAt DateTime?      @db.Timestamptz(3)
 
   @@index([customerId, createdAt])
+  @@index([channel, providerId])
 }
 
 model Conversation {

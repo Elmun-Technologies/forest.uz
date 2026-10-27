@@ -37,6 +37,11 @@ export const deliveryZoneSchema = z.object({
   freeFromSoum: z.number().int().positive().nullable(),
   etaLabel: z.object({ uz: z.string(), ru: z.string() }),
   rule: deliveryRuleSchema,
+  /**
+   * YANDEX zones only: price from Yandex `check-price` when the customer's pin and the warehouse
+   * coordinates are known (falls back to `priceSoum`). Off by default (CLAUDE.md §6).
+   */
+  liveQuote: z.boolean().optional(),
   active: z.boolean().default(true),
   sort: z.number().int().default(0),
 });

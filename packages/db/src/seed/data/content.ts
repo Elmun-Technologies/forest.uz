@@ -505,6 +505,16 @@ export const messageTemplates: {
     smsFallback: true,
   },
   {
+    // Handed to the courier when the carrier gives no ETA (else order_courier with {vaqt}).
+    key: 'order_shipped',
+    body: {
+      uz: "Forest: buyurtma {raqam} kuryerga topshirildi, yo'lda. Kuzatish: {link}",
+      ru: 'Forest: заказ {raqam} передан курьеру и уже в пути. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
+    smsFallback: true,
+  },
+  {
     key: 'order_delivered',
     body: {
       uz: "Yetkazildi. Bo'yashdan oldin 4 daqiqalik qo'llanmani ko'ring: natija ancha yaxshi chiqadi.",
@@ -590,6 +600,35 @@ export const messageTemplates: {
       uz: '{mahsulot} yana omborda! Buyurtma bering: {link}',
       ru: '{mahsulot} снова в наличии! Заказать: {link}',
     },
+    smsFallback: true,
+  },
+  {
+    // BTS manual mode: the parcel was handed to BTS ({trek} = BTS waybill number).
+    key: 'order_shipped_bts',
+    body: {
+      uz: "Forest: buyurtma {raqam} BTS orqali jo'natildi, trek raqam {trek}. Kuzatish: {link}",
+      ru: 'Forest: заказ {raqam} отправлен через BTS, трек-номер {trek}. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
+    smsFallback: true,
+  },
+  {
+    // BTS branch delivery: the parcel waits at {filial} (branch name/address).
+    key: 'order_at_branch',
+    body: {
+      uz: 'Forest: buyurtma {raqam} BTS filialiga yetib keldi: {filial}. Kuzatish: {link}',
+      ru: 'Forest: заказ {raqam} прибыл в отделение BTS: {filial}. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
+    smsFallback: true,
+  },
+  {
+    key: 'order_delivery_failed',
+    body: {
+      uz: "Forest: buyurtma {raqam}ni yetkazib bo'lmadi. Operator siz bilan bog'lanadi. Kuzatish: {link}",
+      ru: 'Forest: не удалось доставить заказ {raqam}. Оператор свяжется с вами. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
   },
 ];
