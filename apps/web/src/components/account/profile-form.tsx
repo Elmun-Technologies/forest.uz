@@ -87,17 +87,19 @@ export function ProfileForm({ me }: { me: MeDto }) {
             />
           )}
         </Field>
-        <Field label={t('phone')}>
-          {(p) => (
-            <Input
-              {...p}
-              value={formatUzPhone(me.phone)}
-              readOnly
-              className="bg-off"
-              data-private
-            />
-          )}
-        </Field>
+        {me.phone ? (
+          <Field label={t('phone')}>
+            {(p) => (
+              <Input
+                {...p}
+                value={formatUzPhone(me.phone ?? '')}
+                readOnly
+                className="bg-off"
+                data-private
+              />
+            )}
+          </Field>
+        ) : null}
         <Field label={t('language')}>
           {(p) => (
             <select

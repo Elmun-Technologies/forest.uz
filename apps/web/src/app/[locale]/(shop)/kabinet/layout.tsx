@@ -33,7 +33,12 @@ export default async function AccountLayout({
   const me = await getMe(locale);
   if (!me) redirect({ href: `${routes.login}?next=${encodeURIComponent(routes.account)}`, locale });
   const t = await getTranslations('account');
-  const phone = formatUzPhone(me!.phone);
+  // Telegram-only accounts have no phone yet; show the Telegram handle instead.
+  const phone = me!.phone
+    ? formatUzPhone(me!.phone)
+    : me!.telegram?.username
+      ? `@${me!.telegram.username}`
+      : '';
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-wrap items-start gap-2.5 px-3 pb-16 lg:gap-4 lg:px-6 lg:pt-2">
