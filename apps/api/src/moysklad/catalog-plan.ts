@@ -19,12 +19,15 @@ export interface LocalVariant {
   active: boolean;
   productStatus: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
   productType: 'SIMPLE' | 'BUNDLE';
+  productMoyskladId: string | null;
 }
 
 export interface VariantPatch {
   variantId: string;
   sku: string;
   moyskladId?: string;
+  /** Link the variant's product to its MoySklad product/bundle (Product.moyskladId). */
+  product?: { id: string; moyskladId: string };
   newSku?: string;
   priceTiyin?: bigint;
   stock?: number;
@@ -41,6 +44,8 @@ export interface NewVariant {
   priceTiyin: bigint;
   ikpu: string | null;
   stock: number;
+  /** False when MoySklad has no usable price: never sellable at 0. */
+  active: boolean;
 }
 
 export interface NewProduct {
@@ -66,6 +71,7 @@ export interface CatalogPlan {
   errors: string[];
   /** Sellable MoySklad units seen (for the "N SKU tekshirildi" summary). */
   checked: number;
+  stockRejected: boolean;
 }
 
 export interface PlanInput {
@@ -87,10 +93,40 @@ export function sellableUnits(items: InventoryItem[]): InventoryItem[] {
   return items.filter((i) => i.type !== 'product' || !i.hasVariants);
 }
 
-export function unitStock(item: InventoryItem, stock: ReadonlyMap<string, number>): number {
-  return item.type === 'bundle'
-    ? bundleStock(item.components, stock)
-    : stockUnits(stock.get(item.externalId) ?? 0);
+/** Stock of a unit; null when the report doesn't mention it (or one of a kit's components). */
+export function unitStock(
+  item: { type: string; externalId: string; components: { externalId: string; qty: number }[] },
+  stock: ReadonlyMap<string, number>,
+): number | null {
+  if (item.type === 'bundle')
+    return item.components.length && item.components.every((c) => stock.has(c.externalId))
+      ? bundleStock(item.components, stock)
+      : null;
+  const v = stock.get(item.externalId);
+  return v === undefined ? null : stockUnits(v);
+}
+
+/**
+ * A stock report that is empty or misses more than half of the ids we expect is not trusted:
+ * applying it would zero the catalog (an outage, a wrong store, a non-admin token).
+ */
+export function stockReportProblem(
+  stock: ReadonlyMap<string, number>,
+  expectedIds: readonly string[],
+): string | null {
+  if (!expectedIds.length) return null;
+  if (stock.size === 0) return "Qoldiq hisoboti bo'sh — qoldiqlar o'zgartirilmadi";
+  const missing = expectedIds.filter((id) => !stock.has(id)).length;
+  return missing * 2 > expectedIds.length
+    ? `Qoldiq hisobotida ${missing}/${expectedIds.length} SKU yo'q — qoldiqlar o'zgartirilmadi`
+    : null;
+}
+
+/** Why MoySklad's price can't be used (null = usable). */
+function priceProblem(u: InventoryItem): string | null {
+  if (u.priceCurrency && u.priceCurrency !== 'UZS')
+    return `narx valyutasi ${u.priceCurrency} (UZS kerak)`;
+  return u.priceTiyin === null ? "MoySklad'da narx yo'q" : null;
 }
 
 /** The IKPU guard (DB trigger): an active variant of an ACTIVE product must have an IKPU. */
@@ -99,7 +135,14 @@ function canBeActive(v: LocalVariant, ikpu: string | null): boolean {
 }
 
 export function planCatalogSync(input: PlanInput): CatalogPlan {
-  const plan: CatalogPlan = { patches: [], creates: [], bundles: [], errors: [], checked: 0 };
+  const plan: CatalogPlan = {
+    patches: [],
+    creates: [],
+    bundles: [],
+    errors: [],
+    checked: 0,
+    stockRejected: false,
+  };
   const byMsId = new Map(
     input.local.filter((v) => v.moyskladId).map((v) => [v.moyskladId!, v] as const),
   );
@@ -111,6 +154,22 @@ export function planCatalogSync(input: PlanInput): CatalogPlan {
   const skusTaken = new Set(input.local.map((v) => v.sku));
   const creates = new Map<string, NewProduct>();
   const units = sellableUnits(input.items);
+  const claimedProducts = new Set(input.productsByExternalId.keys());
+  /** MoySklad product id → our product, learnt from variants linked in this run. */
+  const linkedParents = new Map<string, string>();
+
+  let stock = input.stock;
+  if (stock) {
+    const expected = units
+      .filter((u) => u.type !== 'bundle' && !u.archived)
+      .map((u) => u.externalId);
+    const problem = stockReportProblem(stock, expected);
+    if (problem) {
+      plan.errors.push(problem);
+      plan.stockRejected = true;
+      stock = null;
+    }
+  }
 
   // Full pull answered with nothing while we have links: a broken account/filter, not a wipe.
   if (input.full && units.length === 0 && byMsId.size > 0) {
@@ -163,7 +222,16 @@ export function planCatalogSync(input: PlanInput): CatalogPlan {
         }
       }
       const label = patch.newSku ?? local.sku;
-      if (input.prices && u.priceTiyin !== null && u.priceTiyin !== local.priceTiyin) {
+      const groupId = u.type === 'variant' ? u.parentExternalId! : u.externalId;
+      if (!local.productMoyskladId && !claimedProducts.has(groupId)) {
+        claimedProducts.add(groupId);
+        patch.product = { id: local.productId, moyskladId: groupId };
+      }
+      if (u.type === 'variant') linkedParents.set(groupId, local.productId);
+      const noPrice = priceProblem(u);
+      if (input.prices && noPrice)
+        plan.errors.push(`${label}: ${noPrice} — saytdagi narx o'zgarmadi`);
+      else if (input.prices && u.priceTiyin !== null && u.priceTiyin !== local.priceTiyin) {
         patch.priceTiyin = u.priceTiyin;
         patch.notes.push({
           kind: 'price',
@@ -174,20 +242,22 @@ export function planCatalogSync(input: PlanInput): CatalogPlan {
         patch.ikpu = ikpu;
         patch.notes.push({ kind: 'product', message: `${label}: IKPU yangilandi` });
       }
-      if (input.stock) {
-        const s = unitStock(u, input.stock);
-        if (s !== local.stock) {
+      if (stock) {
+        const s = unitStock(u, stock);
+        if (s !== null && s !== local.stock) {
           patch.stock = s;
           patch.notes.push({ kind: 'stock', message: `${label}: ${local.stock} → ${s}` });
         }
       }
       if (!local.active) {
-        if (canBeActive(local, ikpu ?? local.ikpu)) {
+        if ((patch.priceTiyin ?? local.priceTiyin) <= 0n)
+          plan.errors.push(`${label}: narx yo'q — variant yoqilmadi`);
+        else if (canBeActive(local, ikpu ?? local.ikpu)) {
           patch.active = true;
           patch.notes.push({ kind: 'product', message: `${label}: MoySklad'da bor → yoqildi` });
         } else plan.errors.push(`${label}: IKPU yo'q — variant yoqilmadi`);
       }
-      if (patch.notes.length) plan.patches.push(patch);
+      if (patch.notes.length || patch.product) plan.patches.push(patch);
       continue;
     }
 
@@ -210,15 +280,21 @@ export function planCatalogSync(input: PlanInput): CatalogPlan {
       };
       creates.set(groupId, group);
     }
+    const noPrice = priceProblem(u);
+    if (noPrice)
+      plan.errors.push(`${u.sku}: ${noPrice} — yangi variant o'chirilgan holda qo'shildi`);
     group.variants.push({
       externalId: u.externalId,
       sku: u.sku,
       label: u.label ?? '—',
-      priceTiyin: u.priceTiyin ?? 0n,
+      priceTiyin: noPrice ? 0n : u.priceTiyin!,
       ikpu,
-      stock: input.stock ? unitStock(u, input.stock) : 0,
+      stock: (stock ? unitStock(u, stock) : null) ?? 0,
+      active: !noPrice,
     });
   }
+  // A new modification of a product whose sibling was linked by SKU joins that product.
+  for (const g of creates.values()) g.existingProductId ??= linkedParents.get(g.externalId) ?? null;
   plan.creates = [...creates.values()];
 
   if (input.full) {
@@ -236,7 +312,10 @@ export function planCatalogSync(input: PlanInput): CatalogPlan {
   return plan;
 }
 
-/** Stock-only poll: linked variants' new stock (bundles from their stored composition). */
+/**
+ * Stock-only poll: linked variants' new stock (kits from their stored composition). Ids missing
+ * from the report keep their stock; an untrustworthy report changes nothing.
+ */
 export function planStockUpdates(
   local: {
     id: string;
@@ -246,11 +325,22 @@ export function planStockUpdates(
     bundle: { externalId: string; qty: number }[] | null;
   }[],
   stock: ReadonlyMap<string, number>,
-): { variantId: string; sku: string; from: number; to: number }[] {
-  const out: { variantId: string; sku: string; from: number; to: number }[] = [];
+): {
+  updates: { variantId: string; sku: string; from: number; to: number }[];
+  error: string | null;
+} {
+  const error = stockReportProblem(
+    stock,
+    local.filter((v) => !v.bundle).map((v) => v.moyskladId),
+  );
+  if (error) return { updates: [], error };
+  const updates: { variantId: string; sku: string; from: number; to: number }[] = [];
   for (const v of local) {
-    const to = v.bundle ? bundleStock(v.bundle, stock) : stockUnits(stock.get(v.moyskladId) ?? 0);
-    if (to !== v.stock) out.push({ variantId: v.id, sku: v.sku, from: v.stock, to });
+    const to = v.bundle
+      ? unitStock({ type: 'bundle', externalId: v.moyskladId, components: v.bundle }, stock)
+      : unitStock({ type: 'product', externalId: v.moyskladId, components: [] }, stock);
+    if (to !== null && to !== v.stock)
+      updates.push({ variantId: v.id, sku: v.sku, from: v.stock, to });
   }
-  return out;
+  return { updates, error: null };
 }

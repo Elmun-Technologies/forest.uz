@@ -168,8 +168,10 @@ export interface InventoryItem {
   sku: string | null;
   /** Raw value of the configured IKPU attribute (variants inherit their product's). */
   ikpu: string | null;
-  /** Configured price type, tiyin; null when the item has no such price. */
+  /** Configured price type, tiyin; null when there is no usable price (absent, ≤ 0, not UZS). */
   priceTiyin: bigint | null;
+  /** ISO code of that price's currency when it is known and not UZS (price then unusable). */
+  priceCurrency: string | null;
   archived: boolean;
   /** A product with modifications is sold through its variants, never itself. */
   hasVariants: boolean;

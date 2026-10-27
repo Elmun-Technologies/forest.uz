@@ -128,15 +128,55 @@ export function tiyinToMsMinor(tiyin: bigint): number {
   return Number(tiyin);
 }
 
+export interface SalePrice {
+  /** Tiyin; null when the value is missing or ≤ 0 (MoySklad sends 0 for an unset price). */
+  tiyin: bigint | null;
+  currencyId: string | null;
+}
+
 /** `salePrices[]` entry whose `priceType.name` matches (case-insensitive); null if missing. */
-export function salePriceTiyin(salePrices: unknown, priceType: string): bigint | null {
+export function salePrice(salePrices: unknown, priceType: string): SalePrice | null {
   if (!Array.isArray(salePrices)) return null;
   const want = priceType.trim().toLowerCase();
   for (const p of salePrices) {
     if (!isObj(p) || !isObj(p.priceType)) continue;
-    if (str(p.priceType.name)?.toLowerCase() === want) return msMinorToTiyin(p.value);
+    if (str(p.priceType.name)?.toLowerCase() !== want) continue;
+    const tiyin = msMinorToTiyin(p.value);
+    return {
+      tiyin: tiyin !== null && tiyin > 0n ? tiyin : null,
+      currencyId:
+        isObj(p.currency) && isObj(p.currency.meta) ? idFromHref(p.currency.meta.href) : null,
+    };
   }
   return null;
+}
+
+export function salePriceTiyin(salePrices: unknown, priceType: string): bigint | null {
+  return salePrice(salePrices, priceType)?.tiyin ?? null;
+}
+
+/** `entity/currency` rows → id → ISO code (`isoCode`, e.g. "UZS"; numeric `code` 860). */
+export function parseCurrencies(rows: unknown[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const r of rows) {
+    if (!isObj(r)) continue;
+    const id = str(r.id)?.toLowerCase();
+    const iso = str(r.isoCode)?.toUpperCase() ?? (str(r.code) === '860' ? 'UZS' : null);
+    if (id && iso) out.set(id, iso);
+  }
+  return out;
+}
+
+/** The account currency (`default: true`) as ISO code; null when not listed. */
+export function defaultCurrency(rows: unknown[]): string | null {
+  const d = rows.filter(isObj).find((r) => r.default === true);
+  return d ? (parseCurrencies([d]).values().next().value ?? null) : null;
+}
+
+export interface ProductPriceInfo {
+  priceTiyin: bigint | null;
+  priceCurrency: string | null;
+  ikpu: string | null;
 }
 
 /** Custom attribute value by name (case-insensitive) as a string; null when absent/empty. */
@@ -189,7 +229,8 @@ export function bundleStock(
 export function parseAssortmentRow(
   row: unknown,
   mapping: InventoryMapping,
-  productInfo?: ReadonlyMap<string, { priceTiyin: bigint | null; ikpu: string | null }>,
+  productInfo?: ReadonlyMap<string, ProductPriceInfo>,
+  currencies?: ReadonlyMap<string, string>,
 ): InventoryItem | null {
   if (!isObj(row) || !isObj(row.meta)) return null;
   const type = str(row.meta.type);
@@ -203,7 +244,16 @@ export function parseAssortmentRow(
       : null;
   if (type === 'variant' && !parentExternalId) return null;
   const parent = parentExternalId ? productInfo?.get(parentExternalId) : undefined;
-  const ownPrice = salePriceTiyin(row.salePrices, mapping.priceType);
+  const own = salePrice(row.salePrices, mapping.priceType);
+  const ownCurrency = own?.currencyId ? (currencies?.get(own.currencyId) ?? null) : null;
+  // A price in another currency is unusable (minor units would not be tiyin).
+  const foreign = ownCurrency !== null && ownCurrency !== 'UZS';
+  const ownUsable = own?.tiyin != null && !foreign;
+  const price: { priceTiyin: bigint | null; priceCurrency: string | null } = ownUsable
+    ? { priceTiyin: own.tiyin, priceCurrency: null }
+    : type === 'variant' && parent && !foreign
+      ? { priceTiyin: parent.priceTiyin, priceCurrency: parent.priceCurrency }
+      : { priceTiyin: null, priceCurrency: foreign ? ownCurrency : null };
   const label =
     type === 'variant' && Array.isArray(row.characteristics)
       ? row.characteristics
@@ -231,7 +281,7 @@ export function parseAssortmentRow(
       type === 'variant'
         ? (parent?.ikpu ?? null)
         : attributeValue(row.attributes, mapping.ikpuAttribute),
-    priceTiyin: ownPrice !== null && ownPrice > 0n ? ownPrice : (parent?.priceTiyin ?? ownPrice),
+    ...price,
     archived: row.archived === true,
     hasVariants: type === 'product' && (num(row.variantsCount) ?? 0) > 0,
     label,
@@ -466,6 +516,14 @@ export class MoyskladInventoryProvider implements InventoryProvider {
     if (!this.token) return { ok: false, message: 'token is required' };
     try {
       await this.call('GET', 'entity/organization', { query: { limit: '1' } });
+      const currency = defaultCurrency(
+        await this.listAll('entity/currency', { limit: String(PAGE) }),
+      );
+      if (currency && currency !== 'UZS')
+        return {
+          ok: false,
+          message: `account currency is ${currency}; prices must be in UZS (tiyin) — not synced`,
+        };
       if (mapping) {
         const types = await this.call('GET', 'context/companysettings/pricetype');
         const names = Array.isArray(types)
@@ -491,19 +549,24 @@ export class MoyskladInventoryProvider implements InventoryProvider {
       await this.listAll('entity/variant', { limit: String(PAGE) }),
       await this.listAll('entity/bundle', { limit: String(EXPAND_PAGE), expand: 'components' }),
     ];
+    const currencies = await this.currencies();
     const items: InventoryItem[] = [];
-    const productInfo = new Map<string, { priceTiyin: bigint | null; ikpu: string | null }>();
+    const productInfo = new Map<string, ProductPriceInfo>();
     for (const row of products) {
-      const item = parseAssortmentRow(row, mapping);
+      const item = parseAssortmentRow(row, mapping, undefined, currencies);
       if (!item) continue;
-      productInfo.set(item.externalId, { priceTiyin: item.priceTiyin, ikpu: item.ikpu });
+      productInfo.set(item.externalId, item);
       items.push(item);
     }
     for (const row of [...variants, ...bundles]) {
-      const item = parseAssortmentRow(row, mapping, productInfo);
+      const item = parseAssortmentRow(row, mapping, productInfo, currencies);
       if (item) items.push(item);
     }
     return items;
+  }
+
+  private async currencies(): Promise<Map<string, string>> {
+    return parseCurrencies(await this.listAll('entity/currency', { limit: String(PAGE) }));
   }
 
   private async getOne(type: InventoryItemType, id: string): Promise<unknown> {
@@ -524,20 +587,21 @@ export class MoyskladInventoryProvider implements InventoryProvider {
   ): Promise<InventoryItem[] | null> {
     const row = await this.getOne(type, externalId);
     if (row === null) return null;
+    const currencies = await this.currencies();
     if (type === 'variant') {
       const parentId =
         isObj(row) && isObj(row.product) && isObj(row.product.meta)
           ? idFromHref(row.product.meta.href)
           : null;
       const parentRow = parentId ? await this.getOne('product', parentId) : null;
-      const parent = parentRow ? parseAssortmentRow(parentRow, mapping) : null;
-      const info = new Map(
-        parent ? [[parent.externalId, { priceTiyin: parent.priceTiyin, ikpu: parent.ikpu }]] : [],
-      );
-      const item = parseAssortmentRow(row, mapping, info);
+      const parent = parentRow
+        ? parseAssortmentRow(parentRow, mapping, undefined, currencies)
+        : null;
+      const info = new Map<string, ProductPriceInfo>(parent ? [[parent.externalId, parent]] : []);
+      const item = parseAssortmentRow(row, mapping, info, currencies);
       return item ? [item] : [];
     }
-    const item = parseAssortmentRow(row, mapping);
+    const item = parseAssortmentRow(row, mapping, undefined, currencies);
     if (!item) return [];
     if (!item.hasVariants) return [item];
     // A product's price/IKPU flow into its variants: refresh them together.
@@ -545,11 +609,11 @@ export class MoyskladInventoryProvider implements InventoryProvider {
       limit: String(PAGE),
       filter: `productid=${item.externalId}`,
     });
-    const info = new Map([[item.externalId, { priceTiyin: item.priceTiyin, ikpu: item.ikpu }]]);
+    const info = new Map<string, ProductPriceInfo>([[item.externalId, item]]);
     return [
       item,
       ...variants
-        .map((v) => parseAssortmentRow(v, mapping, info))
+        .map((v) => parseAssortmentRow(v, mapping, info, currencies))
         .filter((v): v is InventoryItem => v !== null),
     ];
   }

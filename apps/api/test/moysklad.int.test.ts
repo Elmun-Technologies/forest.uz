@@ -235,6 +235,8 @@ describe('MoySklad sync', () => {
     expect(after.name).toEqual(before.name);
     expect(after.description).toEqual(before.description);
     expect(after.status).toBe('ACTIVE');
+    // Linked by SKU → the product is linked too, so new modifications of it join it.
+    expect(after.moyskladId).toBe(ids.a);
 
     const neu = await prisma.variant.findUniqueOrThrow({
       where: { sku: sku('NEW') },
@@ -410,6 +412,10 @@ describe('MoySklad sync', () => {
     expect(await jobs.orders(false)).toMatchObject({ failed: 1 });
     const link = await prisma.moyskladOrderLink.findUniqueOrThrow({ where: { orderId: order.id } });
     expect(link).toMatchObject({ externalId: null, attempts: 1 });
+    // The counterparty created before the failure is kept for the retry.
+    expect(link.counterpartyId).toBe(
+      stub.counterparties.find((c) => c.phone === order.contactPhone)?.id,
+    );
     expect(link.nextAttemptAt!.getTime()).toBeGreaterThan(Date.now());
     // Not due yet → not retried; due → pushed.
     expect(await jobs.orders(false)).toMatchObject({ pushed: 0, failed: 0 });
@@ -433,7 +439,7 @@ describe('MoySklad sync', () => {
     await setSettings({ flows: { webhooks: true, orders: false } });
     const order = await placeCod(sku('A'));
     await lifecycle.confirmCod(order.id, staff());
-    expect(await jobs.orders(false)).toBe('off');
+    expect(await jobs.orders(false)).toMatchObject({ pushed: 0 });
     expect(await prisma.moyskladOrderLink.count({ where: { orderId: order.id } })).toBe(0);
     await setSettings({ flows: { webhooks: true } });
     await lifecycle.cancelOrder(order.id, staff(), 'test');
@@ -454,6 +460,145 @@ describe('MoySklad sync', () => {
     const posts = stub.count('POST', 'entity/counterparty');
     expect(await jobs.orders(false)).toMatchObject({ pushed: 1 });
     expect(stub.count('POST', 'entity/counterparty')).toBe(posts + 2);
+  });
+
+  describe('stock holds, prices and reports (review fixes)', () => {
+    const sellable = async (s: string) => {
+      const v = await variantBySku(s);
+      return v.stock - v.reserved;
+    };
+    const toCourier = (orderId: string) =>
+      prisma.$transaction(async (tx) => {
+        for (const to of ['PACKING', 'READY', 'HANDED_TO_COURIER'] as const)
+          await lifecycle.transition(tx, orderId, to, staff());
+      });
+    const linkOf = (orderId: string) =>
+      prisma.moyskladOrderLink.findUniqueOrThrow({ where: { orderId } });
+    afterEach(() => setSettings({ flows: { webhooks: true } }));
+
+    it('stock flow off: no hand-over; cancel gives the hold back; MoySklad reserve dropped', async () => {
+      await setSettings({ flows: { webhooks: true, stock: false } });
+      const s0 = await sellable(sku('A'));
+      const stock0 = (await variantBySku(sku('A'))).stock;
+      const order = await placeCod(sku('A'), 2);
+      await lifecycle.confirmCod(order.id, staff());
+      expect(await jobs.orders(false)).toMatchObject({ pushed: 1 });
+      const link = await linkOf(order.id);
+      expect(link.holdHandedOver).toBe(false);
+      expect(stub.orders.get(link.externalId!)!.positions[0]!.reserve).toBe(2);
+      expect((await variantBySku(sku('A'))).stock).toBe(stock0);
+      expect(await sellable(sku('A'))).toBe(s0 - 2);
+
+      await lifecycle.cancelOrder(order.id, staff(), 'test');
+      expect(await sellable(sku('A'))).toBe(s0);
+      await jobs.orders(false);
+      expect(stub.orders.get(link.externalId!)!.positions[0]!.reserve).toBe(0);
+    });
+
+    it('hand to courier without hand-over: the hold is consumed from our stock (stock flow off)', async () => {
+      await setSettings({ flows: { webhooks: true, stock: false } });
+      const before = await variantBySku(sku('A'));
+      const order = await placeCod(sku('A'), 1);
+      await lifecycle.confirmCod(order.id, staff());
+      await jobs.orders(false);
+      await toCourier(order.id);
+      const after = await variantBySku(sku('A'));
+      expect([after.stock, after.reserved]).toEqual([before.stock - 1, before.reserved]);
+      expect(
+        await prisma.reservation.count({ where: { orderId: order.id, releasedAt: null } }),
+      ).toBe(0);
+      // Idempotent: nothing left to end on later steps.
+      await prisma.$transaction((tx) => lifecycle.transition(tx, order.id, 'DELIVERED', staff()));
+      expect((await variantBySku(sku('A'))).stock).toBe(before.stock - 1);
+    });
+
+    it('hand to courier with the MoySklad stock flow on: the hold is only released', async () => {
+      await setSettings({ flows: { webhooks: true, orders: false } });
+      const before = await variantBySku(sku('A'));
+      const order = await placeCod(sku('A'), 1);
+      await lifecycle.confirmCod(order.id, staff());
+      await toCourier(order.id);
+      const after = await variantBySku(sku('A'));
+      // MoySklad's own stock drops when the warehouse ships there; the next snapshot shows it.
+      expect([after.stock, after.reserved]).toEqual([before.stock, before.reserved]);
+    });
+
+    it('hand-over, then stock flow switched off, then cancel → our stock is restored once', async () => {
+      const s0 = await sellable(sku('A'));
+      const order = await placeCod(sku('A'), 2);
+      await lifecycle.confirmCod(order.id, staff());
+      await jobs.orders(false);
+      expect((await linkOf(order.id)).holdHandedOver).toBe(true);
+      expect(await sellable(sku('A'))).toBe(s0 - 2);
+      await setSettings({ flows: { webhooks: true, stock: false } });
+      await lifecycle.cancelOrder(order.id, staff(), 'test');
+      expect(await sellable(sku('A'))).toBe(s0);
+      expect((await linkOf(order.id)).holdHandedOver).toBe(false);
+    });
+
+    it('statuses flow off: cancel still drops the MoySklad reserve (no state name sent)', async () => {
+      await setSettings({ flows: { webhooks: true, statuses: false } });
+      const order = await placeCod(sku('A'), 1);
+      await lifecycle.confirmCod(order.id, staff());
+      await jobs.orders(false);
+      const link = await linkOf(order.id);
+      const pushed = stub.orders.get(link.externalId!)!;
+      expect(pushed.stateId).toBeNull();
+      expect(pushed.positions[0]!.reserve).toBe(1);
+      await lifecycle.cancelOrder(order.id, staff(), 'test');
+      expect(await jobs.orders(false)).toMatchObject({ updated: 1 });
+      expect(pushed.positions[0]!.reserve).toBe(0);
+      expect(pushed.stateId).toBeNull();
+    });
+
+    it('a zero or foreign-currency price is never written; the error is logged', async () => {
+      const a = stub.products.find((p) => p.id === ids.a)!;
+      const saved = a.salePrices;
+      const priceBefore = (await variantBySku(sku('A'))).priceTiyin;
+      a.salePrices = price(0);
+      await jobs.reconcile();
+      expect((await variantBySku(sku('A'))).priceTiyin).toBe(priceBefore);
+      const rub = stub.currencies.find((c) => c.isoCode === 'RUB')!;
+      a.salePrices = [
+        {
+          value: 99_000,
+          currency: { meta: { href: stub.href('currency', rub.id) } },
+          priceType: { name: 'Chakana' },
+        },
+      ];
+      await jobs.reconcile();
+      expect((await variantBySku(sku('A'))).priceTiyin).toBe(priceBefore);
+      const errors = await prisma.integrationLog.findMany({
+        where: { integrationKey: 'moysklad', ok: false, message: { startsWith: sku('A') } },
+      });
+      expect(errors.map((e) => e.message).join('\n')).toMatch(/narx yo'q[\s\S]*RUB/);
+      a.salePrices = saved;
+    });
+
+    it('health check fails when the account currency is not UZS', async () => {
+      const [uzs, rub] = stub.currencies;
+      uzs!.default = false;
+      rub!.default = true;
+      const health = await integrations.test('moysklad');
+      expect(health.ok).toBe(false);
+      expect(health.message).toContain('RUB');
+      uzs!.default = true;
+      rub!.default = false;
+    });
+
+    it('an empty stock report changes nothing and is logged', async () => {
+      const saved = new Map(stub.stock);
+      const before = (await variantBySku(sku('A'))).stock;
+      stub.stock.clear();
+      expect(await jobs.stock(false)).toBe(0);
+      expect((await variantBySku(sku('A'))).stock).toBe(before);
+      expect(
+        await prisma.integrationLog.count({
+          where: { integrationKey: 'moysklad', kind: 'stock', ok: false },
+        }),
+      ).toBeGreaterThanOrEqual(1);
+      for (const [k, v] of saved) stub.stock.set(k, v);
+    });
   });
 
   it('webhook: secret path, enqueues a targeted refresh; wrong token 404', async () => {

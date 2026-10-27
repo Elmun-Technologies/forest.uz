@@ -48,6 +48,11 @@ export class MoyskladStub {
     { id: randomUUID(), name: 'Отменен' },
   ];
   readonly organizationId = randomUUID();
+  /** `entity/currency`; tests may switch the default to another currency. */
+  readonly currencies: { id: string; isoCode: string; code: string; default: boolean }[] = [
+    { id: randomUUID(), isoCode: 'UZS', code: '860', default: true },
+    { id: randomUUID(), isoCode: 'RUB', code: '643', default: false },
+  ];
   readonly deliveryAttributeId = randomUUID();
   readonly calls: {
     method: string;
@@ -199,6 +204,8 @@ export class MoyskladStub {
         { id: randomUUID(), name: 'Chakana' },
         { id: randomUUID(), name: 'Ulgurji' },
       ]);
+    if (method === 'GET' && path === 'entity/currency')
+      return this.list(res, path, this.currencies, q);
     if (method === 'GET' && path === 'entity/product')
       return this.list(res, path, this.products, q);
     if (method === 'GET' && path === 'entity/variant') {

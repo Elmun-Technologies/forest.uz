@@ -37,7 +37,15 @@ describe('order → MoySklad rules', () => {
       stateMap: { HANDED_TO_COURIER: '  Yo‘lda ', RETURNED: '' },
     });
     expect(stateChangeFor('HANDED_TO_COURIER', custom).stateName).toBe('Yo‘lda');
-    expect(stateChangeFor('RETURNED', custom)).toEqual({ stateName: null, clearReserve: false });
+    // The reserve is dropped even when reserving is off now (an earlier push may hold one).
+    expect(stateChangeFor('RETURNED', custom)).toEqual({ stateName: null, clearReserve: true });
+    // Statuses flow off: no state names, the reserve is still released.
+    const noStatuses = parseMoyskladSettings({ flows: { statuses: false } });
+    expect(stateChangeFor('CANCELLED', noStatuses)).toEqual({
+      stateName: null,
+      clearReserve: true,
+    });
+    expect(stateChangeFor('PACKING', noStatuses)).toEqual({ stateName: null, clearReserve: false });
     expect(stateChangeFor('NEW', settings).stateName).toBeNull();
   });
 

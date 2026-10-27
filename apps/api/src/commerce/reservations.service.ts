@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DomainError } from '@forest/contracts';
 import type { Prisma } from '@forest/db';
+import { endHoldsOnShipment, restoreHandedOverHold } from '../moysklad/stock-holds';
 
 type Tx = Prisma.TransactionClient;
 
@@ -43,9 +44,19 @@ export class ReservationsService {
     return res.count;
   }
 
+  /** HANDED_TO_COURIER: open reservations end (`moysklad/stock-holds.ts`). Idempotent. */
+  async endOnShipment(tx: Tx, orderId: string): Promise<void> {
+    await endHoldsOnShipment(tx, orderId);
+  }
+
+  /** CANCELLED: a hold handed over to MoySklad is restored when no snapshot will. Idempotent. */
+  async restoreHandedOver(tx: Tx, orderId: string): Promise<void> {
+    await restoreHandedOverHold(tx, orderId);
+  }
+
   /**
    * Converts reservations into a hard hold once paid/confirmed: the expiry is cleared so the
-   * expiry job won't release it. Stock itself is decremented when MoySklad reports shipment.
+   * expiry job won't release it. The hold ends at hand-over to the courier (`endOnShipment`) or on cancel/return.
    */
   async confirm(tx: Tx, orderId: string): Promise<void> {
     await tx.reservation.updateMany({

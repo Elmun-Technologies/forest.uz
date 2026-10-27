@@ -156,8 +156,12 @@ export class OrderLifecycleService {
     // A courier is coming for (or has) the parcel: staff cancel the claim first (CLAUDE.md §6).
     if (to === 'CANCELLED' && (await this.parcelOut(tx, orderId)))
       throw new DomainError('DELIVERY_IN_PROGRESS');
+    // A hold handed to MoySklad comes back when no snapshot will (before `release`, CLAUDE.md §6).
+    if (to === 'CANCELLED') await this.reservations.restoreHandedOver(tx, orderId);
     // Every exit from fulfilment frees the stock hold (idempotent).
     if (to === 'CANCELLED' || to === 'RETURNED') await this.reservations.release(tx, orderId);
+    // Goods left the warehouse: the hold ends (released, or consumed from our stock).
+    if (to === 'HANDED_TO_COURIER') await this.reservations.endOnShipment(tx, orderId);
     await tx.order.update({
       where: { id: orderId },
       data: {

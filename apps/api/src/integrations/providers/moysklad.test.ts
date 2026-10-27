@@ -4,6 +4,8 @@ import {
   bundleStock,
   buildCustomerOrderBody,
   createMoyskladFetch,
+  defaultCurrency,
+  parseCurrencies,
   idFromHref,
   MoyskladInventoryProvider,
   moysklad429DelayMs,
@@ -34,6 +36,28 @@ describe('MoySklad mapping helpers', () => {
     expect(msMinorToTiyin(0)).toBe(0n);
     expect(msMinorToTiyin(-1)).toBeNull();
     expect(msMinorToTiyin('100')).toBeNull();
+  });
+
+  it('treats a price ≤ 0 as no price (MoySklad sends 0 when unset)', () => {
+    expect(salePriceTiyin([{ value: 0, priceType: { name: 'Chakana' } }], 'Chakana')).toBeNull();
+    expect(salePriceTiyin([{ value: -5, priceType: { name: 'Chakana' } }], 'Chakana')).toBeNull();
+  });
+
+  it('reads currencies (isoCode, numeric 860 fallback) and the account default', () => {
+    const rows = [
+      { id: 'C1', isoCode: 'uzs', default: true },
+      { id: 'c2', isoCode: 'RUB' },
+      { id: 'c3', code: '860' },
+      { bad: 1 },
+    ];
+    expect([...parseCurrencies(rows)]).toEqual([
+      ['c1', 'UZS'],
+      ['c2', 'RUB'],
+      ['c3', 'UZS'],
+    ]);
+    expect(defaultCurrency(rows)).toBe('UZS');
+    expect(defaultCurrency([{ id: 'x', isoCode: 'RUB', default: true }])).toBe('RUB');
+    expect(defaultCurrency([])).toBeNull();
   });
 
   it('picks the configured price type case-insensitively', () => {
@@ -110,6 +134,7 @@ describe('parseAssortmentRow', () => {
 
   it('maps a product: SKU = article, IKPU from the attribute, price in tiyin', () => {
     expect(parseAssortmentRow(product, mapping)).toEqual({
+      priceCurrency: null,
       externalId: P1,
       type: 'product',
       parentExternalId: null,
@@ -125,7 +150,9 @@ describe('parseAssortmentRow', () => {
   });
 
   it('maps a variant: SKU = code, price/IKPU inherited from its product when missing', () => {
-    const info = new Map([[P1, { priceTiyin: 32_900_000n, ikpu: '03208001001000000' }]]);
+    const info = new Map([
+      [P1, { priceTiyin: 32_900_000n, priceCurrency: null, ikpu: '03208001001000000' }],
+    ]);
     const v = parseAssortmentRow(
       {
         meta: { href: `${BASE}/entity/variant/${V1}`, type: 'variant' },
@@ -149,6 +176,32 @@ describe('parseAssortmentRow', () => {
       label: '2.5 L, Oq',
       priceTiyin: 32_900_000n,
       ikpu: '03208001001000000',
+    });
+  });
+
+  it('a price in another currency is unusable; a zero price is no price', () => {
+    const cur = (id: string) => ({ meta: { href: `${BASE}/entity/currency/${id}` } });
+    const rub = '11111111-2222-3333-4444-555555555555';
+    const uzs = '66666666-2222-3333-4444-555555555555';
+    const currencies = new Map([
+      [rub, 'RUB'],
+      [uzs, 'UZS'],
+    ]);
+    const row = (value: number, currencyId: string) => ({
+      ...product,
+      salePrices: [{ value, currency: cur(currencyId), priceType: { name: 'Chakana' } }],
+    });
+    expect(parseAssortmentRow(row(100, rub), mapping, undefined, currencies)).toMatchObject({
+      priceTiyin: null,
+      priceCurrency: 'RUB',
+    });
+    expect(parseAssortmentRow(row(100, uzs), mapping, undefined, currencies)).toMatchObject({
+      priceTiyin: 100n,
+      priceCurrency: null,
+    });
+    expect(parseAssortmentRow(row(0, uzs), mapping, undefined, currencies)).toMatchObject({
+      priceTiyin: null,
+      priceCurrency: null,
     });
   });
 

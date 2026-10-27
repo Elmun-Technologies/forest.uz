@@ -4,6 +4,7 @@ import { Prisma } from '@forest/db';
 import { IntegrationsService } from '../integrations/integrations.service';
 import type { InventoryItemType, InventoryProvider } from '../integrations/providers/types';
 import { PrismaService } from '../prisma/prisma.service';
+import type { MoyskladLease } from './moysklad-lock';
 import { MoyskladLogService } from './moysklad-log.service';
 import {
   mappingOf,
@@ -37,28 +38,39 @@ export class OrderSyncService {
     private readonly log: MoyskladLogService,
   ) {}
 
-  async syncDue(state: MoyskladState, now = new Date()): Promise<OrderSyncSummary> {
+  /**
+   * Pushes due orders (orders flow) and mirrors status changes of pushed ones. The mirror loop runs
+   * whatever the flows: a cancelled/returned order's MoySklad reserve must always be dropped, even
+   * after the orders or statuses flow was switched off (state names need the statuses flow).
+   */
+  async syncDue(
+    state: MoyskladState,
+    now = new Date(),
+    lease?: MoyskladLease,
+  ): Promise<OrderSyncSummary> {
     const summary: OrderSyncSummary = { pushed: 0, updated: 0, failed: 0 };
-    if (!state.settings.flows.orders) return summary;
     const settings = await this.settings.ensurePushSince(state.settings, now);
     const s = { ...state, settings };
-    const due = { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] };
-    const toPush = await this.prisma.order.findMany({
-      where: {
-        status: { in: [...MOYSKLAD_PUSH_STATUSES] },
-        createdAt: { gte: new Date(settings.pushSince!) },
-        OR: [{ moyskladLink: null }, { moyskladLink: { externalId: null, ...due } }],
-      },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-      take: BATCH,
-    });
-    for (const { id } of toPush) {
-      const r = await this.push(s, id, now);
-      if (r === 'pushed') summary.pushed++;
-      if (r === 'failed') summary.failed++;
+    if (settings.flows.orders) {
+      const due = { OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }] };
+      const toPush = await this.prisma.order.findMany({
+        where: {
+          status: { in: [...MOYSKLAD_PUSH_STATUSES] },
+          createdAt: { gte: new Date(settings.pushSince!) },
+          OR: [{ moyskladLink: null }, { moyskladLink: { externalId: null, ...due } }],
+        },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+        take: BATCH,
+      });
+      for (const { id } of toPush) {
+        lease?.assertHeld();
+        const r = await this.push(s, id, now);
+        if (r === 'pushed') summary.pushed++;
+        if (r === 'failed') summary.failed++;
+      }
     }
-    if (settings.flows.statuses) {
+    {
       const toUpdate = await this.prisma.$queryRaw<{ orderId: string }[]>`
         SELECT l."orderId" FROM "MoyskladOrderLink" l JOIN "Order" o ON o."id" = l."orderId"
         WHERE l."externalId" IS NOT NULL
@@ -66,6 +78,7 @@ export class OrderSyncService {
           AND (l."nextAttemptAt" IS NULL OR l."nextAttemptAt" <= ${now})
         ORDER BY l."updatedAt" ASC LIMIT ${BATCH}`;
       for (const { orderId } of toUpdate) {
+        lease?.assertHeld();
         const r = await this.mirrorState(s, orderId, now);
         if (r === 'updated') summary.updated++;
         if (r === 'failed') summary.failed++;
@@ -107,6 +120,7 @@ export class OrderSyncService {
     });
     if (order.moyskladLink?.externalId) return 'skipped';
     const { settings } = state;
+    let counterpartyId: string | null = order.moyskladLink?.counterpartyId ?? null;
     try {
       const unlinked = order.items.filter((i) => !i.variant.moyskladId).map((i) => i.sku);
       if (unlinked.length)
@@ -114,7 +128,6 @@ export class OrderSyncService {
           `SKU MoySklad bilan bog'lanmagan: ${unlinked.join(', ').slice(0, 120)}`,
         );
       const provider = await this.integrations.inventory();
-      let counterpartyId: string | null = order.moyskladLink?.counterpartyId ?? null;
       let externalId = await provider.findCustomerOrder(order.number);
       if (!externalId) {
         if (!counterpartyId) {
@@ -161,7 +174,10 @@ export class OrderSyncService {
           positions,
         });
       }
-      const handedOver = await this.prisma.$transaction(async (tx) => {
+      // Only while MoySklad snapshots drive our stock does the MoySklad reserve replace our hold;
+      // otherwise our reservation stays and ends at hand-over to the courier (stock-holds.ts).
+      const handOver = settings.reserve && settings.flows.stock;
+      await this.prisma.$transaction(async (tx) => {
         // Order row first (lock order used by every writer), so a concurrent cancel either ran
         // before us (nothing left to hand over) or waits until the hand-over is committed.
         await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${orderId} FOR UPDATE`;
@@ -169,7 +185,7 @@ export class OrderSyncService {
           externalId,
           counterpartyId,
           pushedStatus: order.status,
-          holdHandedOver: settings.reserve,
+          holdHandedOver: handOver,
           attempts: 0,
           nextAttemptAt: null,
           lastError: null,
@@ -179,19 +195,18 @@ export class OrderSyncService {
           update: link,
           create: { orderId, ...link },
         });
-        return settings.reserve ? this.handOver(tx, orderId, now) : 0;
+        if (handOver) await this.handOver(tx, orderId, now);
       });
       await this.log.log(
         'order',
         true,
-        `#${order.number} → MoySklad${settings.reserve ? ", rezerv qo'yildi" : ''}${handedOver ? '' : ''}`,
+        `#${order.number} → MoySklad${settings.reserve ? ", rezerv qo'yildi" : ''}`,
         { direction: 'OUT' },
       );
       return 'pushed';
     } catch (e) {
-      await this.fail(orderId, order.moyskladLink?.attempts ?? 0, e, now, {
-        counterpartyId: null,
-      });
+      // A counterparty created before the failure is kept, so the retry doesn't look it up again.
+      await this.fail(orderId, order.moyskladLink?.attempts ?? 0, e, now, counterpartyId);
       await this.log.log('order', false, `#${order.number}: ${errorText(e)}`, { direction: 'OUT' });
       return 'failed';
     }
@@ -237,12 +252,9 @@ export class OrderSyncService {
     const status: OrderStatus = link.order.status;
     const change = stateChangeFor(status, state.settings);
     try {
-      if (change.stateName || (change.clearReserve && link.holdHandedOver)) {
+      if (change.stateName || change.clearReserve) {
         const provider = await this.integrations.inventory();
-        await provider.updateCustomerOrder(link.externalId, {
-          stateName: change.stateName,
-          clearReserve: change.clearReserve && link.holdHandedOver,
-        });
+        await provider.updateCustomerOrder(link.externalId, change);
       }
       // Conditional: a status change during the call is mirrored on the next run.
       await this.prisma.moyskladOrderLink.updateMany({
@@ -254,13 +266,13 @@ export class OrderSyncService {
           'status',
           true,
           `#${link.order.number}: ${change.stateName ? `«${change.stateName}»` : status}${
-            change.clearReserve && link.holdHandedOver ? ', rezerv bekor qilindi' : ''
+            change.clearReserve ? ', rezerv bekor qilindi' : ''
           }`,
           { direction: 'OUT' },
         );
       return 'updated';
     } catch (e) {
-      await this.fail(orderId, link.attempts, e, now, {});
+      await this.fail(orderId, link.attempts, e, now, null);
       await this.log.log('status', false, `#${link.order.number}: ${errorText(e)}`, {
         direction: 'OUT',
       });
@@ -273,18 +285,19 @@ export class OrderSyncService {
     attempts: number,
     e: unknown,
     now: Date,
-    create: { counterpartyId?: string | null },
+    counterpartyId: string | null,
   ): Promise<void> {
     const next = attempts + 1;
     const data = {
       attempts: next,
       nextAttemptAt: new Date(now.getTime() + pushBackoffMs(next)),
       lastError: errorText(e).slice(0, 300),
+      ...(counterpartyId ? { counterpartyId } : {}),
     };
     await this.prisma.moyskladOrderLink.upsert({
       where: { orderId },
       update: data,
-      create: { orderId, ...create, ...data },
+      create: { orderId, ...data },
     });
   }
 }

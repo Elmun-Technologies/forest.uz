@@ -5,7 +5,7 @@ import type { Queue } from 'bullmq';
 import type { InventoryItemType } from '../integrations/providers/types';
 import { RedisService } from '../redis/redis.module';
 import { CatalogSyncService } from './catalog-sync.service';
-import { MoyskladBusyError, withMoyskladLock } from './moysklad-lock';
+import { MoyskladBusyError, type MoyskladLease, withMoyskladLock } from './moysklad-lock';
 import { MoyskladLogService } from './moysklad-log.service';
 import { MoyskladSettingsService, type MoyskladState } from './moysklad-settings.service';
 import { ITEM_REFRESH, MOYSKLAD_QUEUE, STOCK_REFRESH, SYNC_NOW } from './moysklad-queue';
@@ -33,14 +33,14 @@ export class MoyskladJobs {
     private readonly log: MoyskladLogService,
   ) {}
 
-  private locked<T>(run: () => Promise<T>, waitMs: number): Promise<T> {
+  private locked<T>(run: (lease: MoyskladLease) => Promise<T>, waitMs: number): Promise<T> {
     return withMoyskladLock(this.redis, run, { waitMs });
   }
 
   /** Scheduled work: skipped when busy; failures land in the sync log, not in BullMQ retries. */
   private async scheduled(
     kind: 'product' | 'stock' | 'order',
-    run: () => Promise<unknown>,
+    run: (lease: MoyskladLease) => Promise<unknown>,
   ): Promise<unknown> {
     try {
       return await this.locked(run, 0);
@@ -54,19 +54,20 @@ export class MoyskladJobs {
   async reconcile(): Promise<unknown> {
     const state = await this.settings.runnable(false);
     if (!state?.settings.flows.products) return 'off';
-    return this.scheduled('product', () => this.catalog.pullAll(state));
+    return this.scheduled('product', (lease) => this.catalog.pullAll(state, lease));
   }
 
   async stock(manual: boolean): Promise<unknown> {
     const state = await this.settings.runnable(manual);
     if (!state?.settings.flows.stock) return 'off';
-    return this.scheduled('stock', () => this.catalog.pollStock(state, { manual }));
+    return this.scheduled('stock', (lease) => this.catalog.pollStock(state, { manual, lease }));
   }
 
   async orders(manual: boolean): Promise<unknown> {
+    // Runs with the orders flow off too: pushed orders' reserves must still be released.
     const state = await this.settings.runnable(manual);
-    if (!state?.settings.flows.orders) return 'off';
-    return this.scheduled('order', () => this.orderSync.syncDue(state));
+    if (!state) return 'off';
+    return this.scheduled('order', (lease) => this.orderSync.syncDue(state, new Date(), lease));
   }
 
   /** Webhook: one entity. Waits for the lock and throws on failure (BullMQ retries it). */
@@ -76,7 +77,7 @@ export class MoyskladJobs {
     if (!type || !id) return 'invalid';
     const state = await this.settings.runnable(false);
     if (!state?.settings.flows.products || !state.settings.flows.webhooks) return 'off';
-    return this.locked(() => this.catalog.refreshItem(state, type, id), 60_000);
+    return this.locked((lease) => this.catalog.refreshItem(state, type, id, lease), 60_000);
   }
 
   /** Admin "Hozir sinxronlash": runs the chosen scope now and always writes a summary row. */
@@ -89,7 +90,7 @@ export class MoyskladJobs {
       return 'off';
     }
     try {
-      const parts = await this.locked(() => this.runScope(state, scope), 60_000);
+      const parts = await this.locked((lease) => this.runScope(state, scope, lease), 60_000);
       await this.log.log('sync', true, `Qo'lda sinxronlash tugadi: ${parts.join('; ')}`);
       return parts;
     } catch (e) {
@@ -98,27 +99,33 @@ export class MoyskladJobs {
     }
   }
 
-  private async runScope(state: MoyskladState, scope: MoyskladSyncScope): Promise<string[]> {
+  private async runScope(
+    state: MoyskladState,
+    scope: MoyskladSyncScope,
+    lease: MoyskladLease,
+  ): Promise<string[]> {
     const { flows } = state.settings;
     const parts: string[] = [];
     if (scope === 'all') {
       if (flows.products) {
-        const s = await this.catalog.pullAll(state);
+        const s = await this.catalog.pullAll(state, lease);
         parts.push(`mahsulotlar ${s.checked} (o'zgardi ${s.changed}, yangi ${s.created})`);
       } else if (flows.stock) {
-        parts.push(`qoldiq ${await this.catalog.pollStock(state, { manual: true })} o'zgardi`);
+        parts.push(
+          `qoldiq ${await this.catalog.pollStock(state, { manual: true, lease })} o'zgardi`,
+        );
       } else parts.push("mahsulot va qoldiq oqimlari o'chiq");
     }
     if (scope === 'stock') {
       parts.push(
         flows.stock
-          ? `qoldiq ${await this.catalog.pollStock(state, { manual: true })} o'zgardi`
+          ? `qoldiq ${await this.catalog.pollStock(state, { manual: true, lease })} o'zgardi`
           : "qoldiq oqimi o'chiq",
       );
     }
     if (scope === 'all' || scope === 'orders') {
       if (flows.orders) {
-        const s = await this.orderSync.syncDue(state);
+        const s = await this.orderSync.syncDue(state, new Date(), lease);
         parts.push(`buyurtmalar: ${s.pushed} yuborildi, ${s.updated} holat, ${s.failed} xato`);
       } else parts.push("buyurtmalar oqimi o'chiq");
     }

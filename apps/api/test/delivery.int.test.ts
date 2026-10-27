@@ -573,6 +573,8 @@ describe('delivery: Yandex claims + shipment lifecycle (integration)', () => {
   });
 
   it('claim dies with the parcel out: attention event, no new claim, staff mark it returned', async () => {
+    const rl = () => prisma.variant.findUniqueOrThrow({ where: { sku: 'FR-RL-10' } });
+    const before = await rl();
     const { order, shipmentId, claimId } = await acceptedClaim();
     stub.advance(claimId, 'cancelled_with_items_on_hands', courier);
     await yandex.syncDue(later(5));
@@ -586,11 +588,17 @@ describe('delivery: Yandex claims + shipment lifecycle (integration)', () => {
     await expect(yandex.createClaim(order.id, staff())).rejects.toMatchObject({
       code: 'SHIPMENT_ORDER_NOT_READY',
     });
-    expect(await reservationsOpen(order.id)).toBe(1);
+    // The parcel left the warehouse: the hold ended at HANDED_TO_COURIER (CLAUDE.md §6) — without
+    // MoySklad the shipped unit is consumed from our stock; sellable stock is unchanged by it.
+    expect(await reservationsOpen(order.id)).toBe(0);
+    const out = await rl();
+    expect([out.stock, out.reserved]).toEqual([before.stock - 1, before.reserved]);
     await yandex.markReturned(shipmentId, staff());
     expect((await shipmentOf(order.id)).status).toBe('RETURNED');
     expect((await orderOf(order.id)).status).toBe('RETURNED');
     expect(await reservationsOpen(order.id)).toBe(0);
+    // Returned goods are restocked by hand, not automatically.
+    expect((await rl()).stock).toBe(before.stock - 1);
     await expect(yandex.markReturned(shipmentId, staff())).rejects.toMatchObject({
       code: 'DELIVERY_INVALID_TRANSITION',
     });

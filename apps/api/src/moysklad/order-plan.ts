@@ -22,13 +22,18 @@ export interface StateChange {
   clearReserve: boolean;
 }
 
+/**
+ * State names only with the statuses flow on. The reserve is dropped on CANCELLED/RETURNED
+ * whatever the settings: the order may have been pushed with reserve before they changed, and
+ * clearing positions that hold nothing is a no-op.
+ */
 export function stateChangeFor(status: OrderStatus, settings: MoyskladSettings): StateChange {
   const mirrored = (MOYSKLAD_MIRRORED_STATUSES as readonly OrderStatus[]).includes(status);
-  const name = mirrored ? settings.stateMap[status as MoyskladMirroredStatus].trim() : '';
-  return {
-    stateName: name || null,
-    clearReserve: settings.reserve && RELEASE_RESERVE.includes(status),
-  };
+  const name =
+    mirrored && settings.flows.statuses
+      ? settings.stateMap[status as MoyskladMirroredStatus].trim()
+      : '';
+  return { stateName: name || null, clearReserve: RELEASE_RESERVE.includes(status) };
 }
 
 /** Line discount as MoySklad's position percentage (2 decimals). */
