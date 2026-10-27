@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Mobil mahsulot</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}</style>
+</helmet>
+<div style="width: 390px; background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; position: relative;">
+
+<header style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; position: sticky; top: 0; z-index: 10; background: #EEEFEA;">
+  <a href="Mobil-Bosh.dc.html" aria-label="Orqaga" style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+  <span style="flex: 1; text-align: center; font-size: 14px; font-weight: 600;">Mebel uchun</span>
+  <button type="button" aria-label="Sevimlilarga" style="width: 44px; height: 44px; border-radius: 50%; border: 0; background: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="1.8" aria-hidden="true"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>
+  <a href="Savat.dc.html" aria-label="Savat" style="width: 44px; height: 44px; border-radius: 50%; background: #141712; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></a>
+</header>
+
+<main style="padding: 0 12px 24px; display: flex; flex-direction: column; gap: 12px;">
+  <div style="position: relative; height: 420px; border-radius: 28px; overflow: hidden; background: #E3E6DD;">
+    <img src="{{img}}" alt="Chalk White bilan bo'yalgan komod" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+    <span style="position: absolute; top: 14px; left: 14px; background: #FFFFFF; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600;">Xit</span>
+    <span style="position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px;">
+      <sc-for list="{{dots}}" as="d" hint-placeholder-count="4"><button type="button" onClick="{{d.pick}}" aria-label="{{d.label}}" style="{{d.style}}"></button></sc-for>
+    </span>
+    <span style="position: absolute; bottom: 14px; right: 14px; background: rgba(20,23,18,0.75); color: #FFFFFF; border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; display: inline-flex; gap: 6px; align-items: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>Video</span>
+  </div>
+
+  <section style="background: #FFFFFF; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+    <span style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;"><span style="display: inline-flex; align-items: center; gap: 6px; background: #EEEFEA; border-radius: 999px; padding: 5px 10px 5px 5px; font-weight: 600;"><span style="width: 20px; height: 20px; border-radius: 50%; background: #334229; display: grid; place-items: center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>Forest · rasmiy</span><a href="#msharh" style="display: inline-flex; align-items: center; gap: 4px; font-weight: 600; text-decoration: none;"><svg width="12" height="12" viewBox="0 0 24 24" fill="#334229" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>[4,9] · [N]</a></span>
+    <h1 style="margin: 0; font-size: 30px; line-height: 1.05; font-weight: 500; letter-spacing: -0.035em;">Chalk White mebel bo'yog'i</h1>
+    <p style="margin: 0; font-size: 14px; color: #5E6459; line-height: 1.55;">Matli oq bo'yoq. Yog'och, MDF va lakni grunt va jilvirlashsiz yopadi.</p>
+    <div style="display: flex; gap: 8px;">
+      <sc-for list="{{vols}}" as="v" hint-placeholder-count="3">
+        <button type="button" onClick="{{v.pick}}" style="{{v.style}}"><b style="font-size: 15px;">{{v.label}}</b><span style="font-size: 11px; opacity: 0.75;">{{v.area}}</span></button>
+      </sc-for>
+    </div>
+    <span style="display: flex; align-items: center; gap: 8px; font-size: 13px;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3E8E4E;"></span><b style="font-weight: 600;">Omborda bor</b><span style="color: #5E6459;">· Toshkentda bugun 22:40 gacha</span></span>
+  </section>
+
+  <section style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+    <div style="background: #FFFFFF; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 18px;"><b style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em;">10–12 m²</b><span style="font-size: 12px; font-style: italic; color: #5E6459;">1 litr sarfi</span></div>
+    <div style="background: #FFFFFF; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 18px;"><b style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em;">1 soat</b><span style="font-size: 12px; font-style: italic; color: #5E6459;">qatlamlar orasida</span></div>
+    <div style="background: #FFFFFF; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 18px;"><b style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em;">Hidsiz</b><span style="font-size: 12px; font-style: italic; color: #5E6459;">suv asosida</span></div>
+    <div style="background: #334229; color: #FFFFFF; border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 18px;"><b style="font-size: 24px; font-weight: 600; letter-spacing: -0.03em;">EI</b><span style="font-size: 12px; font-style: italic; color: #D5DDC8;">Yevropada ishlab chiqarilgan</span></div>
+  </section>
+
+  <section style="background: #D5DDC8; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+    <b style="font-size: 20px; font-weight: 600; letter-spacing: -0.02em;">Qancha kerak?</b>
+    <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+      <span style="background: #FFFFFF; border-radius: 12px; padding: 8px 10px; font-size: 12px;"><b>Tumba</b> 1,5 m²</span>
+      <span style="background: #141712; color: #FFFFFF; border-radius: 12px; padding: 8px 10px; font-size: 12px;"><b>Komod</b> 3 m²</span>
+      <span style="background: #FFFFFF; border-radius: 12px; padding: 8px 10px; font-size: 12px;"><b>Stol</b> 2,5 m²</span>
+      <span style="background: #FFFFFF; border-radius: 12px; padding: 8px 10px; font-size: 12px;"><b>Shkaf</b> 8 m²</span>
+    </div>
+    <span style="background: #FFFFFF; border-radius: 18px; padding: 14px; display: flex; justify-content: space-between; align-items: baseline;"><span style="font-size: 13px;">Komod, 2 qatlam</span><b style="font-size: 22px; color: #334229;">0,6 L → 1 L</b></span>
+  </section>
+
+  <section style="background: #FFFFFF; border-radius: 28px; padding: 6px 18px;">
+    <details open style="padding: 14px 0; border-bottom: 1px solid #DADDD3;"><summary style="cursor: pointer; font-size: 15px; font-weight: 600;">Qanday qo'llanadi</summary><p style="margin: 8px 0 0; font-size: 14px; color: #5E6459; line-height: 1.55;">Tozalang, 2 yupqa qatlam surting, 24 soatdan keyin mum bilan himoya qiling.</p></details>
+    <details style="padding: 14px 0; border-bottom: 1px solid #DADDD3;"><summary style="cursor: pointer; font-size: 15px; font-weight: 600;">Xususiyatlar</summary><p style="margin: 8px 0 0; font-size: 14px; color: #5E6459; line-height: 1.55;">Yog'och, MDF, DSP, lak, metall. Matli yuza. [Ishlab chiqaruvchi]</p></details>
+    <details style="padding: 14px 0;"><summary style="cursor: pointer; font-size: 15px; font-weight: 600;">Yetkazish va to'lov</summary>
+      <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+        <span style="display: flex; align-items: center; gap: 10px;"><img src="../assets/logos/yandex-delivery.png" alt="Yandex Dostavka" style="height: 12px; width: auto;">Toshkent · 12 soat</span>
+        <span style="display: flex; align-items: center; gap: 10px;"><img src="../assets/logos/bts.png" alt="BTS" style="height: 22px; width: auto;">Respublika · 24 soat</span>
+        <span style="display: flex; align-items: center; gap: 10px;"><img src="../assets/logos/payme.png" alt="Payme" style="height: 14px; width: auto;"><img src="../assets/logos/click.png" alt="Click" style="height: 13px; width: auto;">yoki qabul qilganda</span>
+      </div>
+    </details>
+  </section>
+
+  <section id="msharh" style="background: #FFFFFF; border-radius: 28px; padding: 20px; display: flex; flex-direction: column; gap: 12px;">
+    <span style="display: flex; justify-content: space-between; align-items: baseline;"><b style="font-size: 20px; font-weight: 600;">Sharhlar</b><span style="font-size: 13px; color: #5E6459;">[4,9] · [N] ta</span></span>
+    <div style="background: #EEEFEA; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 8px;"><span style="display: flex; justify-content: space-between; font-size: 13px;"><b>[Mijoz ismi]</b><span style="color: #334229; font-weight: 600;">Tasdiqlangan</span></span><span style="font-size: 14px; line-height: 1.5;">[Haqiqiy sharh]</span><span style="display: flex; gap: 6px;"><img src="../assets/photos/white-dresser.jpg" alt="" style="width: 56px; height: 56px; border-radius: 12px; object-fit: cover;"><img src="../assets/photos/parquet.jpg" alt="" style="width: 56px; height: 56px; border-radius: 12px; object-fit: cover;"></span></div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 10px;">
+    <b style="padding: 0 6px; font-size: 20px; font-weight: 600;">Birga olinadi</b>
+    <div style="display: flex; gap: 8px; overflow-x: auto;">
+      <a href="Mahsulot.dc.html" style="flex: 0 0 150px; background: #FFFFFF; border-radius: 20px; padding: 6px 6px 12px; text-decoration: none; display: flex; flex-direction: column; gap: 8px;"><img src="../assets/photos/wax-varnish.jpg" alt="" style="width: 100%; height: 110px; border-radius: 14px; object-fit: cover;"><span style="padding: 0 4px; font-size: 13px; font-weight: 600;">Himoya mumi</span><b style="padding: 0 4px; font-size: 13px;">159 000</b></a>
+      <a href="Mahsulot.dc.html" style="flex: 0 0 150px; background: #FFFFFF; border-radius: 20px; padding: 6px 6px 12px; text-decoration: none; display: flex; flex-direction: column; gap: 8px;"><img src="../assets/photos/brush-hand.jpg" alt="" style="width: 100%; height: 110px; border-radius: 14px; object-fit: cover;"><span style="padding: 0 4px; font-size: 13px; font-weight: 600;">Oval 40 cho'tka</span><b style="padding: 0 4px; font-size: 13px;">119 000</b></a>
+      <a href="Mahsulot.dc.html" style="flex: 0 0 150px; background: #FFFFFF; border-radius: 20px; padding: 6px 6px 12px; text-decoration: none; display: flex; flex-direction: column; gap: 8px;"><img src="../assets/photos/painting-materials.jpg" alt="" style="width: 100%; height: 110px; border-radius: 14px; object-fit: cover;"><span style="padding: 0 4px; font-size: 13px; font-weight: 600;">Valik 10 sm</span><b style="padding: 0 4px; font-size: 13px;">79 000</b></a>
+    </div>
+  </section>
+  <div style="height: 72px;"></div>
+</main>
+
+<div style="position: sticky; bottom: 0; z-index: 20; background: #FFFFFF; border-top: 1px solid #DADDD3; padding: 10px 12px 16px; display: flex; align-items: center; gap: 10px;">
+  <span style="display: flex; flex-direction: column; min-width: 0;"><b style="font-size: 20px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; white-space: nowrap;">{{price}}</b><span style="font-size: 11px; color: #5E6459;">{{volLabel}}</span></span>
+  <span style="display: inline-flex; align-items: center; border: 1px solid #DADDD3; border-radius: 999px; margin-left: auto;">
+    <button type="button" onClick="{{dec}}" aria-label="Kamaytirish" style="border: 0; background: none; width: 36px; height: 48px; font: inherit; font-size: 18px;">−</button>
+    <span style="min-width: 16px; text-align: center; font-weight: 600;">{{qty}}</span>
+    <button type="button" onClick="{{inc}}" aria-label="Ko'paytirish" style="border: 0; background: none; width: 36px; height: 48px; font: inherit; font-size: 18px;">+</button>
+  </span>
+  <a href="Mobil-Checkout.dc.html" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; height: 50px; padding: 0 20px; display: grid; place-items: center; font-size: 15px; font-weight: 600; white-space: nowrap;">Savatga</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":3000}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { vol: 1, qty: 1, img: 0 }; }
+  renderVals() {
+    const s = this.state;
+    const V = [{ label: '0,5 L', area: '≈ 5 m²', price: 189000 }, { label: '1 L', area: '≈ 11 m²', price: 329000 }, { label: '2,5 L', area: '≈ 27 m²', price: 749000 }];
+    const IM = ['../assets/photos/white-dresser.jpg', '../assets/photos/brush-hand.jpg', '../assets/photos/parquet.jpg', '../assets/photos/white-shelf-bedroom.jpg'];
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + " so'm";
+    const vb = 'flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; border-radius: 16px; padding: 10px 12px; font: inherit; cursor: pointer;';
+    return {
+      img: IM[s.img],
+      dots: IM.map((_, i) => ({ label: (i + 1) + '-rasm', pick: () => this.setState({ img: i }), style: 'width: ' + (i === s.img ? '22px' : '8px') + '; height: 8px; border-radius: 4px; border: 0; padding: 0; cursor: pointer; background: ' + (i === s.img ? '#FFFFFF' : 'rgba(255,255,255,0.55)') + ';' })),
+      vols: V.map((v, i) => ({ label: v.label, area: v.area, pick: () => this.setState({ vol: i }), style: vb + (i === s.vol ? ' background: #141712; color: #FFFFFF; border: 1px solid #141712;' : ' background: #FFFFFF; color: #141712; border: 1px solid #DADDD3;') })),
+      price: fmt(V[s.vol].price * s.qty),
+      volLabel: V[s.vol].label + ' · Chalk White',
+      qty: s.qty,
+      inc: () => this.setState({ qty: Math.min(99, s.qty + 1) }),
+      dec: () => this.setState({ qty: Math.max(1, s.qty - 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "identities": [
+    {
+      "name": "forest-dev",
+      "credentials": [{ "accessKey": "forest-dev", "secretKey": "forest-dev-secret" }],
+      "actions": ["Admin", "Read", "List", "Tagging", "Write"]
+    },
+    {
+      "name": "anonymous",
+      "actions": ["Read:forest-public"]
+    }
+  ]
+}

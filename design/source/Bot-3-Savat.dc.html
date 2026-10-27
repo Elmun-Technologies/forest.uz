@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest bot · Tashlangan savat</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0}a{color:inherit}</style>
+</helmet>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; background: #E4EADD; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; overflow: hidden;">
+  <header style="display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #FFFFFF; border-bottom: 1px solid #DADDD3;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2A6A9A" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    <span style="width: 42px; height: 42px; border-radius: 50%; background: #334229; display: grid; place-items: center; flex: none;"><img src="../assets/brand/forest-logo-white.png" alt="" style="width: 30px; height: auto;"></span>
+    <span style="flex: 1; display: flex; flex-direction: column; line-height: 1.25;"><b style="font-size: 15px;">Forest</b><span style="font-size: 12px; color: #6E7768;">bot</span></span>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="#6E7768" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+  </header>
+
+  <main style="flex: 1; overflow: hidden; padding: 14px 12px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end;">
+    <span style="align-self: center; background: rgba(20,23,18,0.35); color: #FFFFFF; border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600;">Savatga qo'shilgandan 2 soat o'tib</span>
+    <div style="align-self: flex-start; width: 300px; background: #FFFFFF; border-radius: 16px 16px 16px 4px; overflow: hidden;">
+      <div style="position: relative;"><img src="../assets/photos/classic-green-sofa.jpg" alt="Divan yangilash to'plami" style="width: 100%; height: 170px; object-fit: cover; display: block;"><span style="position: absolute; top: 10px; left: 10px; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700;">−5%</span></div>
+      <div style="padding: 12px; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 6px;">
+        <span>Dilnoza, savatingizda qoldi:</span>
+        <span style="display: flex; justify-content: space-between; align-items: baseline;"><b>Divan yangilash to'plami</b><span style="color: #8D9586; text-decoration: line-through; font-size: 13px;">799 000</span></span>
+        <span>Bugun buyurtma bersangiz: <b>759 050 so'm</b> · kod <span style="background: #EEEFEA; border-radius: 6px; padding: 2px 6px; font-family: ui-monospace, Menlo, monospace; font-weight: 700;">SAVAT5</span></span>
+        <span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #3F453B;"><img src="../assets/logos/yandex-delivery.png" alt="Yandex" style="height: 10px;">Toshkentda 12 soatda yetkazamiz</span>
+        <span style="font-size: 11px; color: #8D9586; text-align: right;">12:14</span>
+      </div>
+    </div>
+    <div style="align-self: flex-start; width: 300px; display: flex; flex-direction: column; gap: 4px;">
+      <a href="Mobil-Checkout.dc.html" style="background: rgba(255,255,255,0.85); border-radius: 10px; padding: 11px; font-size: 13px; font-weight: 700; text-align: center; color: #2A6A9A; text-decoration: none;">Buyurtmani yakunlash ↗</a>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+        <button type="button" onClick="{{ask}}" style="border: 0; background: rgba(255,255,255,0.7); border-radius: 10px; padding: 9px; font: inherit; font-size: 13px; font-weight: 600; color: #2A6A9A; cursor: pointer;">Savolim bor</button>
+        <span style="background: rgba(255,255,255,0.7); border-radius: 10px; padding: 9px; font-size: 13px; font-weight: 600; text-align: center; color: #6E7768;">Eslatmani o'chirish</span>
+      </div>
+    </div>
+    <sc-if value="{{asked}}" hint-placeholder-val="{{false}}">
+      <span style="align-self: flex-end; max-width: 260px; background: #E1F3D0; border-radius: 16px 16px 4px 16px; padding: 8px 12px; font-size: 14px; line-height: 1.45;">Mening divanim velur, kulrang. Zaytun rangi chiqadimi? <span style="font-size: 11px; color: #5E8A4E;">12:31</span></span>
+      <div style="align-self: flex-start; max-width: 300px; background: #FFFFFF; border-radius: 16px 16px 16px 4px; padding: 10px 12px; font-size: 14px; line-height: 1.5;"><span style="display: block; font-size: 12px; font-weight: 700; color: #334229;">Madina · Forest mutaxassisi</span>Ha, velur uchun ideal. Kulrangdan Zaytunga 1 qatlam yetadi. Kod bugun kechgacha amal qiladi. <span style="font-size: 11px; color: #8D9586;">12:34</span></div>
+    </sc-if>
+  </main>
+
+  <div style="background: #FFFFFF; border-top: 1px solid #DADDD3; padding: 10px 12px 16px; display: flex; align-items: center; gap: 10px;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8D9586" stroke-width="1.8" aria-hidden="true"><path d="M21 12.5 12.7 20.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-2.8-2.8l7.8-7.8"/></svg>
+    <span style="flex: 1; color: #8D9586; font-size: 14px;">Xabar</span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8D9586" stroke-width="1.8" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { asked: false }; }
+  renderVals() { return { asked: this.state.asked, ask: () => this.setState({ asked: true }) }; }
+}
+</script>
+</body>
+</html>

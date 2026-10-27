@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest mobil · Savat</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}input:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="width: 390px; background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; position: relative;">
+
+<header style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #EEEFEA; position: sticky; top: 0; z-index: 10;">
+  <a href="Mobil-Katalog.dc.html" aria-label="Orqaga" style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+  <span style="flex: 1; text-align: center; font-size: 16px; font-weight: 600;">Savat · {{n}}</span>
+  <span style="width: 44px;"></span>
+</header>
+
+<main style="padding: 0 12px 24px; display: flex; flex-direction: column; gap: 10px;">
+  <div style="background: #FFFFFF; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <span style="font-size: 13px; line-height: 1.45;">{{freeText}}</span>
+    <span style="height: 6px; border-radius: 999px; background: #EEEFEA; overflow: hidden; display: block;"><span style="{{bar}}"></span></span>
+  </div>
+
+  <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+    <div style="background: #FFFFFF; border-radius: 22px; padding: 10px; display: flex; gap: 12px;">
+      <img src="{{l.img}}" alt="" style="width: 88px; height: 88px; border-radius: 16px; object-fit: cover; flex: none;">
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+        <b style="font-size: 14px; font-weight: 600; line-height: 1.3;">{{l.name}}</b>
+        <span style="font-size: 12px; color: #5E6459;">{{l.variant}}</span>
+        <span style="display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+          <span style="display: inline-flex; align-items: center; background: #EEEFEA; border-radius: 999px; padding: 3px;">
+            <button type="button" onClick="{{l.dec}}" aria-label="Kamaytirish" style="width: 30px; height: 30px; border: 0; border-radius: 50%; background: #FFFFFF; font: inherit; font-size: 16px; cursor: pointer;">−</button>
+            <b style="min-width: 28px; text-align: center; font-size: 14px;">{{l.q}}</b>
+            <button type="button" onClick="{{l.inc}}" aria-label="Ko'paytirish" style="width: 30px; height: 30px; border: 0; border-radius: 50%; background: #FFFFFF; font: inherit; font-size: 16px; cursor: pointer;">+</button>
+          </span>
+          <b style="font-size: 15px; font-variant-numeric: tabular-nums;">{{l.sum}}</b>
+        </span>
+      </div>
+    </div>
+  </sc-for>
+
+  <sc-if value="{{showUpsell}}" hint-placeholder-val="{{true}}">
+    <div style="background: #D5DDC8; border-radius: 22px; padding: 12px; display: flex; gap: 12px; align-items: center;">
+      <img src="../assets/photos/green-spray-bottle.jpg" alt="" style="width: 56px; height: 56px; border-radius: 14px; object-fit: cover;">
+      <span style="flex: 1; display: flex; flex-direction: column; gap: 2px;"><b style="font-size: 13px;">Tozalovchisiz rang notekis chiqadi</b><span style="font-size: 12px; color: #3F453B;">Mato tozalovchi · 149 000</span></span>
+      <button type="button" onClick="{{addUpsell}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 10px 14px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">+ Qo'shish</button>
+    </div>
+  </sc-if>
+
+  <div style="background: #FFFFFF; border-radius: 22px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <label for="mPromo" style="display: flex; gap: 8px;"><input id="mPromo" placeholder="Promo-kod" value="{{promoVal}}" style="flex: 1; min-width: 0; border: 1px solid #DADDD3; border-radius: 14px; padding: 12px 14px; font: inherit; font-size: 14px;"><button type="button" onClick="{{applyPromo}}" style="border: 0; background: #EEEFEA; border-radius: 14px; padding: 0 16px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">{{promoBtn}}</button></label>
+    <span style="display: flex; justify-content: space-between; font-size: 14px;"><span style="color: #5E6459;">Mahsulotlar</span><span style="font-variant-numeric: tabular-nums;">{{sub}}</span></span>
+    <sc-if value="{{promoOn}}" hint-placeholder-val="{{false}}"><span style="display: flex; justify-content: space-between; font-size: 14px; color: #1F6B35; font-weight: 600;"><span>SALOM10 · −10%</span><span style="font-variant-numeric: tabular-nums;">−{{disc}}</span></span></sc-if>
+    <span style="display: flex; justify-content: space-between; font-size: 14px;"><span style="color: #5E6459;">Yetkazish</span><span>{{ship}}</span></span>
+    <span style="display: flex; justify-content: space-between; font-size: 18px; padding-top: 10px; border-top: 1px solid #EEEFEA;"><b>Jami</b><b style="font-variant-numeric: tabular-nums;">{{total}} so'm</b></span>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 4px 6px; font-size: 12px; color: #5E6459;">
+    <img src="../assets/logos/yandex-delivery.png" alt="Yandex" style="height: 12px;"><span>Toshkentda bugun 22:40 gacha</span>
+  </div>
+  <div style="display: flex; gap: 8px; align-items: center; justify-content: center; padding: 2px 0;">
+    <img src="../assets/logos/payme.png" alt="Payme" style="height: 16px;"><img src="../assets/logos/click.png" alt="Click" style="height: 16px;"><span style="font-size: 12px; color: #5E6459;">· olganda to'lov</span>
+  </div>
+  <div style="height: 70px;"></div>
+</main>
+
+<nav aria-label="Rasmiylashtirish" style="position: sticky; bottom: 0; z-index: 20; padding: 10px 12px 14px; background: linear-gradient(0deg, #EEEFEA 70%, rgba(238,239,234,0));">
+  <a href="Mobil-Checkout.dc.html" style="display: flex; justify-content: space-between; align-items: center; background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 0 8px 0 22px; height: 56px; font-size: 15px; font-weight: 600;">Rasmiylashtirish<span style="background: #FFFFFF; color: #141712; border-radius: 999px; padding: 10px 14px; font-size: 14px; font-variant-numeric: tabular-nums;">{{total}}</span></a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { q: { cw: 1, fs: 2, br: 1 }, upsell: false, promo: false }; }
+  renderVals() {
+    const s = this.state;
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const P = { cw: ['Chalk White mebel bo\'yog\'i', '1 L', 329000, '../assets/photos/white-dresser.jpg'], fs: ['Mato bo\'yog\'i spreyi', 'Zaytun · 400 ml', 249000, '../assets/photos/sprayer-hand.jpg'], br: ['Oval 40 cho\'tka', '40 mm', 119000, '../assets/photos/brush-hand.jpg'], cl: ['Mato tozalovchi sprey', '500 ml', 149000, '../assets/photos/green-spray-bottle.jpg'] };
+    const q = { ...s.q }; if (s.upsell) q.cl = q.cl || 1;
+    const ids = Object.keys(q).filter(k => q[k] > 0);
+    const sub = ids.reduce((a, k) => a + P[k][2] * q[k], 0);
+    const disc = s.promo ? Math.round(sub * 0.1 / 1000) * 1000 : 0;
+    const free = 500000, left = Math.max(0, free - (sub - disc));
+    const shipCost = left > 0 ? 35000 : 0;
+    const setQ = (k, v) => this.setState({ q: { ...s.q, [k]: Math.max(0, v) }, upsell: k === 'cl' && v <= 0 ? false : s.upsell });
+    return {
+      n: ids.reduce((a, k) => a + q[k], 0),
+      lines: ids.map(k => ({ name: P[k][0], variant: P[k][1], img: P[k][3], q: q[k], sum: fmt(P[k][2] * q[k]),
+        inc: () => setQ(k, q[k] + 1), dec: () => setQ(k, q[k] - 1) })),
+      showUpsell: !q.cl, addUpsell: () => this.setState({ upsell: true, q: { ...s.q, cl: 1 } }),
+      freeText: left > 0 ? 'Bepul yetkazishgacha ' + fmt(left) + ' so\'m qoldi' : '✓ Yetkazish bepul',
+      bar: 'display: block; height: 100%; border-radius: 999px; background: #334229; width: ' + Math.min(100, Math.round((sub - disc) / free * 100)) + '%;',
+      sub: fmt(sub), disc: fmt(disc), promoOn: s.promo,
+      promoVal: s.promo ? 'SALOM10' : '', promoBtn: s.promo ? '✓' : 'Qo\'llash', applyPromo: () => this.setState({ promo: !s.promo }),
+      ship: shipCost ? fmt(shipCost) + ' so\'m' : 'Bepul',
+      total: fmt(sub - disc + shipCost)
+    };
+  }
+}
+</script>
+</body>
+</html>

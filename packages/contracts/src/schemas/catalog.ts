@@ -1,0 +1,131 @@
+import { z } from 'zod';
+import { PRODUCT_SORTS } from '../catalog';
+
+const csv = z
+  .union([z.string(), z.array(z.string())])
+  .optional()
+  .transform((v) => (v === undefined ? [] : (Array.isArray(v) ? v : v.split(',')).filter(Boolean)));
+
+export const productListQuerySchema = z.object({
+  category: z.string().optional(),
+  surface: csv,
+  color: csv,
+  volume: csv,
+  brand: csv,
+  priceMin: z.coerce.number().int().nonnegative().optional(),
+  priceMax: z.coerce.number().int().nonnegative().optional(),
+  // stringbool: '?onSale=false' must mean false (z.coerce.boolean would make it true).
+  onSale: z.stringbool().optional(),
+  sort: z.enum(PRODUCT_SORTS).default('popular'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(60).default(24),
+});
+export type ProductListQuery = z.infer<typeof productListQuerySchema>;
+
+export interface ImageDto {
+  url: string;
+  alt: string;
+  width: number | null;
+  height: number | null;
+}
+
+export interface CategoryDto {
+  id: string;
+  slug: string;
+  name: string;
+  productCount: number;
+  image: ImageDto | null;
+  /** Admin-edited SEO text shown under the catalog grid. */
+  seoText: string | null;
+}
+
+export interface VariantDto {
+  id: string;
+  sku: string;
+  label: string;
+  colorHex: string | null;
+  volumeMl: number | null;
+  priceSoum: number;
+  compareAtSoum: number | null;
+  /** Available to sell = MoySklad stock − open reservations (never negative). */
+  available: number;
+  inStock: boolean;
+  lowStock: boolean;
+}
+
+export interface ProductCardDto {
+  id: string;
+  slug: string;
+  type: 'SIMPLE' | 'BUNDLE';
+  name: string;
+  categorySlug: string | null;
+  categoryName: string | null;
+  /** Short line under the name: "0,5 L · 1 L · 2,5 L" or "400 ml · 4 rang". */
+  subtitle: string;
+  badges: ('HIT' | 'NEW' | 'SALE')[];
+  discountPct: number | null;
+  priceFromSoum: number;
+  compareAtSoum: number | null;
+  hasPriceRange: boolean;
+  defaultVariantId: string | null;
+  image: ImageDto | null;
+  inStock: boolean;
+  seller: { slug: string; name: string; isOfficial: boolean };
+}
+
+export interface ProductListDto {
+  items: ProductCardDto[];
+  total: number;
+  page: number;
+  pages: number;
+  facets: {
+    colors: { hex: string; label: string; count: number }[];
+    volumes: { volumeMl: number; label: string; count: number }[];
+    brands: { slug: string; name: string; isOfficial: boolean; count: number }[];
+    price: { minSoum: number; maxSoum: number };
+  };
+}
+
+/** GET /v1/catalog/products/:slug/reviews — approved reviews only. */
+export interface ProductReviewDto {
+  id: string;
+  /** First name only (reviews are public). */
+  author: string;
+  rating: number;
+  text: string | null;
+  /** ISO timestamp. */
+  createdAt: string;
+  /** Only photos the customer consented to publish. */
+  photos: ImageDto[];
+  reply: string | null;
+}
+
+export interface ProductReviewsDto {
+  items: ProductReviewDto[];
+  page: number;
+  pageCount: number;
+  total: number;
+}
+
+export const productReviewsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(500).default(1),
+});
+
+export interface ProductDetailDto extends ProductCardDto {
+  shortDesc: string;
+  description: string;
+  howToApply: string[];
+  specs: { key: string; value: string }[];
+  surfaces: string[];
+  coverageM2PerL: number | null;
+  dryTimeMinutes: number | null;
+  videoUrl: string | null;
+  images: ImageDto[];
+  variants: VariantDto[];
+  /** Kit contents (BUNDLE only). */
+  components: { productSlug: string; name: string; variantLabel: string; qty: number }[];
+  rating: { average: number; count: number } | null;
+  related: ProductCardDto[];
+  upsell: ProductCardDto[];
+  alternatives: ProductCardDto[];
+}

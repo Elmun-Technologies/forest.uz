@@ -1,0 +1,144 @@
+# Forest — local infra + production-like stack.
+#   dev:   pnpm dev  (starts postgres/redis/minio/mailpit here, apps run on the host in watch mode)
+#   prod:  docker compose -f infra/compose.yml --profile apps up -d --build
+name: forest
+
+x-app-env: &app-env
+  env_file: ../.env
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: forest
+      # Dev default; production sets POSTGRES_PASSWORD (and DATABASE_URL) in the server's .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-forest}
+      POSTGRES_DB: forest
+    ports: ['127.0.0.1:5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U forest -d forest']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['127.0.0.1:6379:6379']
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage for local dev (MinIO no longer ships public images).
+  # Dev-only credentials live in seaweedfs/s3.json; production uses a UZ-hosted S3 provider.
+  storage:
+    image: chrislusf/seaweedfs:4.50
+    command:
+      [
+        'server',
+        '-dir=/data',
+        '-s3',
+        '-s3.port=8333',
+        '-s3.config=/etc/seaweedfs/s3.json',
+        '-volume.max=0',
+      ]
+    ports: ['127.0.0.1:9000:8333']
+    volumes:
+      - storagedata:/data
+      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8333/status || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    image: axllent/mailpit:v1.32.0
+    ports: ['127.0.0.1:8025:8025', '127.0.0.1:1025:1025']
+    healthcheck:
+      test: ['CMD', '/mailpit', 'readyz']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    env_file: ../.env
+    profiles: [apps]
+    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: migrate }
+    environment:
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  api:
+    <<: *app-env
+    profiles: [apps]
+    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: runtime }
+    ports: ['127.0.0.1:4000:4000']
+    environment:
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://storage:8333
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      storage: { condition: service_healthy }
+
+  web:
+    <<: *app-env
+    profiles: [apps]
+    build:
+      context: ..
+      dockerfile: infra/docker/next.Dockerfile
+      args:
+        APP: web
+        S3_PUBLIC_URL: '${S3_PUBLIC_URL:-http://localhost:9000/forest-public}'
+        API_INTERNAL_URL: http://api:4000
+    ports: ['127.0.0.1:3000:3000']
+    environment:
+      PORT: 3000
+      API_INTERNAL_URL: http://api:4000
+    depends_on: [api]
+
+  admin:
+    <<: *app-env
+    profiles: [apps]
+    build:
+      context: ..
+      dockerfile: infra/docker/next.Dockerfile
+      # The /api rewrite is baked at build time (CLAUDE.md §17), like web.
+      args:
+        APP: admin
+        API_INTERNAL_URL: http://api:4000
+    ports: ['127.0.0.1:3001:3001']
+    environment:
+      PORT: 3001
+      API_INTERNAL_URL: http://api:4000
+    depends_on: [api]
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [apps]
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.localhost}
+      API_DOMAIN: ${API_DOMAIN:-api.localhost}
+      # Space-separated CIDRs of the CDN in front (Cloudflare ranges in production).
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-private_ranges}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on: [web, admin, api]
+
+volumes:
+  pgdata:
+  redisdata:
+  storagedata:
+  caddydata:

@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Checkout</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>
+body{margin:0;background:#EEEFEA}
+a{color:#141712}a:hover{color:#334229}
+input:focus,select:focus,textarea:focus{outline:2px solid #334229;outline-offset:0}
+</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; min-height: 1800px;">
+<header style="max-width: 1392px; margin: 0 auto; padding: 20px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+  <a href="Main.dc.html" aria-label="Forest bosh sahifa"><img src="../assets/brand/forest-logo-green.png" alt="Forest" style="width: 120px; height: auto; display: block;"></a>
+  <span style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 500; margin-left: 16px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Xavfsiz to'lov</span>
+  <span style="margin-left: auto; font-size: 14px;">Savol bormi? <b style="font-variant-numeric: tabular-nums;">+998 99 820 22 77</b></span>
+</header>
+
+<div style="max-width: 1392px; margin: 0 auto; padding: 0 24px 64px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <form style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="background: #FFFFFF; border-radius: 40px; padding: 40px 48px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+      <h1 style="margin: 0; font-size: 72px; line-height: 0.95; font-weight: 500; letter-spacing: -0.05em;">Rasmiylashtirish</h1>
+      <a href="Savat.dc.html" style="font-size: 14px; font-weight: 500;">← Savatga qaytish</a>
+    </div>
+
+    <fieldset style="border: 0; margin: 0; background: #FFFFFF; border-radius: 32px; padding: 36px 40px; display: flex; flex-direction: column; gap: 20px;">
+      <legend style="float: left; padding: 0; display: flex; align-items: center; gap: 14px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px;"><span style="width: 40px; height: 40px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center; font-size: 15px;">1</span>Aloqa ma'lumotlari</legend>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; clear: both;">
+        <label for="coName" style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Ism
+          <input id="coName" value="Dilnoza" autocomplete="name" style="border: 1px solid #DADDD3; border-radius: 18px; padding: 16px 18px; font: inherit; font-size: 16px; font-weight: 400; color: #141712; background: #FFFFFF;"></label>
+        <label for="coPhone" style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Telefon
+          <span style="display: flex; border: 1px solid #DADDD3; border-radius: 18px; overflow: hidden;"><span style="padding: 16px 0 16px 18px; color: #5E6459; font-weight: 500; font-size: 16px;">+998</span><input id="coPhone" value="90 123 45 67" inputmode="tel" autocomplete="tel-national" style="flex: 1; min-width: 0; border: 0; padding: 16px 18px 16px 10px; font: inherit; font-size: 16px; font-weight: 400; color: #141712;"></span></label>
+      </div>
+      <span style="font-size: 13px; color: #5E6459;">Shu raqamga buyurtma holati SMS va Telegram orqali yuboriladi.</span>
+    </fieldset>
+
+    <fieldset style="border: 0; margin: 0; background: #FFFFFF; border-radius: 32px; padding: 36px 40px; display: flex; flex-direction: column; gap: 20px;">
+      <legend style="float: left; padding: 0; display: flex; align-items: center; gap: 14px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px;"><span style="width: 40px; height: 40px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center; font-size: 15px;">2</span>Yetkazish</legend>
+      <div style="display: flex; flex-wrap: wrap; gap: 12px; clear: both;">
+        <sc-for list="{{deliveries}}" as="d" hint-placeholder-count="3">
+          <button type="button" onClick="{{d.pick}}" style="{{d.style}}">
+            <span style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 8px;">
+              <span style="background: #FFFFFF; border-radius: 12px; height: 44px; padding: 0 14px; display: inline-flex; align-items: center; border: 1px solid #E3E6DD;"><img src="{{d.logo}}" alt="{{d.name}}" style="{{d.logoStyle}}"></span>
+              <span style="font-weight: 600;">{{d.price}}</span>
+            </span>
+            <b style="font-size: 17px; margin-top: 6px;">{{d.name}}</b>
+            <span style="font-size: 13px; opacity: 0.8;">{{d.note}}</span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+        <label for="coRegion" style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Shahar / viloyat
+          <select id="coRegion" style="border: 1px solid #DADDD3; border-radius: 18px; padding: 16px 18px; font: inherit; font-size: 16px; font-weight: 400; color: #141712; background: #FFFFFF;"><option>Toshkent shahri</option><option>Toshkent viloyati</option><option>Samarqand</option><option>Buxoro</option><option>Farg'ona</option><option>Andijon</option><option>Namangan</option></select></label>
+        <label for="coDistrict" style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Tuman
+          <select id="coDistrict" style="border: 1px solid #DADDD3; border-radius: 18px; padding: 16px 18px; font: inherit; font-size: 16px; font-weight: 400; color: #141712; background: #FFFFFF;"><option>Mirzo Ulug'bek</option><option>Yunusobod</option><option>Chilonzor</option></select></label>
+      </div>
+      <label for="coAddr" style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Manzil
+        <input id="coAddr" placeholder="Ko'cha, uy, xonadon, mo'ljal" style="border: 1px solid #DADDD3; border-radius: 18px; padding: 16px 18px; font: inherit; font-size: 16px; font-weight: 400; color: #141712;"></label>
+      <div style="display: flex; align-items: center; gap: 12px; background: #EEEFEA; border-radius: 18px; padding: 14px 18px; font-size: 14px;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="2" style="flex: none;" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        <span>{{deliveryNote}}</span>
+      </div>
+    </fieldset>
+
+    <fieldset style="border: 0; margin: 0; background: #FFFFFF; border-radius: 32px; padding: 36px 40px; display: flex; flex-direction: column; gap: 20px;">
+      <legend style="float: left; padding: 0; display: flex; align-items: center; gap: 14px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-bottom: 4px;"><span style="width: 40px; height: 40px; border-radius: 50%; background: #141712; color: #FFFFFF; display: grid; place-items: center; font-size: 15px;">3</span>To'lov usuli</legend>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; clear: both;">
+        <sc-for list="{{pays}}" as="p" hint-placeholder-count="3">
+          <button type="button" onClick="{{p.pick}}" style="{{p.style}}">
+            <span style="background: #FFFFFF; border-radius: 12px; height: 44px; padding: 0 14px; display: inline-flex; align-items: center; border: 1px solid #E3E6DD;">
+              <sc-if value="{{p.hasLogo}}" hint-placeholder-val="{{true}}"><img src="{{p.logo}}" alt="{{p.name}}" style="{{p.logoStyle}}"></sc-if>
+              <sc-if value="{{p.noLogo}}" hint-placeholder-val="{{false}}"><span style="display: inline-flex; align-items: center; gap: 8px; color: #141712; font-size: 13px; font-weight: 700; letter-spacing: 0.04em;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="1.8" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>NAQD / KARTA</span></sc-if>
+            </span>
+            <b style="font-size: 17px;">{{p.name}}</b>
+            <span style="font-size: 13px; opacity: 0.8;">{{p.note}}</span>
+          </button>
+        </sc-for>
+      </div>
+      <label for="coNote" style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 600;">Izoh (ixtiyoriy)
+        <textarea id="coNote" placeholder="Masalan: kelishdan oldin qo'ng'iroq qiling" style="border: 1px solid #DADDD3; border-radius: 18px; padding: 16px 18px; font: inherit; font-size: 15px; font-weight: 400; min-height: 90px; resize: vertical;"></textarea></label>
+    </fieldset>
+  </form>
+
+  <aside aria-label="Buyurtma" style="flex: 1 1 400px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <div style="background: #FFFFFF; border-radius: 40px; padding: 32px; display: flex; flex-direction: column; gap: 18px;">
+      <span style="font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">Buyurtmangiz</span>
+      <div style="display: flex; gap: 14px; align-items: center;"><span style="position: relative;"><img src="../assets/photos/white-dresser.jpg" alt="" style="width: 64px; height: 64px; border-radius: 16px; object-fit: cover; display: block;"><span style="position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #141712; color: #FFFFFF; font-size: 11px; display: grid; place-items: center;">1</span></span><span style="flex: 1; font-size: 14px;"><b style="display: block; font-weight: 600;">Chalk White</b><span style="color: #5E6459;">1 L · Oq</span></span><span style="font-size: 14px; font-weight: 600;">329 000</span></div>
+      <div style="display: flex; gap: 14px; align-items: center;"><span style="position: relative;"><img src="../assets/photos/sprayer-hand.jpg" alt="" style="width: 64px; height: 64px; border-radius: 16px; object-fit: cover; display: block;"><span style="position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #141712; color: #FFFFFF; font-size: 11px; display: grid; place-items: center;">2</span></span><span style="flex: 1; font-size: 14px;"><b style="display: block; font-weight: 600;">Mato bo'yog'i spreyi</b><span style="color: #5E6459;">400 ml · Zaytun</span></span><span style="font-size: 14px; font-weight: 600;">498 000</span></div>
+      <div style="display: flex; gap: 14px; align-items: center;"><span style="position: relative;"><img src="../assets/photos/brush-hand.jpg" alt="" style="width: 64px; height: 64px; border-radius: 16px; object-fit: cover; display: block;"><span style="position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; background: #141712; color: #FFFFFF; font-size: 11px; display: grid; place-items: center;">1</span></span><span style="flex: 1; font-size: 14px;"><b style="display: block; font-weight: 600;">Oval 40 cho'tka</b><span style="color: #5E6459;">40 mm</span></span><span style="font-size: 14px; font-weight: 600;">119 000</span></div>
+      <div style="display: flex; flex-direction: column; gap: 10px; font-size: 15px; border-top: 1px solid #DADDD3; padding-top: 18px; font-variant-numeric: tabular-nums;">
+        <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Mahsulotlar</span><span>946 000 so'm</span></span>
+        <span style="display: flex; justify-content: space-between;"><span style="color: #5E6459;">Yetkazish</span><span>{{delPrice}}</span></span>
+        <span style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px;"><b style="font-size: 16px;">Jami</b><span style="font-size: 32px; font-weight: 600; letter-spacing: -0.03em;">{{total}}</span></span>
+      </div>
+      <a href="Buyurtma.dc.html" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 20px 24px; font-size: 16px; font-weight: 600; text-align: center;">{{cta}}</a>
+      <span style="font-size: 12px; color: #5E6459; line-height: 1.5; text-align: center;">{{ctaNote}}</span>
+    </div>
+    <div style="background: #D5DDC8; border-radius: 32px; padding: 24px 28px; display: flex; gap: 14px; align-items: flex-start; font-size: 14px; line-height: 1.55;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="1.8" style="flex: none; margin-top: 2px;" aria-hidden="true"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>
+      <span>Buyurtma berish orqali <a href="Brend.dc.html">ommaviy oferta</a> shartlariga rozilik bildirasiz. Karta ma'lumotlari Forest serverlarida saqlanmaydi.</span>
+    </div>
+  </aside>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1800}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { del: 'yandex', pay: 'payme' }; }
+  renderVals() {
+    const s = this.state;
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + " so'm";
+    const D = [
+      { id: 'yandex', name: 'Yandex tezkor', note: "Toshkent shahri bo'ylab · 12 soat ichida", fee: 0, label: 'Bepul', logo: '../assets/logos/yandex-delivery.png', logoStyle: 'width: 120px; height: auto; display: block;',
+        info: "Yandex kuryeri buyurtma tasdiqlangandan keyin 12 soat ichida yetkazadi va kelishdan oldin qo'ng'iroq qiladi." },
+      { id: 'bts', name: 'BTS pochta', note: "Respublika bo'ylab · 24 soat ichida", fee: 45000, label: "45 000 so'm", logo: '../assets/logos/bts.png', logoStyle: 'height: 32px; width: auto; display: block;',
+        info: "BTS buyurtmani 24 soat ichida yetkazadi. Yuk raqami SMS va Telegram orqali yuboriladi." }
+    ];
+    const P = [
+      { id: 'payme', name: 'Payme', note: 'Uzcard, Humo, Visa', logo: '../assets/logos/payme.png', logoStyle: 'height: 24px; width: auto; display: block;' },
+      { id: 'click', name: 'Click', note: 'Click ilovasi yoki karta', logo: '../assets/logos/click.png', logoStyle: 'height: 22px; width: auto; display: block;' },
+      { id: 'cash', name: 'Qabul qilganda', note: 'Kuryerga naqd yoki karta', logo: '', logoStyle: '' }
+    ];
+    const card = 'display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; border-radius: 22px; padding: 18px 20px; font: inherit; cursor: pointer; flex: 1 1 200px;';
+    const on = ' background: #141712; color: #FFFFFF; border: 1px solid #141712;';
+    const off = ' background: #FFFFFF; color: #141712; border: 1px solid #DADDD3;';
+    const sub = 946000;
+    const d = D.find(x => x.id === s.del);
+    const online = s.pay !== 'cash';
+    return {
+      deliveries: D.map(x => ({ name: x.name, note: x.note, price: x.label, logo: x.logo, logoStyle: x.logoStyle, pick: () => this.setState({ del: x.id }), style: card + ' gap: 4px; flex: 1 1 280px;' + (x.id === s.del ? on : off) })),
+      deliveryNote: d.info,
+      pays: P.map(x => ({
+        name: x.name, note: x.note, logo: x.logo, logoStyle: x.logoStyle, hasLogo: !!x.logo, noLogo: !x.logo,
+        pick: () => this.setState({ pay: x.id }),
+        style: card + ' gap: 10px; padding: 22px;' + (x.id === s.pay ? on : off)
+      })),
+      delPrice: d.fee ? fmt(d.fee) : 'Bepul',
+      total: fmt(sub + d.fee),
+      cta: online ? (s.pay === 'payme' ? 'Payme orqali to\'lash · ' : 'Click orqali to\'lash · ') + fmt(sub + d.fee) : 'Buyurtmani tasdiqlash',
+      ctaNote: online ? 'To\'lov sahifasiga yo\'naltirilasiz, so\'ng saytga qaytasiz.' : 'Operator 15 daqiqa ichida qo\'ng\'iroq qilib tasdiqlaydi.'
+    };
+  }
+}
+</script>
+</body>
+</html>

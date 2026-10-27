@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Auditoriyalar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="audiences" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Auditoriyalar va retarget</h1>
+        <span style="font-size: 13px; color: #5E6459;">Segmentlar har soatda yangilanadi va reklama platformalariga avtomatik yuboriladi · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <button type="button" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;">+ Yangi auditoriya</button>
+    </header>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 2 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 10px;">
+        <sc-for list="{{list}}" as="a" hint-placeholder-count="6">
+          <button type="button" onClick="{{a.pick}}" style="{{a.style}}">
+            <span style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; width: 100%;"><b style="font-size: 15px; font-weight: 600; text-align: left;">{{a.name}}</b><b style="font-size: 18px; font-variant-numeric: tabular-nums;">{{a.size}}</b></span>
+            <span style="font-size: 12px; opacity: 0.75; text-align: left;">{{a.desc}}</span>
+            <span style="display: flex; align-items: center; gap: 8px; width: 100%;">
+              <sc-for list="{{a.dest}}" as="d" hint-placeholder-count="3"><span style="width: 26px; height: 26px; border-radius: 8px; background: #FFFFFF; display: grid; place-items: center;"><img src="{{d}}" alt="" style="width: 16px; height: 16px; object-fit: contain;"></span></sc-for>
+              <span style="margin-left: auto; font-size: 12px; opacity: 0.75;">{{a.sync}}</span>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="flex: 3 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 24px 26px; display: flex; flex-direction: column; gap: 16px;">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px;">
+            <h2 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.02em;">{{cur.name}}</h2>
+            <span style="display: inline-flex; align-items: center; gap: 8px; background: #E8F2EA; color: #1F5A30; border-radius: 999px; padding: 7px 12px; font-size: 12px; font-weight: 600;"><span style="width: 7px; height: 7px; border-radius: 50%; background: #3E8E4E;"></span>Faol · avtomatik yangilanadi</span>
+          </div>
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #5E6459;">Qoidalar</span>
+          <sc-for list="{{cur.rules}}" as="r" hint-placeholder-count="3">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+              <span style="width: 44px; font-size: 12px; font-weight: 700; color: #5E6459;">{{r.op}}</span>
+              <span style="background: #EEEFEA; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 600;">{{r.a}}</span>
+              <span style="background: #EEEFEA; border-radius: 12px; padding: 10px 14px; font-size: 13px;">{{r.b}}</span>
+              <span style="background: #EEEFEA; border-radius: 12px; padding: 10px 14px; font-size: 13px;">{{r.c}}</span>
+              <span aria-hidden="true" style="color: #A0A69A; font-size: 18px; margin-left: auto;">×</span>
+            </div>
+          </sc-for>
+          <span style="align-self: flex-start; border: 1.5px dashed #B9BEB2; border-radius: 12px; padding: 9px 14px; font-size: 13px; font-weight: 500;">+ Qoida qo'shish</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 12px; background: #F7F7F4; border-radius: 20px; padding: 16px 18px; align-items: center;">
+            <span style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;"><span style="font-size: 12px; color: #5E6459;">Hozirgi hajm</span><b style="font-size: 30px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums;">{{cur.size}}</b></span>
+            <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #5E6459;">Telefon raqami bor</span><b style="font-size: 18px;">{{cur.phones}}</b></span>
+            <span style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 12px; color: #5E6459;">Telegram ulangan</span><b style="font-size: 18px;">{{cur.tg}}</b></span>
+          </div>
+        </div>
+
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 24px 26px; display: flex; flex-direction: column; gap: 12px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 600;">Qayerga yuboriladi</h2>
+          <sc-for list="{{dests}}" as="d" hint-placeholder-count="6">
+            <div style="display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid #EEEFEA;">
+              <span style="width: 40px; height: 40px; border-radius: 12px; background: #F7F7F4; display: grid; place-items: center; flex: none;"><sc-if value="{{d.icon}}" hint-placeholder-val="{{true}}"><img src="{{d.icon}}" alt="" style="width: 22px; height: 22px; object-fit: contain;"></sc-if><sc-if value="{{d.noIcon}}" hint-placeholder-val="{{false}}"><b style="font-size: 11px;">SMS</b></sc-if></span>
+              <span style="flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0;"><b style="font-size: 14px; font-weight: 600;">{{d.name}}</b><span style="font-size: 12px; color: #5E6459;">{{d.note}}</span></span>
+              <button type="button" role="switch" aria-checked="{{d.on}}" onClick="{{d.toggle}}" aria-label="{{d.name}}" style="{{d.track}}"><span style="{{d.knob}}"></span></button>
+            </div>
+          </sc-for>
+          <span style="display: flex; gap: 10px; align-items: flex-start; font-size: 12px; color: #5E6459; line-height: 1.5;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="2" style="flex: none;" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Telefon raqamlari platformaga SHA-256 bilan xeshlanib yuboriladi. Faqat reklamaga rozilik bergan mijozlar kiradi.</span>
+        </div>
+
+        <div style="background: #D5DDC8; border-radius: 28px; padding: 22px 26px; display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;">Avtomatik xabar</span>
+          <b style="font-size: 16px;">{{cur.msgWhen}}</b>
+          <span style="background: #FFFFFF; border-radius: 16px; padding: 14px 16px; font-size: 14px; line-height: 1.55;">{{cur.msg}}</span>
+          <span style="font-size: 12px;">Natija (30 kun): {{cur.result}}</span>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 0, on: { meta: true, gads: true, tt: false, tg: true, sms: true, ya: false } }; }
+  renderVals() {
+    const s = this.state;
+    const meta = '../assets/icons/meta.png', gads = '../assets/icons/googleads.png', tt = '../assets/icons/tiktok.png', tg = '../assets/icons/telegram.png', ym = '../assets/icons/yandexmetrika.png';
+    const A = [
+      { name: 'Savatni tashlaganlar · 7 kun', size: '412', desc: 'Savatga qo\'shgan, lekin xarid qilmagan', dest: [meta, gads, tg], sync: '12 daq oldin', phones: '268', tg: '141',
+        rules: [['AGAR', 'Hodisa: add_to_cart', 'bajarilgan', 'oxirgi 7 kun'], ['VA', 'Hodisa: purchase', 'bajarilmagan', 'oxirgi 7 kun'], ['VA', 'Reklamaga rozilik', 'bor', '—']],
+        msgWhen: '2 soatdan keyin Telegram, 24 soatdan keyin SMS', msg: 'Salom! Savatingizda {mahsulot} qoldi. Bugun buyurtma bersangiz, Toshkentda 12 soatda yetkazamiz. Kod: SAVAT5 (−5%)', result: '412 dan 58 tasi qaytib xarid qildi · 44,7 mln so\'m' },
+      { name: 'Divanni ko\'rib ketganlar', size: '1 840', desc: 'Divan to\'plami sahifasida 30 soniyadan ko\'p bo\'lgan', dest: [meta, tt], sync: '1 soat oldin', phones: '310', tg: '122',
+        rules: [['AGAR', 'Sahifa: /divan-toplami', 'ko\'rilgan', '> 30 soniya'], ['VA', 'Hodisa: add_to_cart', 'bajarilmagan', 'oxirgi 14 kun']],
+        msgWhen: 'Faqat reklama (raqam yo\'q bo\'lganlar ko\'p)', msg: 'Meta: oldin/keyin Reels kreativi, 14 kun, chastota 3/hafta', result: 'ROAS 6,2x' },
+      { name: 'Lead, xarid yo\'q', size: '681', desc: 'Popup orqali raqam qoldirgan, xarid qilmagan', dest: [tg, meta], sync: '20 daq oldin', phones: '681', tg: '233',
+        rules: [['AGAR', 'Hodisa: lead_phone', 'bajarilgan', 'istalgan vaqt'], ['VA', 'Xaridlar soni', '=', '0']],
+        msgWhen: '1, 3 va 7-kunlari Telegram yoki SMS', msg: 'FOREST10 kodingiz hali amal qilmoqda. Qaysi buyumni yangilamoqchisiz? Rasmini yuboring, rang tanlab beramiz.', result: '681 dan 97 tasi xarid qildi' },
+      { name: 'Mato xaridorlari → mum va mebel upsell', size: '536', desc: 'Mato spreyi olgan, 21+ kun o\'tgan', dest: [meta, tg], sync: '3 soat oldin', phones: '536', tg: '301',
+        rules: [['AGAR', 'Sotib olgan', 'Mato bo\'yog\'i spreyi', '21+ kun oldin'], ['VA', 'Sotib olmagan', 'Mebel to\'plami', 'istalgan vaqt']],
+        msgWhen: 'Xariddan 21 kun keyin Telegram', msg: 'Divaningiz yangilandi. Endi komod yoki stolni ham: Mebel to\'plami −10%.', result: 'Konversiya 7,4%' },
+      { name: 'VIP mijozlar', size: '96', desc: 'LTV 2 mln so\'mdan yuqori', dest: [meta, gads], sync: '1 kun oldin', phones: '96', tg: '74',
+        rules: [['AGAR', 'LTV', '≥', '2 000 000 so\'m']], msgWhen: 'Yangi mahsulot chiqqanda birinchi xabar', msg: 'Lookalike manbasi sifatida Meta va Google\'ga yuboriladi', result: 'Lookalike 1%: CPA −34%' },
+      { name: 'Faol emas · 60+ kun', size: '1 104', desc: 'Oxirgi xariddan 60 kun o\'tgan', dest: [tg], sync: '1 kun oldin', phones: '1 104', tg: '508',
+        rules: [['AGAR', 'Oxirgi xarid', 'oldin', '60+ kun'], ['VA', 'Telegram', 'ulangan', '—']], msgWhen: 'Oyda 1 marta', msg: 'Yangi ranglar keldi: Antrasit va Bej. Doimiy mijozlar uchun −15%.', result: 'Qaytish 4,1%' }
+    ];
+    const cur = A[s.sel];
+    const D = [['meta', meta, 'Meta Custom Audience', 'Facebook va Instagram reklamasi'], ['gads', gads, 'Google Ads Customer Match', 'Qidiruv, YouTube, PMax'], ['tt', tt, 'TikTok Custom Audience', 'TikTok Ads'], ['ya', ym, 'Yandex Audience', 'Yandex Direct'], ['tg', tg, 'Telegram bot', 'Shaxsiy xabar, rozilik bilan'], ['sms', '', 'SMS (Eskiz / Playmobile)', 'Faqat rozilik berganlarga']];
+    return {
+      list: A.map((a, i) => ({ ...a, pick: () => this.setState({ sel: i }), style: 'display: flex; flex-direction: column; gap: 8px; text-align: left; width: 100%; border-radius: 24px; padding: 18px; font: inherit; cursor: pointer; ' + (i === s.sel ? 'background: #141712; color: #FFFFFF; border: 1px solid #141712;' : 'background: #FFFFFF; color: #141712; border: 1px solid #FFFFFF;') })),
+      cur: { ...cur, rules: cur.rules.map(([op, a, b, c]) => ({ op, a, b, c })) },
+      dests: D.map(([id, icon, name, note]) => { const on = !!s.on[id]; return { icon, noIcon: !icon, name, note, on: on ? 'true' : 'false',
+        toggle: () => this.setState({ on: { ...s.on, [id]: !on } }),
+        track: 'width: 48px; height: 28px; border-radius: 999px; border: 0; padding: 3px; cursor: pointer; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#334229' : '#DADDD3') + ';',
+        knob: 'width: 22px; height: 22px; border-radius: 50%; background: #FFFFFF; display: block;' }; })
+    };
+  }
+}
+</script>
+</body>
+</html>

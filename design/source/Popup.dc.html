@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Exit-intent popup</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1440px; height: 900px; position: relative; overflow: hidden; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; background: #EEEFEA;">
+  <img src="../assets/photos/hero-after.jpg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; filter: blur(6px); transform: scale(1.05);">
+  <span style="position: absolute; inset: 0; background: rgba(20,23,18,0.55);"></span>
+
+  <sc-if value="{{open}}" hint-placeholder-val="{{true}}">
+  <div role="dialog" aria-modal="true" aria-labelledby="popTitle" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 960px; height: 560px; background: #FFFFFF; border-radius: 40px; overflow: hidden; display: flex;">
+    <div style="flex: 1 1 50%; position: relative; background: #334229;">
+      <img src="../assets/photos/hero-before.jpg" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; clip-path: inset(0 50% 0 0);">
+      <img src="../assets/photos/hero-after.jpg" alt="Oldin va keyin: divan rangi tiklangan" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; clip-path: inset(0 0 0 50%);">
+      <span style="position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #FFFFFF;"></span>
+      <span style="position: absolute; left: 24px; bottom: 24px; background: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 14px; font-weight: 700;">−10% birinchi buyurtmaga</span>
+    </div>
+    <div style="flex: 1 1 50%; padding: 48px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; gap: 22px; position: relative;">
+      <button type="button" onClick="{{close}}" aria-label="Yopish" style="position: absolute; top: 20px; right: 20px; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #EEEFEA; display: grid; place-items: center; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <sc-if value="{{form}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 22px;">
+          <h2 id="popTitle" style="margin: 0; font-size: 44px; line-height: 1.02; font-weight: 500; letter-spacing: -0.04em;">Ketishdan oldin: −10% sizga</h2>
+          <p style="margin: 0; color: #5E6459; font-size: 16px; line-height: 1.6;">Raqamingizni qoldiring. Promokod SMS'da keladi, 7 kun amal qiladi.</p>
+          <label for="popPhone" style="display: flex; align-items: center; border: 1px solid #DADDD3; border-radius: 999px; padding: 0 20px; height: 60px;">
+            <span style="position: absolute; width: 1px; height: 1px; overflow: hidden;">Telefon raqam</span>
+            <span style="color: #5E6459; font-weight: 500; margin-right: 8px;">+998</span>
+            <input id="popPhone" inputmode="tel" placeholder="90 123 45 67" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px; color: #141712;">
+          </label>
+          <button type="button" onClick="{{submit}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; height: 60px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">Promokodni olish</button>
+          <span style="display: flex; align-items: center; gap: 12px; font-size: 13px; color: #5E6459;"><span style="flex: 1; height: 1px; background: #DADDD3;"></span>yoki<span style="flex: 1; height: 1px; background: #DADDD3;"></span></span>
+          <a href="https://t.me/" style="display: inline-flex; justify-content: center; align-items: center; gap: 10px; border: 1.5px solid #141712; color: #141712; text-decoration: none; border-radius: 999px; height: 56px; font-size: 15px; font-weight: 600;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 4 3 11l6 2 2 6 3-4 5 4z"/></svg>Telegram bot orqali olish</a>
+          <span style="font-size: 12px; color: #5E6459;">Spam yubormaymiz. Istalgan vaqtda obunani bekor qilish mumkin.</span>
+        </div>
+      </sc-if>
+      <sc-if value="{{done}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; flex-direction: column; gap: 20px; align-items: flex-start;">
+          <span style="width: 72px; height: 72px; border-radius: 50%; background: #334229; display: grid; place-items: center;"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+          <h2 style="margin: 0; font-size: 40px; line-height: 1.05; font-weight: 500; letter-spacing: -0.04em;">Promokod yuborildi</h2>
+          <span style="background: #EEEFEA; border-radius: 16px; padding: 14px 20px; font-size: 24px; font-weight: 700; letter-spacing: 0.08em;">FOREST10</span>
+          <a href="Main.dc.html#tanlash" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; padding: 16px 26px; font-size: 15px; font-weight: 600;">Buyumimga bo'yoq tanlash</a>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+  <div style="position: absolute; left: 32px; bottom: 32px; display: flex; flex-direction: column; gap: 6px; max-width: 420px; background: rgba(255,255,255,0.92); border-radius: 20px; padding: 16px 20px; font-size: 13px; line-height: 1.5;">
+    <b>Qachon chiqadi</b>
+    <span>Desktop: kursor brauzer tepasiga chiqqanda. Mobil: 40 soniyadan keyin yoki tez yuqoriga surganda. Bir sessiyada 1 marta; raqam qoldirganlarga ko'rsatilmaydi.</span>
+    <sc-if value="{{closed}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{reopen}}" style="align-self: flex-start; margin-top: 6px; border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;">Qayta ko'rsatish</button></sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { open: true, done: false }; }
+  renderVals() {
+    const s = this.state;
+    return {
+      open: s.open, closed: !s.open, form: !s.done, done: s.done,
+      close: () => this.setState({ open: false }),
+      reopen: () => this.setState({ open: true, done: false }),
+      submit: () => this.setState({ done: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+.env
+.env.*
+!.env.example
+.git
+design/screens
+design/source
+e2e/test-results
+e2e/playwright-report

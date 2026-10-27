@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · MoySklad</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="stock" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <span style="width: 56px; height: 56px; border-radius: 16px; background: #1F4FA0; color: #FFFFFF; display: grid; place-items: center; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; flex: none;">МС</span>
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">MoySklad sinxronlash</h1>
+        <span style="font-size: 13px; color: #5E6459;">Ombor, narx va buyurtmalar uchun yagona manba · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <span style="display: inline-flex; align-items: center; gap: 8px; background: #E8F2EA; color: #1F6B35; border-radius: 999px; padding: 10px 14px; font-size: 13px; font-weight: 700;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3E8E4E;"></span>Ulangan</span>
+      <button type="button" onClick="{{runSync}}" style="border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;">{{syncLabel}}</button>
+    </header>
+
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px;">
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Oxirgi sinxron</span><b style="font-size: 24px; font-weight: 600;">{{last}}</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Bog'langan SKU</span><b style="font-size: 24px; font-weight: 600;">14 / 14</b></div>
+      <div style="background: #FFFFFF; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #5E6459;">Bugun yuborilgan buyurtma</span><b style="font-size: 24px; font-weight: 600;">37</b></div>
+      <div style="background: #FFF4D6; border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 8px;"><span style="font-size: 12px; color: #6B4E00; font-weight: 600;">Xato · e'tibor kerak</span><b style="font-size: 24px; font-weight: 600; color: #6B4E00;">1</b></div>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 8px;">
+      <h2 style="margin: 0 0 6px; font-size: 20px; font-weight: 600;">Ma'lumot oqimi</h2>
+      <sc-for list="{{flows}}" as="f" hint-placeholder-count="6">
+        <div style="{{f.rowStyle}}">
+          <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0;"><b style="font-size: 14px; font-weight: 600;">{{f.what}}</b><span style="font-size: 12px; color: #5E6459;">{{f.note}}</span></span>
+          <span style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; justify-self: start;"><span style="background: #EEEFEA; border-radius: 8px; padding: 4px 8px;">{{f.from}}</span><svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true"><path d="M0 5h19M15 1l4 4-4 4" fill="none" stroke="#334229" stroke-width="1.8"/></svg><span style="background: #EEEFEA; border-radius: 8px; padding: 4px 8px;">{{f.to}}</span></span>
+          <span style="font-size: 13px;">{{f.freq}}</span>
+          <button type="button" role="switch" aria-checked="{{f.on}}" aria-label="Yoqish" onClick="{{f.toggle}}" style="{{f.swStyle}}"><span style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; display: block;"></span></button>
+        </div>
+      </sc-for>
+    </section>
+
+    <section style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+      <div style="flex: 3 1 520px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 22px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+        <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Maydonlar mosligi</h2>
+        <div style="display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); gap: 10px; padding: 8px 4px; color: #5E6459; font-size: 12px; border-bottom: 1px solid #DADDD3;"><span>Forest sayt</span><span></span><span>MoySklad</span></div>
+        <sc-for list="{{map}}" as="m" hint-placeholder-count="8">
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) 30px minmax(0, 1fr); gap: 10px; align-items: center; padding: 10px 4px; border-bottom: 1px solid #EEEFEA;"><b style="font-weight: 600;">{{m.a}}</b><span style="color: #8D9586; text-align: center;">⇄</span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px;">{{m.b}}</span></div>
+        </sc-for>
+      </div>
+
+      <div style="flex: 2 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Qoidalar</h2>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Narx/qoldiq ziddiyati</span><b style="font-weight: 600; text-align: right;">MoySklad ustun</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Tavsif, rasm, SEO</span><b style="font-weight: 600; text-align: right;">Sayt ustun</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Qoldiq 0 bo'lsa</span><b style="font-weight: 600; text-align: right;">«Tez orada» + kutish ro'yxati</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Rezerv</span><b style="font-weight: 600; text-align: right;">Buyurtma vaqtida, 30 daq to'lovsiz → bo'shatish</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Ombor</span><b style="font-weight: 600; text-align: right;">Asosiy ombor · Toshkent</b></span>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Ulanish</h2>
+          <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px;"><span style="color: #5E6459;">API token</span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #EEEFEA; border-radius: 8px; padding: 4px 8px;">•••• •••• a91f</span></span>
+          <span style="display: flex; justify-content: space-between; align-items: center; gap: 10px;"><span style="color: #5E6459;">Webhook</span><span style="font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #EEEFEA; border-radius: 8px; padding: 4px 8px;">forest.uz/hooks/moysklad</span></span>
+          <span style="background: #F1F5EC; border-radius: 14px; padding: 12px; font-size: 12px; line-height: 1.5; color: #3F453B;">Token serverda shifrlangan saqlanadi, admin panelda faqat oxirgi 4 belgi ko'rinadi.</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+      <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Sinxron jurnali</h2>
+      <sc-for list="{{log}}" as="l" hint-placeholder-count="6">
+        <div style="display: grid; grid-template-columns: 70px 110px minmax(0, 1fr) 90px; gap: 12px; align-items: center; padding: 10px 4px; border-top: 1px solid #EEEFEA; font-variant-numeric: tabular-nums;"><span style="color: #5E6459;">{{l.t}}</span><b style="font-weight: 600;">{{l.k}}</b><span style="min-width: 0;">{{l.m}}</span><span style="{{l.stStyle}}">{{l.st}}</span></div>
+      </sc-for>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1700}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { off: {}, synced: false }; }
+  renderVals() {
+    const s = this.state;
+    const F = [
+      ['Mahsulotlar va variantlar', 'Nom, SKU, IKPU, o\'lchov', 'MoySklad', 'Sayt', 'Har soat'],
+      ['Narxlar', 'Chakana narx turi', 'MoySklad', 'Sayt', 'Webhook · darhol'],
+      ['Qoldiqlar', 'Mavjud − rezerv', 'MoySklad', 'Sayt', 'Webhook · darhol'],
+      ['Buyurtmalar', 'Mijoz buyurtmasi + rezerv', 'Sayt', 'MoySklad', 'Darhol'],
+      ['Mijozlar', 'Kontragent: ism, telefon, manzil', 'Sayt', 'MoySklad', 'Darhol'],
+      ['To\'lov va jo\'natish holati', 'Payme/Click to\'landi · BTS/Yandex trek', 'Sayt', 'MoySklad', 'Darhol']
+    ];
+    const row = 'display: grid; grid-template-columns: minmax(0, 1fr) 210px 130px 52px; gap: 12px; align-items: center; padding: 12px 4px; border-top: 1px solid #EEEFEA;';
+    return {
+      last: s.synced ? 'hozir' : '3 daq oldin',
+      syncLabel: s.synced ? 'Sinxronlandi ✓' : 'Hozir sinxronlash',
+      runSync: () => this.setState({ synced: true }),
+      flows: F.map(([what, note, from, to, freq], i) => { const on = !s.off[i]; return { what, note, from, to, freq, on: String(on),
+        toggle: () => this.setState({ off: { ...s.off, [i]: on } }),
+        rowStyle: row + (on ? '' : ' opacity: 0.5;'),
+        swStyle: 'width: 44px; height: 26px; border: 0; border-radius: 999px; padding: 3px; cursor: pointer; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? '#334229' : '#C9CDC2') + ';' }; }),
+      map: [['Mahsulot nomi (UZ/RU)', 'product.name'], ['SKU', 'product.article'], ['IKPU (MXIK)', 'attributes.ikpu'], ['Narx', 'salePrices[Chakana]'], ['Qoldiq', 'stock − reserve'], ['Buyurtma raqami', 'customerorder.name'], ['Mijoz telefoni', 'counterparty.phone'], ['Yetkazish usuli', 'attributes.dostavka']].map(([a, b]) => ({ a, b })),
+      log: [
+        ['14:32', 'Buyurtma', '#F-10488 → MoySklad, rezerv qo\'yildi', 'OK'],
+        ['14:30', 'Qoldiq', 'FR-WX-0250: 5 → 4', 'OK'],
+        ['14:12', 'Narx', 'FR-CW-1000: 319 000 → 329 000', 'OK'],
+        ['13:58', 'Buyurtma', '#F-10485: kontragent telefoni formati noto\'g\'ri', 'Xato'],
+        ['13:00', 'Mahsulot', '14 SKU tekshirildi, o\'zgarish yo\'q', 'OK'],
+        ['12:41', 'Holat', '#F-10479 BTS trek → MoySklad', 'OK']
+      ].map(([t, k, m, st]) => ({ t, k, m, st, stStyle: 'justify-self: end; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 10px; ' + (st === 'OK' ? 'background: #E8F2EA; color: #1F6B35;' : 'background: #FBEAE8; color: #8A1C12;') }))
+    };
+  }
+}
+</script>
+</body>
+</html>

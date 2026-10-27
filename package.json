@@ -1,0 +1,64 @@
+{
+  "name": "forest",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:apps": "turbo run dev --parallel --filter=@forest/web --filter=@forest/admin --filter=@forest/api --filter=@forest/contracts",
+    "infra:up": "docker compose -f infra/compose.yml up -d --wait postgres redis storage mailpit",
+    "infra:down": "docker compose -f infra/compose.yml down",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:integration": "turbo run test:integration",
+    "e2e": "pnpm --filter @forest/e2e e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @forest/db generate",
+    "db:migrate": "pnpm --filter @forest/db migrate:dev",
+    "db:deploy": "pnpm --filter @forest/db migrate:deploy",
+    "db:seed": "pnpm --filter @forest/db seed",
+    "db:reset": "pnpm --filter @forest/db reset",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "dotenv-cli": "^8.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "5.9.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs,json,css,yml,yaml}": "prettier --write"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "esbuild",
+      "argon2",
+      "sharp",
+      "@nestjs/core",
+      "@swc/core"
+    ],
+    "ignoredBuiltDependencies": [
+      "cpu-features",
+      "msgpackr-extract",
+      "protobufjs",
+      "ssh2"
+    ],
+    "overrides": {
+      "postcss@<8.5.23": "^8.5.23",
+      "multer@<2.5.0": "^2.5.0",
+      "deepmerge-ts@<8.0.0": "^8.0.0"
+    }
+  }
+}

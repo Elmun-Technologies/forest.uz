@@ -1,0 +1,14 @@
+{
+  "name": "@forest/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:smoke": "playwright test --grep @smoke"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.18.0",
+    "typescript": "5.9.3"
+  }
+}

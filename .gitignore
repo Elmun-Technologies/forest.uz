@@ -1,0 +1,17 @@
+node_modules
+.env
+.env.*
+!.env.example
+.next
+dist
+coverage
+.turbo
+*.log
+.DS_Store
+playwright-report
+test-results
+*.tsbuildinfo
+.turbo
+next-env.d.ts
+/data/
+e2e/.auth

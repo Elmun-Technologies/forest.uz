@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest · Mobil checkout</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}input:focus,select:focus{outline:2px solid #334229;outline-offset:0}</style>
+</helmet>
+<div style="width: 390px; background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; position: relative;">
+
+<header style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; position: sticky; top: 0; z-index: 10; background: #EEEFEA;">
+  <a href="Mobil-Mahsulot.dc.html" aria-label="Orqaga" style="width: 44px; height: 44px; border-radius: 50%; background: #FFFFFF; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></a>
+  <span style="flex: 1; text-align: center; font-size: 16px; font-weight: 600;">Rasmiylashtirish</span>
+  <span style="width: 44px; height: 44px; display: grid; place-items: center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="2" aria-label="Xavfsiz to'lov" role="img"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+</header>
+
+<main style="padding: 0 12px 24px; display: flex; flex-direction: column; gap: 10px;">
+  <details style="background: #FFFFFF; border-radius: 24px; padding: 16px 18px;">
+    <summary style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; list-style: none;"><span style="display: inline-flex; align-items: center; gap: 10px;"><span style="display: inline-flex;"><img src="../assets/photos/white-dresser.jpg" alt="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid #FFFFFF;"><img src="../assets/photos/sprayer-hand.jpg" alt="" style="width: 32px; height: 32px; border-radius: 50%; object-fit: cover; border: 2px solid #FFFFFF; margin-left: -10px;"></span>2 ta mahsulot</span><span style="font-variant-numeric: tabular-nums;">578 000 so'm</span></summary>
+    <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #5E6459;"><span>Chalk White 1 L × 1 · 329 000</span><span>Mato spreyi, Zaytun × 1 · 249 000</span></div>
+  </details>
+
+  <section style="background: #FFFFFF; border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+    <b style="font-size: 17px;">1 · Aloqa</b>
+    <label for="mcPhone" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600;">Telefon
+      <span style="display: flex; border: 1px solid #DADDD3; border-radius: 16px; overflow: hidden; height: 52px; align-items: center;"><span style="padding-left: 14px; color: #5E6459; font-size: 16px; font-weight: 500;">+998</span><input id="mcPhone" value="90 123 45 67" inputmode="tel" autocomplete="tel-national" style="flex: 1; min-width: 0; border: 0; padding: 0 14px 0 8px; font: inherit; font-size: 16px; font-weight: 400;"></span></label>
+    <label for="mcName" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600;">Ism
+      <input id="mcName" value="Dilnoza" autocomplete="name" style="border: 1px solid #DADDD3; border-radius: 16px; height: 52px; padding: 0 14px; font: inherit; font-size: 16px; font-weight: 400;"></label>
+  </section>
+
+  <section style="background: #FFFFFF; border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 12px;">
+    <b style="font-size: 17px;">2 · Yetkazish</b>
+    <sc-for list="{{dels}}" as="d" hint-placeholder-count="2">
+      <button type="button" onClick="{{d.pick}}" style="{{d.style}}">
+        <span style="background: #FFFFFF; border-radius: 10px; height: 36px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid #E3E6DD; flex: none;"><img src="{{d.logo}}" alt="{{d.name}}" style="{{d.logoStyle}}"></span>
+        <span style="flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left;"><b style="font-size: 14px;">{{d.name}}</b><span style="font-size: 12px; opacity: 0.8;">{{d.note}}</span></span>
+        <b style="font-size: 13px;">{{d.price}}</b>
+      </button>
+    </sc-for>
+    <label for="mcAddr" style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 600;">Manzil
+      <input id="mcAddr" placeholder="Shahar, ko'cha, uy" autocomplete="street-address" style="border: 1px solid #DADDD3; border-radius: 16px; height: 52px; padding: 0 14px; font: inherit; font-size: 16px; font-weight: 400;"></label>
+    <button type="button" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1.5px dashed #B9BEB2; background: transparent; border-radius: 16px; height: 48px; font: inherit; font-size: 14px; font-weight: 500;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#334229" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Xaritadan belgilash</button>
+  </section>
+
+  <section style="background: #FFFFFF; border-radius: 24px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+    <b style="font-size: 17px;">3 · To'lov</b>
+    <sc-for list="{{pays}}" as="p" hint-placeholder-count="3">
+      <button type="button" onClick="{{p.pick}}" style="{{p.style}}">
+        <span style="width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex: none; {{p.radio}}"></span>
+        <span style="flex: 1; text-align: left; font-size: 14px; font-weight: 600;">{{p.name}}</span>
+        <sc-if value="{{p.hasLogo}}" hint-placeholder-val="{{true}}"><img src="{{p.logo}}" alt="" style="{{p.logoStyle}}"></sc-if>
+      </button>
+    </sc-for>
+  </section>
+
+  <section style="background: #D5DDC8; border-radius: 24px; padding: 14px 18px; display: flex; align-items: center; gap: 10px; font-size: 13px;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141712" stroke-width="2" aria-hidden="true"><path d="M20 12v8H4v-8M2 7h20v5H2zM12 22V7M12 7c-2 0-4-1-4-3s3-2 4 3c1-5 4-5 4-3s-2 3-4 3"/></svg>
+    <span style="flex: 1;">Promokod: <b>FOREST10</b> · −57 800 so'm</span>
+  </section>
+  <div style="height: 110px;"></div>
+</main>
+
+<div style="position: sticky; bottom: 0; z-index: 20; background: #FFFFFF; border-top: 1px solid #DADDD3; padding: 12px 12px 16px; display: flex; flex-direction: column; gap: 10px;">
+  <span style="display: flex; justify-content: space-between; font-size: 13px; color: #5E6459;"><span>Mahsulotlar 578 000 · Chegirma −57 800 · Yetkazish {{delPrice}}</span></span>
+  <a href="Buyurtma.dc.html" style="background: #141712; color: #FFFFFF; text-decoration: none; border-radius: 999px; height: 56px; display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 16px; font-weight: 600;">{{cta}}</a>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2100}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { del: 'yandex', pay: 'payme' }; }
+  renderVals() {
+    const s = this.state;
+    const D = [
+      { id: 'yandex', name: 'Yandex tezkor', note: 'Toshkent · 12 soat ichida', fee: 30000, label: "30 000", logo: '../assets/logos/yandex-delivery.png', logoStyle: 'width: 84px; height: auto; display: block;' },
+      { id: 'bts', name: 'BTS pochta', note: 'Respublika · 24 soat ichida', fee: 45000, label: "45 000", logo: '../assets/logos/bts.png', logoStyle: 'height: 26px; width: auto; display: block;' }
+    ];
+    const P = [
+      { id: 'payme', name: 'Payme', logo: '../assets/logos/payme.png', logoStyle: 'height: 18px; width: auto; display: block;' },
+      { id: 'click', name: 'Click', logo: '../assets/logos/click.png', logoStyle: 'height: 16px; width: auto; display: block;' },
+      { id: 'cash', name: 'Qabul qilganda (naqd / karta)', logo: '', logoStyle: '' }
+    ];
+    const fmt = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + " so'm";
+    const row = 'display: flex; align-items: center; gap: 12px; width: 100%; border-radius: 16px; padding: 12px; font: inherit; cursor: pointer; ';
+    const d = D.find(x => x.id === s.del);
+    const total = 578000 - 57800 + d.fee;
+    return {
+      dels: D.map(x => ({ ...x, price: x.label, pick: () => this.setState({ del: x.id }), style: row + (x.id === s.del ? 'background: #141712; color: #FFFFFF; border: 1px solid #141712;' : 'background: #FFFFFF; color: #141712; border: 1px solid #DADDD3;') })),
+      pays: P.map(x => ({ ...x, hasLogo: !!x.logo, pick: () => this.setState({ pay: x.id }),
+        style: row + (x.id === s.pay ? 'background: #EEEFEA; color: #141712; border: 1.5px solid #141712;' : 'background: #FFFFFF; color: #141712; border: 1px solid #DADDD3;'),
+        radio: x.id === s.pay ? 'border: 6px solid #141712; box-sizing: border-box;' : 'border: 2px solid #B9BEB2; box-sizing: border-box;' })),
+      delPrice: fmt(d.fee),
+      cta: (s.pay === 'cash' ? 'Tasdiqlash · ' : (s.pay === 'payme' ? 'Payme bilan to\'lash · ' : 'Click bilan to\'lash · ')) + fmt(total)
+    };
+  }
+}
+</script>
+</body>
+</html>

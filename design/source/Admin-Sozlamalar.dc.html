@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Sozlamalar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="settings" hint-size="264px,1160px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Sozlamalar</h1>
+        <span style="font-size: 13px; color: #5E6459;">Do'kon, xodimlar va yetkazish qoidalari · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna</span></span>
+      </div>
+      <div role="tablist" aria-label="Bo'limlar" style="display: flex; gap: 4px; background: #FFFFFF; border-radius: 999px; padding: 4px;">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3"><button type="button" role="tab" onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button></sc-for>
+      </div>
+    </header>
+
+    <sc-if value="{{isTeam}}" hint-placeholder-val="{{true}}">
+      <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+        <span style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Xodimlar</h2><span style="background: #141712; color: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600;">+ Taklif qilish</span></span>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 130px minmax(0, 1fr) 70px; gap: 12px; padding: 8px 4px; color: #5E6459; font-size: 12px; border-bottom: 1px solid #DADDD3;"><span>Xodim</span><span>Rol</span><span>Oxirgi kirish</span><span>2FA</span></div>
+        <sc-for list="{{staff}}" as="p" hint-placeholder-count="5">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.3fr) 130px minmax(0, 1fr) 70px; gap: 12px; align-items: center; padding: 12px 4px; border-bottom: 1px solid #EEEFEA;">
+            <span style="display: flex; align-items: center; gap: 10px; min-width: 0;"><span style="width: 34px; height: 34px; border-radius: 50%; background: #D5DDC8; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none;">{{p.i}}</span><span style="display: flex; flex-direction: column; min-width: 0;"><b style="font-weight: 600;">{{p.n}}</b><span style="font-size: 12px; color: #5E6459;">{{p.ph}}</span></span></span>
+            <span style="background: #EEEFEA; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; justify-self: start;">{{p.r}}</span>
+            <span style="color: #5E6459;">{{p.last}}</span>
+            <span style="{{p.faStyle}}">{{p.fa}}</span>
+          </div>
+        </sc-for>
+      </section>
+      <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+        <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Rollar va huquqlar</h2>
+        <div style="overflow-x: auto;"><div style="min-width: 640px;">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(5, 90px); gap: 8px; padding: 8px 4px; color: #5E6459; font-size: 12px; border-bottom: 1px solid #DADDD3;"><span>Huquq</span><span style="text-align: center;">Egasi</span><span style="text-align: center;">Menejer</span><span style="text-align: center;">Operator</span><span style="text-align: center;">Omborchi</span><span style="text-align: center;">Marketolog</span></div>
+          <sc-for list="{{perms}}" as="r" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(5, 90px); gap: 8px; align-items: center; padding: 10px 4px; border-bottom: 1px solid #EEEFEA;"><b style="font-weight: 600;">{{r.p}}</b><sc-for list="{{r.cells}}" as="c" hint-placeholder-count="5"><span style="{{c.style}}">{{c.v}}</span></sc-for></div>
+          </sc-for>
+        </div></div>
+        <span style="font-size: 12px; color: #5E6459; padding-top: 8px; line-height: 1.5;">Operator mijoz telefonini to'liq ko'radi, lekin bazani eksport qila olmaydi. Integratsiya kalitlarini faqat Egasi o'zgartiradi.</span>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isShip}}" hint-placeholder-val="{{false}}">
+      <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+        <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Yetkazish zonalari</h2>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) 150px 100px 120px 120px; gap: 12px; padding: 8px 4px; color: #5E6459; font-size: 12px; border-bottom: 1px solid #DADDD3;"><span>Zona</span><span>Xizmat</span><span>Muddat</span><span style="text-align: right;">Narx</span><span style="text-align: right;">Bepul</span></div>
+        <sc-for list="{{zones}}" as="z" hint-placeholder-count="4">
+          <div style="display: grid; grid-template-columns: minmax(0, 1.2fr) 150px 100px 120px 120px; gap: 12px; align-items: center; padding: 12px 4px; border-bottom: 1px solid #EEEFEA; font-variant-numeric: tabular-nums;"><b style="font-weight: 600;">{{z.z}}</b><span style="display: flex; align-items: center;"><img src="{{z.logo}}" alt="{{z.s}}" style="height: 16px;"></span><span>{{z.t}}</span><span style="text-align: right;">{{z.p}}</span><span style="text-align: right;">{{z.f}}</span></div>
+        </sc-for>
+      </section>
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 600;">Qoidalar</h2>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Bepul yetkazish chegarasi</span><b style="font-weight: 600;">500 000 so'm [tasdiqlanadi]</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Toshkent: 12 soat kafolati</span><b style="font-weight: 600;">18:00 gacha buyurtma</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">18:00 dan keyin</span><b style="font-weight: 600;">Ertasi kuni 12:00 gacha</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Naqd to'lov chegarasi</span><b style="font-weight: 600;">3 000 000 so'm</b></span>
+          <span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">Dam olish kunlari</span><b style="font-weight: 600;">Yakshanba: faqat BTS</b></span>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 600;">Saytda ko'rinishi</h2>
+          <span style="background: #141712; color: #FFFFFF; border-radius: 14px; padding: 12px 14px; font-size: 12px; font-weight: 600;">Toshkent bo'ylab 12 soatda · O'zbekiston bo'ylab 24 soatda</span>
+          <span style="background: #F1F5EC; border-radius: 14px; padding: 12px 14px; font-size: 12px; line-height: 1.5;">Savatda: «Yana 120 000 so'mlik xarid qiling — yetkazish bepul»</span>
+          <span style="font-size: 12px; color: #5E6459; line-height: 1.5;">Matn va muddat shu sozlamadan avtomatik olinadi: header, mahsulot, savat, checkout.</span>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{isStore}}" hint-placeholder-val="{{false}}">
+      <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+          <h2 style="margin: 0 0 8px; font-size: 18px; font-weight: 600;">Do'kon</h2>
+          <sc-for list="{{store}}" as="r" hint-placeholder-count="7"><span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">{{r.k}}</span><b style="font-weight: 600; text-align: right;">{{r.v}}</b></span></sc-for>
+        </div>
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+          <h2 style="margin: 0 0 8px; font-size: 18px; font-weight: 600;">Yuridik va ma'lumotlar</h2>
+          <sc-for list="{{legal}}" as="r" hint-placeholder-count="6"><span style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">{{r.k}}</span><b style="font-weight: 600; text-align: right;">{{r.v}}</b></span></sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <section style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+      <h2 style="margin: 0 0 8px; font-size: 20px; font-weight: 600;">Faoliyat jurnali</h2>
+      <sc-for list="{{audit}}" as="a" hint-placeholder-count="5">
+        <div style="display: grid; grid-template-columns: 110px 120px minmax(0, 1fr); gap: 12px; padding: 10px 4px; border-top: 1px solid #EEEFEA;"><span style="color: #5E6459;">{{a.t}}</span><b style="font-weight: 600;">{{a.who}}</b><span>{{a.what}}</span></div>
+      </sc-for>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1500}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'team' }; }
+  renderVals() {
+    const t = this.state.tab;
+    const Y = '✓', N = '—', P = 'qisman';
+    const M = [
+      ['Buyurtmalarni ko\'rish va o\'zgartirish', [Y, Y, Y, Y, N]],
+      ['Buyurtmani bekor qilish / pul qaytarish', [Y, Y, N, N, N]],
+      ['Mijoz telefoni va manzili', [Y, Y, Y, P, N]],
+      ['Mijozlar bazasini eksport', [Y, N, N, N, N]],
+      ['Mahsulot tavsifi, rasm, SEO', [Y, Y, N, N, Y]],
+      ['Promo-kodlar', [Y, Y, N, N, Y]],
+      ['Analitika va heatmap', [Y, Y, N, N, Y]],
+      ['Integratsiya kalitlari', [Y, N, N, N, N]]
+    ];
+    const seg = (on) => 'border: 0; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; ' + (on ? 'background: #141712; color: #FFFFFF;' : 'background: transparent; color: #5E6459;');
+    return {
+      tabs: [['team', 'Xodimlar'], ['ship', 'Yetkazish'], ['store', 'Do\'kon']].map(([id, label]) => ({ label, pick: () => this.setState({ tab: id }), style: seg(id === t) })),
+      isTeam: t === 'team', isShip: t === 'ship', isStore: t === 'store',
+      staff: [['E', 'Elmurodov', '+998 •• ••• •• 00', 'Egasi', 'hozir', true], ['MA', 'Madina', '+998 •• ••• •• 12', 'Operator', '10 daq oldin', true], ['SR', 'Sardor', '+998 •• ••• •• 47', 'Operator', 'kecha', false], ['OB', 'Ombor', '+998 •• ••• •• 85', 'Omborchi', 'bugun 09:02', true], ['MK', 'Marketolog', '+998 •• ••• •• 31', 'Marketolog', '3 kun oldin', true]]
+        .map(([i, n, ph, r, last, fa]) => ({ i, n, ph, r, last, fa: fa ? 'Yoniq' : 'O\'chiq', faStyle: 'font-size: 11px; font-weight: 700; border-radius: 999px; padding: 4px 8px; justify-self: start; ' + (fa ? 'background: #E8F2EA; color: #1F6B35;' : 'background: #FBEAE8; color: #8A1C12;') })),
+      perms: M.map(([p, cs]) => ({ p, cells: cs.map(v => ({ v, style: 'text-align: center; font-weight: 700; ' + (v === Y ? 'color: #1F6B35;' : v === P ? 'color: #6B4E00; font-size: 11px;' : 'color: #B9BEB2;') })) })),
+      zones: [
+        ['Toshkent shahri', 'Yandex', '../assets/logos/yandex-delivery.png', '12 soat', '[narx]', '500 000+'],
+        ['Toshkent viloyati', 'BTS', '../assets/logos/bts.png', '24 soat', '[narx]', '500 000+'],
+        ['Viloyat markazlari', 'BTS', '../assets/logos/bts.png', '24 soat', '[narx]', '500 000+'],
+        ['Tuman va qishloqlar', 'BTS', '../assets/logos/bts.png', '24–48 soat', '[narx]', '—']
+      ].map(([z, s, logo, tt, p, f]) => ({ z, s, logo, t: tt, p, f })),
+      store: [['Nomi', 'Forest'], ['Domen', 'forest.uz'], ['Tillar', 'UZ (asosiy) · RU'], ['Valyuta', 'so\'m'], ['Telefon', '+998 •• ••• •• ••'], ['Ish vaqti', 'Du–Sha 09:00–21:00'], ['Telegram', '@forest_uz_bot']].map(([k, v]) => ({ k, v })),
+      legal: [['Yuridik shaxs', '[MChJ nomi]'], ['STIR', '[kiritiladi]'], ['Oferta versiyasi', 'v1.0 · 26.10.2026'], ['Shaxsiy ma\'lumotlar', 'O\'zbekistondagi serverda'], ['Cookie banneri', 'Yoniq'], ['Ma\'lumotlarni o\'chirish so\'rovi', '30 kun ichida']].map(([k, v]) => ({ k, v })),
+      audit: [['Bugun 14:12', 'Elmurodov', 'Payme: test rejimdan jonli rejimga o\'tkazdi'], ['Bugun 11:40', 'Marketolog', 'Promo SAVAT5 muddatini 30.11 gacha uzaytirdi'], ['Kecha 19:05', 'Madina', '#F-10471 buyurtmani bekor qildi · sabab: mijoz rad etdi'], ['Kecha 10:22', 'Elmurodov', 'Sardor\'ga Operator roli berildi'], ['24.10 16:30', 'Ombor', 'FR-WX-0250 qoldig\'ini qo\'lda tuzatdi (MoySklad)']].map(([tt, who, what]) => ({ t: tt, who, what }))
+    };
+  }
+}
+</script>
+</body>
+</html>

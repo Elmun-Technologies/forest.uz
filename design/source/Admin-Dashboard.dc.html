@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Forest Admin · Dashboard</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&amp;display=swap">
+<style>body{margin:0;background:#EEEFEA}a{color:#141712}a:hover{color:#334229}</style>
+</helmet>
+<div style="background: #EEEFEA; font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif; color: #141712; padding: 16px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start;">
+  <div style="flex: 1 1 248px; max-width: 264px;"><dc-import name="AdminNav" active="dashboard" hint-size="264px,1060px"></dc-import></div>
+
+  <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+    <!-- TOPBAR -->
+    <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 4px;">
+      <div style="display: flex; flex-direction: column; gap: 2px; margin-right: auto;">
+        <h1 style="margin: 0; font-size: 36px; font-weight: 500; letter-spacing: -0.035em;">Dashboard</h1>
+        <span style="font-size: 13px; color: #5E6459;">26-oktabr, dushanba · <span style="background: #FFF4D6; color: #6B4E00; border-radius: 6px; padding: 2px 6px; font-weight: 600;">Namuna ma'lumotlar</span></span>
+      </div>
+      <span style="display: inline-flex; align-items: center; gap: 8px; background: #FFFFFF; border-radius: 999px; padding: 10px 16px; font-size: 13px; font-weight: 600;"><span style="width: 8px; height: 8px; border-radius: 50%; background: #3E8E4E; box-shadow: 0 0 0 4px rgba(62,142,78,0.18);"></span>37 kishi hozir saytda</span>
+      <div role="group" aria-label="Davr" style="display: flex; background: #FFFFFF; border-radius: 999px; padding: 4px;">
+        <sc-for list="{{ranges}}" as="r" hint-placeholder-count="3"><button type="button" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="{{r.style}}">{{r.label}}</button></sc-for>
+      </div>
+      <button type="button" style="display: inline-flex; align-items: center; gap: 8px; border: 0; background: #141712; color: #FFFFFF; border-radius: 999px; padding: 12px 18px; font: inherit; font-size: 13px; font-weight: 600;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>Hisobot</button>
+    </header>
+
+    <!-- KPI -->
+    <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px;">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="6">
+        <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+          <span style="font-size: 13px; color: #5E6459;">{{k.label}}</span>
+          <b style="font-size: 30px; font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1;">{{k.value}}</b>
+          <span style="{{k.deltaStyle}}">{{k.delta}}</span>
+        </div>
+      </sc-for>
+    </section>
+
+    <!-- TRAFFIC CHART + ALERTS -->
+    <section style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 3 1 620px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Tashriflar</h2>
+          <span style="font-size: 13px; color: #5E6459;">kunlik sessiyalar, oxirgi {{days}} kun</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <div style="display: flex; flex-direction: column; justify-content: space-between; height: 240px; font-size: 11px; color: #5E6459; text-align: right; font-variant-numeric: tabular-nums; width: 36px;">
+            <sc-for list="{{yTicks}}" as="t" hint-placeholder-count="4"><span style="transform: translateY(-6px);">{{t}}</span></sc-for>
+          </div>
+          <div style="flex: 1; min-width: 0; position: relative; height: 240px;">
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between;">
+              <span style="border-top: 1px solid #EEEFEA;"></span><span style="border-top: 1px solid #EEEFEA;"></span><span style="border-top: 1px solid #EEEFEA;"></span><span style="border-top: 1px solid #DADDD3;"></span>
+            </div>
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none" style="position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;" aria-hidden="true">
+              <path d="{{area}}" fill="#3A7D44" fill-opacity="0.10"/>
+              <path d="{{line}}" fill="none" stroke="#3A7D44" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+            </svg>
+            <span style="{{crossStyle}}"></span>
+            <span style="{{dotStyle}}"></span>
+            <div style="position: absolute; inset: 0; display: flex;">
+              <sc-for list="{{cols}}" as="c" hint-placeholder-count="30"><span onMouseEnter="{{c.enter}}" style="flex: 1; height: 100%;"></span></sc-for>
+            </div>
+            <div style="{{tipStyle}}">
+              <span style="font-size: 12px; color: #C9CFC2;">{{tip.date}}</span>
+              <b style="font-size: 16px; font-variant-numeric: tabular-nums;">{{tip.s}} sessiya</b>
+              <span style="font-size: 12px; font-variant-numeric: tabular-nums;">{{tip.o}} buyurtma · {{tip.cr}}</span>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-left: 46px; font-size: 11px; color: #5E6459; font-variant-numeric: tabular-nums;">
+          <sc-for list="{{xLabels}}" as="x" hint-placeholder-count="5"><span>{{x}}</span></sc-for>
+        </div>
+      </div>
+      <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+        <div style="background: #FFFFFF; border-radius: 28px; padding: 22px; display: flex; flex-direction: column; gap: 12px;">
+          <h2 style="margin: 0; font-size: 18px; font-weight: 600;">Diqqat talab qiladi</h2>
+          <a href="Admin-Buyurtmalar.dc.html" style="display: flex; gap: 12px; align-items: flex-start; text-decoration: none; border-radius: 18px; padding: 12px; background: #FBEAE8;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B42318" stroke-width="2" style="flex: none;" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+            <span style="font-size: 13px; line-height: 1.45;"><b style="display: block; color: #8A1C12;">Kritik · 2 ta buyurtma kechikmoqda</b>12 soatlik Yandex muddati 1 soatdan kam qoldi</span></a>
+          <a href="Admin-Dashboard.dc.html" style="display: flex; gap: 12px; align-items: flex-start; text-decoration: none; border-radius: 18px; padding: 12px; background: #FFF4D6;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A6700" stroke-width="2" style="flex: none;" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17v.5"/></svg>
+            <span style="font-size: 13px; line-height: 1.45;"><b style="display: block; color: #6B4E00;">Ogohlantirish · qoldiq kam</b>Chalk White 2,5 L: omborda 6 dona</span></a>
+          <a href="Admin-Analitika.dc.html" style="display: flex; gap: 12px; align-items: flex-start; text-decoration: none; border-radius: 18px; padding: 12px; background: #FFF4D6;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9A6700" stroke-width="2" style="flex: none;" aria-hidden="true"><path d="M12 3 2 20h20zM12 10v4M12 17v.5"/></svg>
+            <span style="font-size: 13px; line-height: 1.45;"><b style="display: block; color: #6B4E00;">Ogohlantirish · mobil bounce +8%</b>Mahsulot sahifasi, oxirgi 3 kun</span></a>
+          <a href="Admin-Auditoriya.dc.html" style="display: flex; gap: 12px; align-items: flex-start; text-decoration: none; border-radius: 18px; padding: 12px; background: #E8F2EA;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1F6B35" stroke-width="2" style="flex: none;" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>
+            <span style="font-size: 13px; line-height: 1.45;"><b style="display: block; color: #1F5A30;">Imkoniyat · 412 ta tashlangan savat</b>Retarget auditoriyasi tayyor</span></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- FUNNEL + SOURCES -->
+    <section style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 1 1 460px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Savdo voronkasi</h2><a href="Admin-Analitika.dc.html" style="font-size: 13px;">Batafsil</a></div>
+        <sc-for list="{{funnel}}" as="f" hint-placeholder-count="5">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <span style="display: flex; justify-content: space-between; font-size: 13px;"><span style="font-weight: 600;">{{f.label}}</span><span style="font-variant-numeric: tabular-nums;"><b>{{f.v}}</b> <span style="color: #5E6459;">· {{f.pct}}</span></span></span>
+            <span style="height: 28px; background: #EEEFEA; border-radius: 4px; display: block;"><span style="{{f.bar}}"></span></span>
+            <sc-if value="{{f.drop}}" hint-placeholder-val="{{true}}"><span style="font-size: 12px; color: #8A1C12; display: inline-flex; align-items: center; gap: 6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>{{f.drop}}</span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="flex: 1 1 460px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">Trafik manbalari</h2><span style="font-size: 12px; color: #5E6459;">sessiya · konversiya · daromad</span></div>
+        <sc-for list="{{sources}}" as="s" hint-placeholder-count="6">
+          <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr) 70px 54px 92px; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #EEEFEA; font-size: 13px; font-variant-numeric: tabular-nums;">
+            <sc-if value="{{s.icon}}" hint-placeholder-val="{{true}}"><img src="{{s.icon}}" alt="" style="width: 22px; height: 22px; object-fit: contain;"></sc-if>
+            <sc-if value="{{s.noIcon}}" hint-placeholder-val="{{false}}"><span style="width: 22px; height: 22px; border-radius: 6px; background: #EEEFEA; display: grid; place-items: center; font-size: 11px; font-weight: 700;">{{s.letter}}</span></sc-if>
+            <span style="display: flex; flex-direction: column; gap: 5px; min-width: 0;"><span style="font-weight: 600;">{{s.name}}</span><span style="height: 6px; background: #EEEFEA; border-radius: 3px; display: block;"><span style="{{s.bar}}"></span></span></span>
+            <span style="text-align: right;">{{s.sess}}</span>
+            <span style="text-align: right; color: #5E6459;">{{s.cr}}</span>
+            <b style="text-align: right; font-weight: 600;">{{s.rev}}</b>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- ORDERS + PRODUCTS -->
+    <section style="display: flex; flex-wrap: wrap; gap: 16px;">
+      <div style="flex: 3 1 600px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;"><h2 style="margin: 0; font-size: 20px; font-weight: 600;">So'nggi buyurtmalar</h2><a href="Admin-Buyurtmalar.dc.html" style="font-size: 13px;">Hammasi</a></div>
+        <div style="overflow-x: auto;">
+        <div style="min-width: 620px; font-size: 13px; font-variant-numeric: tabular-nums;">
+          <div style="display: grid; grid-template-columns: 100px minmax(0, 1fr) 80px 90px 110px 120px; gap: 10px; padding: 10px 6px; border-bottom: 1px solid #DADDD3; color: #5E6459; font-size: 12px;"><span>№</span><span>Mijoz</span><span>To'lov</span><span>Yetkazish</span><span style="text-align: right;">Summa</span><span>Holat</span></div>
+          <sc-for list="{{orders}}" as="o" hint-placeholder-count="5">
+            <div style="display: grid; grid-template-columns: 100px minmax(0, 1fr) 80px 90px 110px 120px; gap: 10px; padding: 12px 6px; border-bottom: 1px solid #EEEFEA; align-items: center;">
+              <a href="Admin-Buyurtma.dc.html" style="font-weight: 600;">{{o.no}}</a>
+              <a href="Admin-Mijoz.dc.html" style="text-decoration: none;">{{o.name}}</a>
+              <span><sc-if value="{{o.payLogo}}" hint-placeholder-val="{{true}}"><img src="{{o.payLogo}}" alt="{{o.pay}}" style="{{o.payStyle}}"></sc-if><sc-if value="{{o.cash}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; font-weight: 600;">Naqd</span></sc-if></span>
+              <span><img src="{{o.delLogo}}" alt="{{o.del}}" style="{{o.delStyle}}"></span>
+              <b style="text-align: right; font-weight: 600;">{{o.sum}}</b>
+              <span><span style="{{o.stStyle}}">{{o.st}}</span></span>
+            </div>
+          </sc-for>
+        </div>
+        </div>
+      </div>
+      <div style="flex: 2 1 340px; min-width: 0; background: #FFFFFF; border-radius: 28px; padding: 24px 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;">
+        <h2 style="margin: 0; font-size: 20px; font-weight: 600;">Top mahsulotlar</h2>
+        <sc-for list="{{top}}" as="t" hint-placeholder-count="4">
+          <div style="display: flex; align-items: center; gap: 12px; font-size: 13px; font-variant-numeric: tabular-nums;">
+            <img src="{{t.img}}" alt="" style="width: 44px; height: 44px; border-radius: 12px; object-fit: cover;">
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;"><b style="font-weight: 600;">{{t.name}}</b><span style="color: #5E6459;">{{t.sold}} dona · {{t.cr}} konversiya</span></span>
+            <b style="font-weight: 600;">{{t.rev}}</b>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { range: 30, hover: null }; }
+  renderVals() {
+    const S = [612,640,598,701,760,820,690,655,702,744,810,866,905,780,742,798,851,903,960,1012,890,860,921,980,1043,1102,1187,1010,995,1064];
+    const n = this.state.range;
+    const data = S.slice(S.length - n);
+    const sp = (v) => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    const start = new Date(2026, 9, 26 - (n - 1));
+    const lab = (i) => { const d = new Date(start); d.setDate(start.getDate() + i); return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0'); };
+    const max = 1200;
+    const X = (i) => n === 1 ? 500 : i / (n - 1) * 1000;
+    const Y = (v) => 240 - v / max * 240;
+    const pts = data.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1));
+    const line = 'M' + pts.join(' L');
+    const area = line + ' L1000,240 L0,240 Z';
+    const orders = data.map(v => Math.round(v * 0.028));
+    const sum = data.reduce((a, b) => a + b, 0);
+    const osum = orders.reduce((a, b) => a + b, 0);
+    const rev = osum * 785000;
+    const h = this.state.hover == null ? n - 1 : this.state.hover;
+    const hx = X(h) / 10;
+    const good = 'display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #1F6B35;';
+    const bad = 'display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #B42318;';
+    const D = { 7: ['+9%', '+7%', '+0,2 pp', '+11%', '+12%', '−2%'], 14: ['+6%', '+5%', '+0,1 pp', '+8%', '+9%', '+1%'], 30: ['+14%', '+12%', '+0,3 pp', '+18%', '+21%', '+3%'] }[n];
+    const segBase = 'border: 0; border-radius: 999px; padding: 9px 16px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;';
+    return {
+      days: n,
+      ranges: [[7, '7 kun'], [14, '14 kun'], [30, '30 kun']].map(([v, l]) => ({ label: l, on: v === n ? 'true' : 'false', pick: () => this.setState({ range: v, hover: null }), style: segBase + (v === n ? ' background: #141712; color: #FFFFFF;' : ' background: transparent; color: #5E6459;') })),
+      kpis: [
+        { label: 'Tashriflar', value: sp(sum), delta: '▲ ' + D[0] + ' oldingi davrga', deltaStyle: good },
+        { label: 'Unikal tashrifchilar', value: sp(sum * 0.74), delta: '▲ ' + D[1], deltaStyle: good },
+        { label: 'Konversiya', value: '2,8%', delta: '▲ ' + D[2], deltaStyle: good },
+        { label: 'Buyurtmalar', value: sp(osum), delta: '▲ ' + D[3], deltaStyle: good },
+        { label: 'Daromad', value: (rev / 1e6).toFixed(1).replace('.', ',') + ' mln', delta: '▲ ' + D[4], deltaStyle: good },
+        { label: "O'rtacha chek", value: "785 000", delta: (D[5][0] === '−' ? '▼ ' : '▲ ') + D[5], deltaStyle: D[5][0] === '−' ? bad : good }
+      ],
+      line, area,
+      yTicks: ['1 200', '800', '400', '0'],
+      xLabels: [0, Math.round((n - 1) / 4), Math.round((n - 1) / 2), Math.round(3 * (n - 1) / 4), n - 1].map(lab),
+      cols: data.map((_, i) => ({ enter: () => this.setState({ hover: i }) })),
+      crossStyle: 'position: absolute; top: 0; bottom: 0; left: ' + hx + '%; width: 1px; background: #8D9586; pointer-events: none;',
+      dotStyle: 'position: absolute; left: ' + hx + '%; top: ' + (Y(data[h]) / 2.4) + '%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #3A7D44; box-shadow: 0 0 0 2px #FFFFFF; pointer-events: none;',
+      tipStyle: 'position: absolute; top: 8px; ' + (hx > 70 ? 'right: ' + (100 - hx + 1.5) + '%;' : 'left: ' + (hx + 1.5) + '%;') + ' background: #141712; color: #FFFFFF; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; white-space: nowrap;',
+      tip: { date: lab(h), s: sp(data[h]), o: orders[h], cr: (orders[h] / data[h] * 100).toFixed(1).replace('.', ',') + '%' },
+      funnel: [
+        ['Saytga kirdi', sum, ''], ['Mahsulot ko\'rdi', sum * 0.43, '57% shu yerda ketdi: mahsulot ko\'rmadi'], ['Savatga qo\'shdi', sum * 0.099, '77% savatga qo\'shmadi'], ['Checkout boshladi', sum * 0.048, '51% savatni tashladi'], ['Xarid qildi', osum, '42% checkoutda to\'xtadi']
+      ].map(([label, v, drop], i) => ({ label, v: sp(v), pct: (v / sum * 100).toFixed(1).replace('.', ',') + '%', drop: i === 0 ? '' : drop,
+        bar: 'display: block; height: 100%; border-radius: 4px; background: #3A7D44; width: ' + Math.max(1.5, v / sum * 100) + '%;' })),
+      sources: [
+        ['Instagram reklama', '../assets/icons/instagram.png', 0.38, '3,1%'], ['Google qidiruv (organik)', '../assets/icons/googleads.png', 0.21, '3,4%'], ['Telegram', '../assets/icons/telegram.png', 0.14, '4,2%'], ['To\'g\'ridan', '', 0.12, '2,6%'], ['Facebook reklama', '../assets/icons/facebook.png', 0.09, '1,9%'], ['Yandex qidiruv', '', 0.06, '2,2%']
+      ].map(([name, icon, share, cr]) => ({ name, icon, noIcon: !icon, letter: name[0], sess: sp(sum * share), cr, rev: (sum * share * parseFloat(cr.replace(',', '.')) / 100 * 0.785).toFixed(1).replace('.', ',') + ' mln',
+        bar: 'display: block; height: 100%; border-radius: 3px; background: #3A7D44; width: ' + (share / 0.38 * 100) + '%;' })),
+      orders: [
+        ['FR-240913', 'Dilnoza R.', 'Payme', 'yandex', "946 000", 'Yig\'ilmoqda'], ['FR-240912', 'Jasur T.', 'Click', 'bts', "549 000", 'To\'landi'], ['FR-240911', 'Malika S.', 'Naqd', 'yandex', "799 000", 'Yo\'lda'], ['FR-240910', 'Akmal Q.', 'Payme', 'bts', "1 028 000", 'Yetkazildi'], ['FR-240909', 'Nodira X.', 'Click', 'yandex', "329 000", 'Kechikmoqda']
+      ].map(([no, name, pay, del, sum2, st]) => ({ no, name, pay, del, sum: sum2 + " so'm", st,
+        payLogo: pay === 'Payme' ? '../assets/logos/payme.png' : pay === 'Click' ? '../assets/logos/click.png' : '', cash: pay === 'Naqd',
+        payStyle: 'height: ' + (pay === 'Payme' ? 15 : 13) + 'px; width: auto; display: block;',
+        delLogo: del === 'yandex' ? '../assets/logos/yandex-delivery.png' : '../assets/logos/bts.png',
+        delStyle: del === 'yandex' ? 'height: 10px; width: auto; display: block;' : 'height: 22px; width: auto; display: block;',
+        stStyle: 'display: inline-block; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; ' + ({ 'Yig\'ilmoqda': 'background: #EEEFEA; color: #141712;', 'To\'landi': 'background: #E3ECF8; color: #1D4F91;', 'Yo\'lda': 'background: #D5DDC8; color: #22301B;', 'Yetkazildi': 'background: #E8F2EA; color: #1F5A30;', 'Kechikmoqda': 'background: #FBEAE8; color: #8A1C12;' }[st]) })),
+      top: [
+        ['Divan yangilash to\'plami', '../assets/photos/classic-green-sofa.jpg', 142, '4,1%', '113,5 mln'], ['Chalk White 1 L', '../assets/photos/white-dresser.jpg', 188, '3,6%', '61,9 mln'], ['Mato bo\'yog\'i spreyi', '../assets/photos/sprayer-hand.jpg', 236, '3,2%', '58,8 mln'], ['Mebel yangilash to\'plami', '../assets/photos/white-shelf-bedroom.jpg', 74, '2,9%', '40,6 mln']
+      ].map(([name, img, sold, cr, rev2]) => ({ name, img, sold, cr, rev: rev2 }))
+    };
+  }
+}
+</script>
+</body>
+</html>

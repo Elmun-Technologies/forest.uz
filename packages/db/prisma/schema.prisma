@@ -1,0 +1,1047 @@
+// Forest — data model. Invariants: docs/04-data-model.md, docs/02-business-rules.md.
+// Raw SQL in migrations adds: Event monthly partitions, pg_trgm/unaccent, sequences for
+// Order.number / Customer.publicId, search index. Never edit applied migrations.
+// Money = BigInt tiyin (1 so'm = 100 tiyin). Localized text = Json { "uz": string, "ru": string }.
+
+generator client {
+  provider      = "prisma-client-js"
+  // Generated inside the package so deployed images ship a ready client (no generate at runtime).
+  output        = "../generated/client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Enums ─────────────────────────
+
+enum Locale {
+  uz
+  ru
+}
+
+enum ProductType {
+  SIMPLE
+  BUNDLE
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  PACKING
+  READY
+  HANDED_TO_COURIER
+  DELIVERED
+  COMPLETED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+}
+
+enum PaymentMethod {
+  PAYME
+  CLICK
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  COD_PENDING
+  PAID
+  FAILED
+  EXPIRED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum DeliveryCarrier {
+  YANDEX
+  BTS
+  PICKUP
+}
+
+enum DeliveryStatus {
+  NOT_CREATED
+  CREATED
+  COURIER_ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  AT_BRANCH
+  DELIVERED
+  FAILED
+  RETURNED
+}
+
+enum ActorType {
+  CUSTOMER
+  STAFF
+  SYSTEM
+  CARRIER
+  PAYMENT_PROVIDER
+  BOT
+}
+
+enum StaffRole {
+  OWNER
+  MANAGER
+  OPERATOR
+  WAREHOUSE
+  MARKETER
+}
+
+enum PromoType {
+  PERCENT
+  FIXED
+  FREE_SHIPPING
+  GIFT
+}
+
+enum PromoAudience {
+  ALL
+  FIRST_ORDER
+  SEGMENT
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConsentChannel {
+  SMS_MARKETING
+  TELEGRAM
+  ADS_MATCHING
+  ANALYTICS_COOKIES
+}
+
+enum MessageChannel {
+  TELEGRAM
+  SMS
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SKIPPED_CAP
+  SKIPPED_NO_CONSENT
+}
+
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  COMING_SOON
+}
+
+enum ConversationStatus {
+  NEW
+  OPEN
+  ANSWERED
+  COMPLAINT
+  CLOSED
+}
+
+// ───────────────────────── Marketplace-ready seller ─────────────────────────
+
+model Seller {
+  id            String     @id @default(cuid())
+  slug          String     @unique
+  name          String
+  isOfficial    Boolean    @default(false)
+  commissionBps Int? // v2: basis points
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @db.Timestamptz(3)
+  products      Product[]
+  shipments     Shipment[]
+}
+
+// ───────────────────────── Catalog ─────────────────────────
+
+model Category {
+  id       String            @id @default(cuid())
+  slug     String            @unique
+  name     Json // {uz, ru}
+  seoText  Json? // {uz, ru} rich text block under catalog
+  parentId String?
+  parent   Category?         @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[]        @relation("CategoryTree")
+  sort     Int               @default(0)
+  imageId  String?
+  image    File?             @relation("CategoryImage", fields: [imageId], references: [id])
+  products ProductCategory[]
+}
+
+model Product {
+  id             String            @id @default(cuid())
+  slug           String            @unique
+  type           ProductType       @default(SIMPLE)
+  status         ProductStatus     @default(DRAFT)
+  sellerId       String
+  seller         Seller            @relation(fields: [sellerId], references: [id])
+  name           Json // {uz, ru}
+  subtitle       Json? // card line override {uz, ru}; auto-built from variants when null
+  shortDesc      Json?
+  description    Json? // rich text per locale
+  howToApply     Json?
+  specs          Json? // [{key:{uz,ru}, value:{uz,ru}}]
+  badges         String[] // HIT, NEW, SALE
+  surfaces       String[] // wood, lacquer, metal, fabric — catalog filter
+  videoUrl       String?
+  popularity     Int               @default(0) // 30-day units sold, refreshed by job; default sort
+  searchText     String            @default("") // normalized uz+ru name/desc/synonyms (pg_trgm index)
+  coverageM2PerL Decimal?          @db.Decimal(5, 2) // for calculator
+  dryTimeMinutes Int?
+  isBestseller   Boolean           @default(false)
+  bestsellerSort Int?
+  moyskladId     String?           @unique
+  createdAt      DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(3)
+  variants       Variant[]
+  images         ProductImage[]
+  categories     ProductCategory[]
+  reviews        Review[]
+  bundleItems    BundleItem[]      @relation("BundleParent")
+  related        ProductRelation[] @relation("RelFrom")
+  relatedTo      ProductRelation[] @relation("RelTo")
+  waitlist       WaitlistEntry[]
+
+  @@index([status, sellerId])
+  @@index([status, popularity])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+}
+
+model ProductRelation {
+  fromId String
+  toId   String
+  kind   String // CROSS_SELL | UPSELL | ALTERNATIVE
+  sort   Int     @default(0)
+  from   Product @relation("RelFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to     Product @relation("RelTo", fields: [toId], references: [id], onDelete: Cascade)
+
+  @@id([fromId, toId, kind])
+}
+
+model Variant {
+  id             String       @id @default(cuid())
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String       @unique
+  label          Json // {uz:"1 L", ru:"1 л"} or color name
+  colorHex       String?
+  volumeMl       Int?
+  priceTiyin     BigInt
+  compareAtTiyin BigInt?
+  ikpu           String? // MXIK code — required before ACTIVE
+  packageCode    String?
+  vatPercent     Int          @default(12)
+  barcode        String?
+  weightGrams    Int?
+  stock          Int          @default(0) // from MoySklad (available)
+  reserved       Int          @default(0) // our open reservations
+  lowStockAt     Int          @default(10)
+  moyskladId     String?      @unique
+  active         Boolean      @default(true)
+  sort           Int          @default(0)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  bundleOf       BundleItem[] @relation("BundleComponent")
+  orderItems     OrderItem[]
+  cartItems      CartItem[]
+
+  @@index([productId])
+}
+
+model BundleItem {
+  bundleId  String
+  variantId String
+  qty       Int     @default(1)
+  bundle    Product @relation("BundleParent", fields: [bundleId], references: [id], onDelete: Cascade)
+  variant   Variant @relation("BundleComponent", fields: [variantId], references: [id])
+
+  @@id([bundleId, variantId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  fileId    String
+  file      File    @relation(fields: [fileId], references: [id])
+  alt       Json?
+  isVideo   Boolean @default(false)
+  sort      Int     @default(0)
+}
+
+model WaitlistEntry {
+  id         String         @id @default(cuid())
+  productId  String
+  variantId  String?
+  product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customerId String?
+  phone      String?
+  channel    MessageChannel
+  notifiedAt DateTime?      @db.Timestamptz(3)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+}
+
+// ───────────────────────── Customers & CRM ─────────────────────────
+
+model Customer {
+  id               String         @id @default(cuid())
+  publicId         String         @unique @default(dbgenerated("('C-'::text || nextval('customer_public_seq'::regclass))")) // C-10482
+  /// E.164. Null for a Telegram-login customer who never gave a phone (CLAUDE.md §6).
+  phone            String?        @unique
+  name             String?
+  locale           Locale         @default(uz)
+  telegramId       BigInt?        @unique
+  telegramUsername String?
+  tags             String[]
+  firstSeenAt      DateTime       @default(now()) @db.Timestamptz(3)
+  firstTouch       Json? // {source, medium, campaign, content, term, clickId, landing, ts}
+  lastTouch        Json?
+  ordersCount      Int            @default(0)
+  ltvTiyin         BigInt         @default(0)
+  lastOrderAt      DateTime?      @db.Timestamptz(3)
+  leadSource       String? // popup | selector | bot | checkout | footer ...
+  leadAt           DateTime?      @db.Timestamptz(3)
+  deletedAt        DateTime?      @db.Timestamptz(3) // erasure request processed
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
+  addresses        Address[]
+  orders           Order[]
+  consents         Consent[]
+  visitors         Visitor[]
+  reviews          Review[]
+  carts            Cart[]
+  messages         Message[]
+  conversations    Conversation[]
+  favorites        Favorite[]
+  notes            CustomerNote[]
+}
+
+model Address {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String? // "Uy", "Dacha"
+  region     String
+  district   String?
+  line       String
+  lat        Decimal? @db.Decimal(9, 6)
+  lng        Decimal? @db.Decimal(9, 6)
+  isDefault  Boolean  @default(false)
+}
+
+model Consent {
+  id         String         @id @default(cuid())
+  customerId String
+  customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  channel    ConsentChannel
+  granted    Boolean
+  source     String // checkout, popup, bot, cabinet
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([customerId, channel, createdAt])
+}
+
+model Favorite {
+  customerId String
+  productId  String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([customerId, productId])
+}
+
+model CustomerNote {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  staffId    String
+  text       String
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model OtpCode {
+  id        String    @id @default(cuid())
+  phone     String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  ip        String?
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([phone, createdAt])
+}
+
+// ───────────────────────── Cart & checkout ─────────────────────────
+
+model Cart {
+  id          String     @id @default(cuid())
+  anonymousId String?    @unique
+  customerId  String?
+  customer    Customer?  @relation(fields: [customerId], references: [id])
+  promoCode   String?
+  deviceHash  String?
+  status      String     @default("ACTIVE") // ACTIVE | CONVERTED | ABANDONED_NOTIFIED
+  updatedAt   DateTime   @updatedAt @db.Timestamptz(3)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(3)
+  items       CartItem[]
+
+  @@index([customerId])
+  @@index([status, updatedAt])
+}
+
+model CartItem {
+  cartId    String
+  variantId String
+  qty       Int
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant   Variant  @relation(fields: [variantId], references: [id])
+  addedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([cartId, variantId])
+}
+
+// ───────────────────────── Orders ─────────────────────────
+
+model Order {
+  id              String           @id @default(cuid())
+  number          String           @unique @default(dbgenerated("('F-'::text || nextval('order_number_seq'::regclass))")) // F-10482
+  /// Unguessable id for the "order received" URL (number is sequential, never used in URLs).
+  publicId        String           @unique
+  trackingToken   String           @unique
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  status          OrderStatus      @default(NEW)
+  locale          Locale           @default(uz)
+  contactName     String
+  contactPhone    String
+  address         Json // snapshot {region, district, line, lat, lng}
+  comment         String?
+  subtotalTiyin   BigInt
+  discountTiyin   BigInt           @default(0)
+  shippingTiyin   BigInt           @default(0)
+  totalTiyin      BigInt
+  promoCode       String?
+  paymentMethod   PaymentMethod
+  deliveryZone    String
+  carrier         DeliveryCarrier
+  offerVersion    String
+  slaDueAt        DateTime?        @db.Timestamptz(3) // 12h / 24h promise
+  attribution     Json? // {firstTouch, lastTouch, touches[], model results}
+  anonymousId     String?
+  sessionId       String?
+  source          String           @default("web") // web | bot | admin
+  cancelReason    String?
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+  items           OrderItem[]
+  payments        Payment[]
+  shipments       Shipment[]
+  events          OrderEvent[]
+  reservations    Reservation[]
+  promoRedemption PromoRedemption?
+  fiscalReceipts  FiscalReceipt[]
+  moyskladLink    MoyskladOrderLink?
+
+  @@index([status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([slaDueAt])
+}
+
+/// MoySklad `customerorder` mirror of an Order (apps/api/src/moysklad): created once, then its
+/// state follows ours. `holdHandedOver`: our stock hold moved to the MoySklad reserve on push.
+model MoyskladOrderLink {
+  orderId        String    @id
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  externalId     String?   @unique
+  counterpartyId String?
+  /// Our OrderStatus last mirrored to MoySklad.
+  pushedStatus   String?
+  holdHandedOver Boolean   @default(false)
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime? @db.Timestamptz(3)
+  lastError      String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([nextAttemptAt])
+}
+
+model OrderItem {
+  id            String  @id @default(cuid())
+  orderId       String
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId     String
+  variant       Variant @relation(fields: [variantId], references: [id])
+  sellerId      String
+  nameSnapshot  Json
+  sku           String
+  ikpu          String
+  packageCode   String?
+  vatPercent    Int
+  qty           Int
+  priceTiyin    BigInt
+  discountTiyin BigInt  @default(0)
+}
+
+model OrderEvent {
+  id        String    @id @default(cuid())
+  orderId   String
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String // STATUS_CHANGED, PAYMENT_*, DELIVERY_*, NOTE, NOTIFICATION_SENT ...
+  from      String?
+  to        String?
+  actorType ActorType
+  actorId   String?
+  data      Json?
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([orderId, createdAt])
+}
+
+model Reservation {
+  id         String    @id @default(cuid())
+  orderId    String
+  order      Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId  String
+  qty        Int
+  expiresAt  DateTime? @db.Timestamptz(3)
+  releasedAt DateTime? @db.Timestamptz(3)
+
+  @@index([variantId, releasedAt])
+  @@index([expiresAt, releasedAt])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  orderId          String
+  order            Order         @relation(fields: [orderId], references: [id])
+  method           PaymentMethod
+  status           PaymentStatus
+  amountTiyin      BigInt
+  providerTxnId    String? // Payme transaction id / Click click_trans_id
+  providerState    Int? // Payme state 1,2,-1,-2
+  providerData     Json?
+  performedAt      DateTime?     @db.Timestamptz(3)
+  cancelledAt      DateTime?     @db.Timestamptz(3)
+  cancelReason     Int?
+  fiscalReceiptUrl String?
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(3)
+  refunds          Refund[]
+
+  @@unique([method, providerTxnId])
+  @@index([orderId])
+}
+
+model Refund {
+  id          String   @id @default(cuid())
+  paymentId   String
+  payment     Payment  @relation(fields: [paymentId], references: [id])
+  amountTiyin BigInt
+  reason      String
+  staffId     String
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Shipment {
+  id             String          @id @default(cuid())
+  orderId        String
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sellerId       String
+  seller         Seller          @relation(fields: [sellerId], references: [id])
+  carrier        DeliveryCarrier
+  status         DeliveryStatus  @default(NOT_CREATED)
+  externalId     String? // Yandex claim id / BTS waybill
+  trackNumber    String?
+  branch         Json? // BTS branch info
+  courier        Json? // name, phone, car, plate, eta
+  priceTiyin     BigInt          @default(0)
+  history        Json? // carrier tracking history
+  /// Raw carrier status (Yandex claim status, e.g. `pickuped`); `status` is our mapping of it.
+  providerStatus String?
+  /// Carrier bookkeeping: Yandex claim version, updated_ts, request ids of every attempt, cost.
+  providerData   Json?
+  acceptedAt     DateTime?       @db.Timestamptz(3)
+  /// Polling: last successful sync, next due time (also the lease between job runs), errors in a row.
+  syncedAt       DateTime?       @db.Timestamptz(3)
+  nextSyncAt     DateTime?       @db.Timestamptz(3)
+  syncFailures   Int             @default(0)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+
+  @@index([carrier, externalId])
+  @@index([orderId])
+  @@index([carrier, nextSyncAt])
+}
+
+/// Fiscal receipt evidence for an order (docs/06 Fiscal). `provider` = manual (operator entry),
+/// fiscal_ofd, or the payment provider that issued it. One per order and kind (SALE / REFUND).
+model FiscalReceipt {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId     String?
+  kind          String   @default("SALE") // SALE | REFUND
+  provider      String // manual | fiscal_ofd | payme | click
+  receiptNumber String?
+  url           String?
+  staffId       String?
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([orderId, kind])
+}
+
+// ───────────────────────── Promo ─────────────────────────
+
+model PromoCode {
+  id               String            @id @default(cuid())
+  code             String            @unique
+  type             PromoType
+  value            Int // percent or tiyin/100 depending on type
+  giftVariantId    String?
+  minCartTiyin     BigInt            @default(0)
+  audience         PromoAudience     @default(ALL)
+  segmentId        String?
+  usageLimit       Int?
+  perCustomerLimit Int               @default(1)
+  startsAt         DateTime?         @db.Timestamptz(3)
+  endsAt           DateTime?         @db.Timestamptz(3)
+  utmSource        String?
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  redemptions      PromoRedemption[]
+}
+
+model PromoRedemption {
+  id            String    @id @default(cuid())
+  promoId       String
+  promo         PromoCode @relation(fields: [promoId], references: [id])
+  orderId       String    @unique
+  order         Order     @relation(fields: [orderId], references: [id])
+  customerId    String
+  deviceHash    String?
+  discountTiyin BigInt
+  suspicious    Boolean   @default(false)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([promoId, customerId])
+}
+
+// ───────────────────────── Reviews & UGC ─────────────────────────
+
+model Review {
+  id           String       @id @default(cuid())
+  productId    String
+  product      Product      @relation(fields: [productId], references: [id])
+  customerId   String
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  orderId      String
+  rating       Int
+  text         String?
+  locale       Locale
+  source       String // web | bot
+  status       ReviewStatus @default(PENDING)
+  photoFileIds String[]
+  photoConsent Boolean      @default(false)
+  inGallery    Boolean      @default(false)
+  gallerySort  Int?
+  beforeFileId String?
+  reply        String?
+  moderatedBy  String?
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@unique([orderId, productId])
+  @@index([productId, status])
+}
+
+// ───────────────────────── Analytics (first-party) ─────────────────────────
+
+model Visitor {
+  anonymousId String    @id // first-party cookie fr_aid
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  firstSeenAt DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
+  firstTouch  Json?
+  deviceHash  String?
+
+  @@index([customerId])
+}
+
+model Session {
+  id          String   @id // uuid from tracker
+  anonymousId String
+  customerId  String?
+  startedAt   DateTime @db.Timestamptz(3)
+  endedAt     DateTime @db.Timestamptz(3)
+  landingPath String
+  exitPath    String?
+  pageviews   Int      @default(0)
+  events      Int      @default(0)
+  durationSec Int      @default(0)
+  bounced     Boolean  @default(true)
+  utm         Json? // source, medium, campaign, content, term
+  clickIds    Json? // fbclid, gclid, ttclid, yclid
+  referrer    String?
+  channel     String // paid_social, organic_search, telegram, direct, referral, email, sms...
+  device      String // mobile | desktop | tablet
+  os          String?
+  browser     String?
+  city        String?
+  region      String?
+  country     String?
+  converted   Boolean  @default(false)
+  orderId     String?
+  hasReplay   Boolean  @default(false)
+  replayKey   String? // object storage prefix
+
+  @@index([startedAt])
+  @@index([anonymousId, startedAt])
+  @@index([channel, startedAt])
+}
+
+// NOTE: high-volume table. Create as PARTITION BY RANGE (ts) monthly via raw SQL migration;
+// Prisma model mirrors columns for typed reads. See docs/07-analytics-tracking.md.
+model Event {
+  id          String // uuid v7, also used as event_id for ad-platform dedupe
+  ts          DateTime @db.Timestamptz(3)
+  sessionId   String
+  anonymousId String
+  customerId  String?
+  name        String // page_view, view_item, add_to_cart, begin_checkout, purchase, lead, selector_used ...
+  path        String
+  props       Json?
+  // heatmap fields (click events)
+  selector    String?
+  x           Int? // relative ‰ within element/page width
+  y           Int?
+  viewportW   Int?
+  scrollDepth Int?
+
+  // Partition key must be part of the PK (PARTITION BY RANGE (ts)).
+  @@id([id, ts])
+  @@index([ts], type: Brin)
+  @@index([name, ts])
+  @@index([sessionId])
+  @@index([path, name])
+}
+
+model AdSpendDaily {
+  date        DateTime @db.Date
+  platform    String // meta | google | tiktok | yandex
+  campaignId  String
+  campaign    String
+  adset       String?
+  spendTiyin  BigInt
+  impressions Int
+  clicks      Int
+
+  @@id([date, platform, campaignId])
+}
+
+model Segment {
+  id           String          @id @default(cuid())
+  name         String
+  rules        Json // rule tree, see docs/08-admin-panel.md A8
+  autoMessage  Json? // optional automation (template, delay, channel)
+  destinations String[] // meta, google, tiktok, yandex, telegram, sms
+  size         Int             @default(0)
+  refreshedAt  DateTime?       @db.Timestamptz(3)
+  active       Boolean         @default(true)
+  members      SegmentMember[]
+}
+
+model SegmentMember {
+  segmentId  String
+  customerId String
+  addedAt    DateTime @default(now()) @db.Timestamptz(3)
+  segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@id([segmentId, customerId])
+}
+
+// ───────────────────────── Messaging & bot ─────────────────────────
+
+model MessageTemplate {
+  id          String   @id @default(cuid())
+  key         String   @unique // lead_welcome, order_status_shipped, cart_abandoned_2h, review_request ...
+  body        Json // {uz, ru} with {ism},{mahsulot},{raqam},{kod},{link},{vaqt}
+  buttons     Json?
+  delayMin    Int      @default(0)
+  smsFallback Boolean  @default(true)
+  active      Boolean  @default(true)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model Message {
+  id          String         @id @default(cuid())
+  customerId  String?
+  customer    Customer?      @relation(fields: [customerId], references: [id])
+  channel     MessageChannel
+  templateKey String?
+  body        String
+  status      MessageStatus  @default(QUEUED)
+  marketing   Boolean        @default(false)
+  providerId  String?
+  error       String?
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  sentAt      DateTime?      @db.Timestamptz(3)
+  deliveredAt DateTime?      @db.Timestamptz(3)
+
+  @@index([customerId, createdAt])
+  @@index([channel, providerId])
+}
+
+model Conversation {
+  id             String                @id @default(cuid())
+  customerId     String?
+  customer       Customer?             @relation(fields: [customerId], references: [id])
+  telegramChatId BigInt
+  topic          String // advice | cart | status | review | other
+  status         ConversationStatus    @default(NEW)
+  assigneeId     String?
+  lastMessageAt  DateTime              @default(now()) @db.Timestamptz(3)
+  messages       ConversationMessage[]
+
+  @@index([status, lastMessageAt])
+}
+
+model ConversationMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  fromCustomer   Boolean
+  staffId        String?
+  text           String?
+  fileIds        String[]
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+}
+
+// ───────────────────────── SEO & content ─────────────────────────
+
+model SeoMeta {
+  id          String  @id @default(cuid())
+  path        String // route pattern or concrete path, e.g. "/", "/p/chalk-white"
+  locale      Locale
+  title       String
+  description String
+  ogImageId   String?
+  noindex     Boolean @default(false)
+  canonical   String?
+
+  @@unique([path, locale])
+}
+
+model Redirect {
+  id        String   @id @default(cuid())
+  from      String   @unique
+  to        String
+  code      Int      @default(301)
+  hits      Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model NotFoundLog {
+  path     String   @id
+  hits     Int      @default(1)
+  lastSeen DateTime @default(now()) @db.Timestamptz(3)
+  referrer String?
+}
+
+model SearchQueryLog {
+  id        String   @id @default(cuid())
+  query     String
+  locale    Locale
+  results   Int
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([results, createdAt])
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  kind      String // LEGAL | ARTICLE | FAQ | HOME_BLOCK
+  slug      String
+  locale    Locale
+  title     String
+  body      Json // rich text (TipTap JSON)
+  version   String?
+  published Boolean  @default(false)
+  coverId   String?
+  data      Json? // kind-specific: {category, durationSec, videoUrl, excerpt, sort}
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@unique([kind, slug, locale])
+}
+
+// ───────────────────────── Integrations, settings, staff ─────────────────────────
+
+model Integration {
+  key         String            @id // payme, click, yandex, bts, moysklad, eskiz, telegram, meta_capi, google_ads, gsc, ywm ...
+  status      IntegrationStatus @default(DISCONNECTED)
+  credentials Bytes? // AES-256-GCM encrypted JSON
+  config      Json?
+  lastCheckAt DateTime?         @db.Timestamptz(3)
+  lastError   String?
+  updatedAt   DateTime          @updatedAt @db.Timestamptz(3)
+  logs        IntegrationLog[]
+}
+
+model IntegrationLog {
+  id             String      @id @default(cuid())
+  integrationKey String
+  integration    Integration @relation(fields: [integrationKey], references: [key])
+  direction      String // IN | OUT
+  kind           String // e.g. order.push, stock.update, webhook
+  ok             Boolean
+  message        String
+  payload        Json? // redacted
+  createdAt      DateTime    @default(now()) @db.Timestamptz(3)
+
+  @@index([integrationKey, createdAt])
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  url       String
+  events    String[] // order.created, order.paid, order.shipped, cart.abandoned, customer.created, stock.low
+  secret    String // HMAC-SHA256 signing secret (encrypted at rest)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Setting {
+  key       String   @id // delivery.zones, delivery.cutoff, store.info, legal.offerVersion, flags ...
+  value     Json
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  updatedBy String?
+}
+
+model Staff {
+  id               String        @id @default(cuid())
+  name             String
+  email            String        @unique
+  phone            String?
+  /// null = invite not accepted yet (no password set).
+  passwordHash     String?
+  role             StaffRole
+  totpSecret       Bytes? // encrypted
+  totpEnabled      Boolean       @default(false)
+  /// Last accepted TOTP time step (replay protection: only newer steps are accepted).
+  totpLastUsedStep Int?
+  failedLogins     Int           @default(0)
+  lockedUntil      DateTime?     @db.Timestamptz(3)
+  active           Boolean       @default(true)
+  lastLoginAt      DateTime?     @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  invites          StaffInvite[] @relation("StaffInvites")
+}
+
+/// One-time invite link (only the sha256 of the token is stored).
+model StaffInvite {
+  id          String    @id @default(cuid())
+  staffId     String
+  staff       Staff     @relation("StaffInvites", fields: [staffId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime  @db.Timestamptz(3)
+  usedAt      DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdById String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([staffId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  staffId   String?
+  action    String // e.g. order.cancel, integration.update, promo.update, customer.view_pii
+  entity    String
+  entityId  String?
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@index([staffId, createdAt])
+}
+
+model File {
+  id            String         @id @default(cuid())
+  key           String         @unique // object storage key
+  isPublic      Boolean        @default(true) // false → private bucket, served via signed URL
+  mime          String
+  size          Int
+  width         Int?
+  height        Int?
+  createdAt     DateTime       @default(now()) @db.Timestamptz(3)
+  productImages ProductImage[]
+  categories    Category[]     @relation("CategoryImage")
+  selectorItems SelectorItem[]
+}
+
+// ───────────────────────── Storefront content ─────────────────────────
+
+/// "Nimani yangilaymiz?" quick selector tiles (Home). Admin-managed.
+model SelectorItem {
+  id               String  @id @default(cuid())
+  key              String  @unique // komod, shkaf, stol, oshxona, divan, kreslo
+  name             Json // {uz, ru}
+  kind             Json // {uz:"Mebel · bo'yoq", ru:"..."}
+  imageId          String?
+  image            File?   @relation(fields: [imageId], references: [id])
+  title            Json // recommendation title {uz, ru}
+  contents         Json // {uz, ru} what's inside
+  items            Json // [{sku, qty}] — priced live from variants
+  areaLabel        Json? // {uz:"≈ 4 m²"}
+  timeLabel        Json? // {uz:"3 soat"}
+  newItemPriceSoum Int? // "buy new" comparison; null → comparison row hidden
+  sort             Int     @default(0)
+  active           Boolean @default(true)
+}
+
+/// Search synonyms (UZ Latin/Cyrillic, RU, common typos). Terms stored normalized.
+model SearchSynonym {
+  id       String   @id @default(cuid())
+  term     String   @unique
+  synonyms String[]
+}
+
+/// Idempotency keys for checkout/refund POSTs (24 h).
+model IdempotencyKey {
+  key         String   @id
+  scope       String
+  requestHash String
+  status      Int?
+  response    Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([createdAt])
+}

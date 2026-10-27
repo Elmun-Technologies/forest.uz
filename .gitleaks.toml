@@ -1,0 +1,16 @@
+# gitleaks config: default rules + allowlist for unit/integration test fixtures, which use
+# fake credential-looking strings on purpose (e.g. to assert they never appear in ciphertext/logs).
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "test fixtures"
+paths = [
+  '''(^|/)[^/]+\.(test|int\.test|spec)\.tsx?$''',
+]
+
+# Config values read from env (not literals), e.g. `secretAccessKey: env.S3_SECRET_KEY`.
+[[allowlists]]
+description = "env references"
+regexTarget = "line"
+regexes = ['''env\.[A-Z0-9_]+''']

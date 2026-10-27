@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 22
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  checks:
+    name: Typecheck · lint · unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm exec turbo run typecheck lint test
+      - name: Commit messages follow Conventional Commits
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      # gitleaks-action requires a paid licence for organisations; the CLI itself is MIT.
+      - name: gitleaks
+        run: |
+          VERSION=8.28.0
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${VERSION}/gitleaks_${VERSION}_linux_x64.tar.gz" | tar xz gitleaks
+          ./gitleaks git --redact --verbose --config .gitleaks.toml .
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - run: pnpm audit --prod --audit-level high
+
+  integration:
+    name: Integration tests (Testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build --filter=@forest/contracts --filter=@forest/db
+      - run: pnpm --filter @forest/api test:integration
+
+  e2e:
+    name: E2E smoke on docker compose images (desktop + 390px)
+    runs-on: ubuntu-latest
+    needs: [checks]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare .env (CI-only throwaway secrets, fake providers allowed)
+        run: |
+          cp .env.example .env
+          sed -i "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
+          sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
+          sed -i "s|^ALLOW_FAKE_PROVIDERS=.*|ALLOW_FAKE_PROVIDERS=true|" .env
+      # Builds the production images (validates Dockerfiles) and runs migrate → api, web, admin, caddy.
+      - run: docker compose -f infra/compose.yml --profile apps up -d --build
+      - run: pnpm exec turbo run build --filter=@forest/contracts --filter=@forest/db
+      - name: Seed (from host, against the compose database)
+        run: |
+          for i in $(seq 1 60); do curl -sf localhost:4000/ready && break; sleep 3; done
+          pnpm db:seed
+      - name: Wait for web and admin
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null localhost:3000/uz && curl -sf -o /dev/null localhost:3001 && exit 0
+            sleep 3
+          done
+          exit 1
+      - run: pnpm --filter @forest/e2e exec playwright install --with-deps chromium
+      - run: pnpm e2e
+        env: { CI: 'true' }
+      - if: failure()
+        run: docker compose -f infra/compose.yml --profile apps logs --no-color --tail 200
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+          retention-days: 7

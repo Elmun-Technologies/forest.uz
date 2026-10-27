@@ -1,0 +1,10 @@
+{
+  "extends": "@forest/config/tsconfig/nest.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "baseUrl": ".",
+    "declaration": false,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src", "test"]
+}

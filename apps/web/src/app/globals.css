@@ -1,0 +1,54 @@
+/* Self-hosted Montserrat (latin + cyrillic subsets via unicode-range): no third-party font requests. */
+@import '@fontsource-variable/montserrat';
+@import 'tailwindcss';
+@import '@forest/ui/theme.css';
+
+/* Tailwind v4 only scans this app by default; include shared components. */
+@source '../../../../packages/ui/src';
+
+/* Dual price range: two native ranges stacked; only the thumbs take pointer events. */
+.price-range {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  pointer-events: none;
+  margin: 0;
+}
+.price-range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.price-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  border: 2px solid var(--color-forest);
+  cursor: pointer;
+}
+.price-range::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-panel);
+  border: 2px solid var(--color-forest);
+  cursor: pointer;
+}
+.price-range:focus-visible::-webkit-slider-thumb {
+  outline: 3px solid var(--color-forest);
+  outline-offset: 2px;
+}
+
+/* The product sticky buy bar replaces the floating Telegram button while visible. */
+html[data-buybar] .fr-fab {
+  display: none;
+}
+
+/* Cart (and other flow pages inside the shop frame) draw their own compact mobile header. */
+@media (width < 64rem) {
+  body:has([data-mobile-flow]) [data-chrome-mobile] {
+    display: none;
+  }
+}
