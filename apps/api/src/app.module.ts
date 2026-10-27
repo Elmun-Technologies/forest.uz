@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
+import { AdminModule } from './admin/admin.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CommerceModule } from './commerce/commerce.module';
 import { CustomerModule } from './customer/customer.module';
@@ -56,6 +57,7 @@ import { SettingsModule } from './settings/settings.module';
     MessagingModule,
     DeliveryModule,
     JobsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
