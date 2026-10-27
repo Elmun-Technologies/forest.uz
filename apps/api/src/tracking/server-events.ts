@@ -50,16 +50,37 @@ interface ServerEvent {
   customerId: string | null;
   path: string;
   props: Record<string, unknown>;
+  /** Earliest time an earlier copy of this id can have: bounds the lookup (partition pruning). */
+  since: Date;
 }
 
-/** Inserts unless an event with this id already exists (any ts): idempotent by id. */
+/** Inserts unless an event with this id already exists since `since`: idempotent by id. */
 async function insertOnce(tx: Tx, e: ServerEvent): Promise<boolean> {
   const n = await tx.$executeRaw`
     INSERT INTO "Event" ("id", "ts", "sessionId", "anonymousId", "customerId", "name", "path", "props")
     SELECT ${e.id}, ${e.ts}, ${e.sessionId}, ${e.anonymousId}, ${e.customerId}, ${e.name}, ${e.path},
            ${JSON.stringify(e.props)}::jsonb
-    WHERE NOT EXISTS (SELECT 1 FROM "Event" WHERE "id" = ${e.id} AND "name" = ${e.name})`;
+    WHERE NOT EXISTS (
+      SELECT 1 FROM "Event"
+      WHERE "id" = ${e.id} AND "name" = ${e.name} AND "ts" >= ${e.since})`;
   return n > 0;
+}
+
+/**
+ * The tracker session id from `fr_sid` only when it can belong to this visitor: a stored session
+ * of another visitor is refused (a crafted cookie must not mark someone else's session). A
+ * session not stored yet (its first beacon is still in flight) is accepted; marking it converted
+ * later checks the visitor again.
+ */
+export async function verifiedSessionId(
+  db: Tx,
+  raw: string | null,
+  anonymousId: string | null,
+): Promise<string | null> {
+  const sid = trackerSessionId(raw);
+  if (!sid || !anonymousId) return null;
+  const row = await db.session.findUnique({ where: { id: sid }, select: { anonymousId: true } });
+  return !row || row.anonymousId === anonymousId ? sid : null;
 }
 
 /**
@@ -79,6 +100,7 @@ export async function recordPurchaseEvent(tx: Tx, orderId: string, at: Date): Pr
       paymentMethod: true,
       anonymousId: true,
       sessionId: true,
+      createdAt: true,
       items: { select: { variantId: true, sku: true, qty: true, priceTiyin: true } },
     },
   });
@@ -103,10 +125,11 @@ export async function recordPurchaseEvent(tx: Tx, orderId: string, at: Date): Pr
     customerId: order.customerId,
     path: '/checkout',
     props,
+    since: order.createdAt,
   });
-  if (inserted && order.sessionId)
+  if (inserted && order.sessionId && order.anonymousId)
     await tx.session.updateMany({
-      where: { id: order.sessionId },
+      where: { id: order.sessionId, anonymousId: order.anonymousId },
       data: { converted: true, orderId: order.id },
     });
 }
@@ -135,5 +158,7 @@ export async function recordLeadEvent(
     customerId: input.customerId,
     path: input.path ?? '/',
     props,
+    // One id per Tashkent day: an earlier copy is at most a day old.
+    since: new Date(input.at.getTime() - 86_400_000),
   });
 }

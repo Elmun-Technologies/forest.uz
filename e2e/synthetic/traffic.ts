@@ -15,6 +15,7 @@
  * Bot filter: contexts use real device UAs and hide `navigator.webdriver` (CLAUDE.md §6).
  */
 import { type Browser, type BrowserContext, type Page, chromium, devices } from '@playwright/test';
+import { devHeaders } from '../dev-token';
 
 export interface SyntheticOptions {
   browser?: Browser;
@@ -336,7 +337,9 @@ export async function waitForSessions(
     for (const s of manifest.sessions) {
       if (!s.sessionId || found.has(s.sessionId)) continue;
       try {
-        const res = await fetch(`${apiURL}/v1/dev/events?sessionId=${s.sessionId}`);
+        const res = await fetch(`${apiURL}/v1/dev/events?sessionId=${s.sessionId}`, {
+          headers: devHeaders(),
+        });
         const body = (await res.json()) as { sessions: StoredSession[] };
         if (body.sessions[0]) found.set(s.sessionId, body.sessions[0]);
       } catch {

@@ -147,14 +147,39 @@ export const TRACK_LIMITS = {
   selector: 200,
   string: 100,
   q: 100,
-  message: 200,
+  message: 80,
   path: 300,
 } as const;
 
-const SECRET_SEGMENTS: Record<string, string> = { t: ':token', buyurtma: ':id', invite: ':token' };
+/**
+ * Capability segments: the next path segment is a secret (tracking token, order id, marketing
+ * opt-out token, cart-restore token, staff invite) and is replaced by a placeholder.
+ */
+const SECRET_SEGMENTS: Record<string, string> = {
+  t: ':token',
+  buyurtma: ':id',
+  obuna: ':token',
+  c: ':token',
+  invite: ':token',
+};
+
 const EMAIL = /[^\s@/]+@[^\s@/]+\.[a-z]{2,}/i;
 /** 7+ digits possibly separated by spaces, dashes, dots or brackets, optional leading +. */
 const PHONE = /(?:\+?\d[\s\-().]*){7,}/;
+
+/**
+ * js_error text: URLs without query strings, quoted fragments (values, selectors, user input)
+ * and digit runs removed, at most 80 chars — enough for "TypeError: Cannot read properties…".
+ */
+export function cleanErrorMessage(raw: string): string {
+  return raw
+    .replace(/(https?:\/\/[^\s?#'"`]*)[?#][^\s'"`]*/g, '$1')
+    .replace(/(["'`])[^"'`]{0,500}\1/g, '$1…$1')
+    .replace(/\d{3,}/g, '#')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
 
 /** True for text that looks like a phone number or an email (PII guard for every string prop). */
 export function looksLikePii(text: string): boolean {

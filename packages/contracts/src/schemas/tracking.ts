@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   type AutoEventName,
+  cleanErrorMessage,
   type CommerceEventName,
   TRACK_LIMITS,
   looksLikePii,
@@ -66,7 +67,10 @@ export const trackPropsSchemas = {
     kind: z.enum(['required', 'pattern', 'type', 'range', 'length', 'invalid']).optional(),
   }),
   js_error: z.object({
-    message: text(TRACK_LIMITS.message),
+    message: z
+      .string()
+      .transform(cleanErrorMessage)
+      .transform((m) => (looksLikePii(m) ? REDACTED : m)),
     source: text(TRACK_LIMITS.path).optional(),
     line: count.optional(),
     col: count.optional(),

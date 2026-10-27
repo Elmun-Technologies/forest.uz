@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUTO_EVENTS,
+  cleanErrorMessage,
   COMMERCE_EVENTS,
   classifyChannel,
   isCommerceEvent,
@@ -102,12 +103,29 @@ describe('classifyChannel (docs/07 channel rules, first match)', () => {
   });
 });
 
+describe('cleanErrorMessage', () => {
+  it('keeps the error class, drops URL queries, quoted fragments and digit runs, ≤ 80 chars', () => {
+    const m = cleanErrorMessage(
+      `TypeError: Cannot read properties of undefined (reading 'Ali Valiyev') at https://x.uz/a.js?t=secret:1234`,
+    );
+    expect(m).toMatch(
+      /^TypeError: Cannot read properties of undefined \(reading '…'\) at https:\/\/x/,
+    );
+    expect(m).not.toMatch(/Ali|secret|1234/);
+    expect(m.length).toBeLessThanOrEqual(80);
+    expect(cleanErrorMessage('Order 998901234567 failed')).toBe('Order # failed');
+    expect(cleanErrorMessage('x'.repeat(200))).toHaveLength(80);
+  });
+});
+
 describe('scrubPath / looksLikePii', () => {
   it('drops query and hash, masks capability segments and PII', () => {
     expect(scrubPath('/uz/qidiruv?q=divan#top')).toBe('/uz/qidiruv');
     expect(scrubPath('/uz/t/AbC123token')).toBe('/uz/t/:token');
     expect(scrubPath('/t/AbC123token')).toBe('/t/:token');
     expect(scrubPath('/ru/buyurtma/ord_12345')).toBe('/ru/buyurtma/:id');
+    expect(scrubPath('/uz/obuna/OptOutTok_123')).toBe('/uz/obuna/:token');
+    expect(scrubPath('/c/CartRestoreTok')).toBe('/c/:token');
     expect(scrubPath('/uz/p/+998901234567')).toBe('/uz/p/:redacted');
     expect(scrubPath('/uz/p/ali%40mail.uz')).toBe('/uz/p/:redacted');
     expect(scrubPath('/uz/p/divan-toplami')).toBe('/uz/p/divan-toplami');

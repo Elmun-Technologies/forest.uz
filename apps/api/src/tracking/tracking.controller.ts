@@ -9,10 +9,11 @@ import {
   Query,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { TRACK_LIMITS } from '@forest/contracts';
 import type { Request, Response } from 'express';
-import { assertDevEndpoints } from '../common/dev-endpoints';
+import { assertDevEndpoints, DevEndpointsGuard } from '../common/dev-endpoints';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,9 +30,9 @@ const firstString = (v: unknown): string | undefined => {
  * preflight), which Nest's parsers leave unread. Oversized bodies are cut off, never parsed.
  */
 async function readBody(req: Request, limit: number): Promise<string | null> {
-  if (typeof req.body === 'object' && req.body !== null && Object.keys(req.body).length)
-    return JSON.stringify(req.body);
-  if (req.readableEnded) return null;
+  // A body Nest already parsed (JSON/urlencoded, up to its own 100 KB limit) never comes from the
+  // tracker, which always posts text/plain: dropped, so the 64 KB cap can't be bypassed.
+  if (req.readableEnded || !/^text\/plain\b/i.test(req.header('content-type') ?? '')) return null;
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -76,6 +77,7 @@ export class TrackingController {
 
 /** Dev/e2e: what the ingest stored for a session or visitor (404 outside fake mode). */
 @Controller('dev/events')
+@UseGuards(DevEndpointsGuard)
 export class DevEventsController {
   constructor(
     private readonly prisma: PrismaService,

@@ -77,10 +77,13 @@ export class IdentityService {
   async backfill(anonymousId: string, customerId: string): Promise<number> {
     const sessions = await this.prisma.session.findMany({
       where: { anonymousId, customerId },
-      select: { id: true },
+      select: { id: true, startedAt: true },
     });
     if (!sessions.length) return 0;
     const ids = sessions.map((s) => s.id);
+    // Events of a session are never older than its start (ingest clamps to the last hour):
+    // bounding ts lets Postgres skip older monthly partitions.
+    const since = new Date(Math.min(...sessions.map((s) => s.startedAt.getTime())) - 3600_000);
     let total = 0;
     for (;;) {
       const n = await this.prisma.$executeRaw`
@@ -88,7 +91,9 @@ export class IdentityService {
         WHERE ("id", "ts") IN (
           SELECT "id", "ts" FROM "Event"
           WHERE "sessionId" IN (${Prisma.join(ids)}) AND "customerId" IS NULL
-          LIMIT ${BACKFILL_CHUNK})`;
+            AND "ts" >= ${since}
+          LIMIT ${BACKFILL_CHUNK})
+        AND "ts" >= ${since}`;
       total += n;
       if (n < BACKFILL_CHUNK) return total;
     }

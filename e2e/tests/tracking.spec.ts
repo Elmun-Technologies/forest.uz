@@ -7,7 +7,7 @@ import {
   trackingIds,
   waitForSessions,
 } from '../synthetic/traffic';
-import { API } from './helpers';
+import { API, devHeaders } from './helpers';
 
 /**
  * First-party tracker end to end (docs/07): the idle-loaded `/t.js` sends page views, list/item
@@ -26,7 +26,9 @@ async function stored(sessionId: string): Promise<{
   sessions: { channel: string; device: string; landingPath: string; pageviews: number }[];
   events: StoredEvent[];
 }> {
-  const res = await fetch(`${API}/v1/dev/events?sessionId=${sessionId}`);
+  const res = await fetch(`${API}/v1/dev/events?sessionId=${sessionId}`, {
+    headers: devHeaders(),
+  });
   return (await res.json()) as Awaited<ReturnType<typeof stored>>;
 }
 

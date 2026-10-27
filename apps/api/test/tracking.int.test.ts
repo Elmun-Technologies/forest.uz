@@ -192,6 +192,13 @@ describe('tracker ingest POST /v1/t (integration)', () => {
       .set('Content-Type', 'text/plain')
       .send('{not json')
       .expect(204);
+    // JSON-typed bodies never come from the tracker (always text/plain): dropped.
+    await junk.agent
+      .post('/v1/t')
+      .set('User-Agent', MOBILE_UA)
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ v: 1, sid, now: Date.now(), events: [ev('page_view', '/uz')] }))
+      .expect(204);
     await junk.agent
       .post('/v1/t')
       .set('User-Agent', MOBILE_UA)
@@ -243,6 +250,8 @@ describe('tracker ingest POST /v1/t (integration)', () => {
     const res = await b
       .send(sid, [
         ev('page_view', '/uz/t/SecretTrackingToken123?phone=998901234567', { nav: 'load' }),
+        ev('page_view', '/uz/obuna/SecretOptOutToken456', { nav: 'spa' }),
+        ev('page_view', '/c/SecretCartToken789', { nav: 'spa' }),
         ev('page_view', '/uz/p/+998901234567', { nav: 'spa' }),
         ev('search', '/uz/qidiruv?q=ali@mail.uz', {
           q: 'menga +998 90 123 45 67 qo‘ng‘iroq',
@@ -251,6 +260,7 @@ describe('tracker ingest POST /v1/t (integration)', () => {
         ev('search', '/uz/qidiruv', { q: 'ali.valiyev@gmail.com', results: 0 }),
         ev('form_error', '/uz/checkout', { field: 'phone', kind: 'required', value: '901234567' }),
         ev('js_error', '/uz', { message: 'Failed for +998901234567 at https://x.uz/a.js?t=1' }),
+        ev('js_error', '/uz', { message: `TypeError: bad value "Ali Valiyev" (id 12345)` }),
         ev(
           'click',
           '/uz',
@@ -276,10 +286,15 @@ describe('tracker ingest POST /v1/t (integration)', () => {
       const text = JSON.stringify({ path: r.path, props: r.props, selector: r.selector });
       expect(text, text).not.toMatch(PHONE_RE);
       expect(text, text).not.toMatch(EMAIL_RE);
-      expect(text).not.toContain('SecretTrackingToken123');
+      expect(text).not.toMatch(/SecretTrackingToken123|SecretOptOutToken456|SecretCartToken789/);
       expect(text).not.toContain('Ali Valiyev');
     }
-    expect(rows.map((r) => r.path)).toContain('/uz/t/:token');
+    expect(rows.map((r) => r.path)).toEqual(
+      expect.arrayContaining(['/uz/t/:token', '/uz/obuna/:token', '/c/:token']),
+    );
+    expect(rows.find((r) => JSON.stringify(r.props).includes('TypeError'))?.props).toEqual({
+      message: 'TypeError: bad value "…" (id #)',
+    });
     const session = await prisma.session.findUniqueOrThrow({ where: { id: sid } });
     expect(session.landingPath).toBe('/uz/t/:token');
   });
@@ -387,10 +402,11 @@ describe('tracker ingest POST /v1/t (integration)', () => {
       converted: true,
       orderId: order.id,
     });
-    // The visitor is linked to the buyer.
+    // The checkout phone is unverified: the browser is NOT linked to the phone's customer.
     expect(
       (await prisma.visitor.findUniqueOrThrow({ where: { anonymousId: aid } })).customerId,
-    ).toBe(order.customerId);
+    ).toBeNull();
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: sid } })).customerId).toBeNull();
 
     // Lead from the same browser: one server-side event per source and day.
     const phone = nextPhone();
@@ -412,6 +428,49 @@ describe('tracker ingest POST /v1/t (integration)', () => {
       props: { source: 'popup' },
     });
     expect(leads[0]!.id).toBe(leadEventId(lead.id, 'popup', tashkentDayKey(leads[0]!.ts)));
+    // Leads don't link either (anyone can type someone else's phone).
+    expect(
+      (await prisma.visitor.findUniqueOrThrow({ where: { anonymousId: aid } })).customerId,
+    ).toBeNull();
+
+    // A crafted fr_sid naming another visitor's session is neither stored nor marked converted.
+    const victim = browser(app);
+    const victimSid = randomUUID();
+    visitors.push(aidFrom(await victim.send(victimSid, [ev('page_view', '/uz')]).expect(204)));
+    const added2 = await http()
+      .post('/v1/cart/items')
+      .set('X-Forwarded-For', ip)
+      .set('Cookie', `fr_aid=${aid}`)
+      .send({ variantId: variant.id, qty: 1 })
+      .expect(201);
+    const crafted = await http()
+      .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', ip)
+      .set(
+        'Cookie',
+        `fr_aid=${aid}; fr_sid=${victimSid}; fr_cart=${cookieValue(added2, 'fr_cart')}`,
+      )
+      .set('Idempotency-Key', `trk-${randomUUID()}`)
+      .send({
+        name: 'Dilnoza',
+        phone: nextPhone(),
+        region: 'tashkent_city',
+        district: 'mirzo_ulugbek',
+        addressLine: "Mirzo Ulug'bek, 5-uy",
+        zoneKey: 'tashkent-city-yandex',
+        paymentMethod: 'COD',
+        offerVersion: '2026-10-26-draft',
+      });
+    expect(crafted.status, JSON.stringify(crafted.body)).toBe(201);
+    const craftedOrder = await prisma.order.findUniqueOrThrow({
+      where: { publicId: crafted.body.publicId },
+    });
+    expect(craftedOrder.sessionId).toBeNull();
+    await lifecycle.confirmCod(craftedOrder.id, { type: 'SYSTEM' });
+    expect((await prisma.session.findUniqueOrThrow({ where: { id: victimSid } })).converted).toBe(
+      false,
+    );
+    await lifecycle.cancelOrder(craftedOrder.id, { type: 'SYSTEM' }, 'test cleanup');
 
     await lifecycle.cancelOrder(order.id, { type: 'SYSTEM' }, 'test cleanup');
   });

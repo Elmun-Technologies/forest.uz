@@ -1,7 +1,7 @@
 import type { TrackEventName, TrackPropsMap } from '@forest/contracts/core';
 // The source module, not the package entry: the bundled entry carries other modules' top-level
 // tables, which esbuild can't tree-shake out of an IIFE (≈ +4 KB gz).
-import { scrubPath } from '../../contracts/src/tracking';
+import { cleanErrorMessage, scrubPath } from '../../contracts/src/tracking';
 
 /**
  * Forest first-party tracker (docs/07 "Tracker"). Runs on the storefront after idle; batches
@@ -105,10 +105,8 @@ export function cssPath(el: Element): string {
   return parts.join('>').slice(-200);
 }
 
-/** Error text without query strings of URLs (they may carry tokens). */
-export function cleanMessage(msg: string): string {
-  return msg.replace(/(https?:\/\/[^\s?#'"]*)[?#][^\s'"]*/g, '$1').slice(0, 200);
-}
+/** Error text without URL queries, quoted fragments and digit runs (≤ 80 chars). */
+export const cleanMessage = cleanErrorMessage;
 
 const readCookie = (doc: Document, name: string): string | null => {
   const m = doc.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
