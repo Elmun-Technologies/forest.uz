@@ -9,7 +9,6 @@ import { randomBytes } from 'node:crypto';
 import { parseMoyskladSettings } from '@forest/contracts';
 import { maskSecret, parseKey, SecretBox } from './crypto/secret-box';
 import {
-  FakeAdSignalProvider,
   FakeAiProvider,
   FakeDeliveryProvider,
   FakeFiscalProvider,
@@ -29,12 +28,19 @@ import {
 } from './providers/eskiz';
 import { BtsManualDeliveryProvider } from './providers/bts-manual';
 import { ManualFiscalProvider } from './providers/manual-fiscal';
-import { normalizeBotUsername, telegramGetMe } from './providers/telegram';
+import {
+  normalizeBotUsername,
+  telegramGetMe,
+  telegramSetWebhook,
+  telegramWebhookUrl,
+} from './providers/telegram';
 import { paymeAuthKey, PaymePaymentProvider } from './providers/payme';
 import { yandexCallbackUrl, YandexDeliveryProvider } from './providers/yandex-delivery';
+import { adsHealth, isAdIntegration } from './providers/ads/health';
+import { seoProviderTest } from './providers/seo-factory';
+import { ClaudeAiProvider } from './providers/claude';
 import { HttpClient } from './http-client';
 import type {
-  AdSignalProvider,
   AiProvider,
   DeliveryProvider,
   FiscalProvider,
@@ -185,13 +191,12 @@ export class IntegrationsService {
   }
 
   async ai(): Promise<AiProvider> {
-    return this.fakeMode ? this.fakes.ai : this.real<AiProvider>('claude', () => null);
+    return this.fakeMode ? this.fakes.ai : this.real<AiProvider>('claude', (c) => this.claude(c));
   }
 
-  async adSignal(key: AdSignalProvider['key']): Promise<AdSignalProvider> {
-    return this.fakeMode
-      ? new FakeAdSignalProvider(key)
-      : this.real<AdSignalProvider>(key, () => null);
+  /** Real Claude adapter (AI drafts, CLAUDE.md §6); model from the integration's `model` field. */
+  private claude(c: Record<string, string>): ClaudeAiProvider | null {
+    return c.apiKey ? new ClaudeAiProvider({ apiKey: c.apiKey, model: c.model }) : null;
   }
 
   /** `key` names the breaker; a provider may use a second one (`<integration>:<purpose>`). */
@@ -269,8 +274,13 @@ export class IntegrationsService {
     // MoySklad webhooks are unsigned too: secret path token (CLAUDE.md §6).
     if (key === 'moysklad' && !merged.webhookToken)
       merged.webhookToken = randomBytes(24).toString('base64url');
+    // Telegram bot webhook: secret path segment + `secret_token` header (CLAUDE.md §6, 5A).
+    if (key === 'telegram' && !merged.webhookSecret)
+      merged.webhookSecret = randomBytes(32).toString('base64url');
 
-    const health = await this.test(key, merged);
+    let health = await this.test(key, merged);
+    if (key === 'telegram' && health.ok && !this.fakeMode)
+      health = await this.telegramWebhook(merged, health);
     await this.prisma.$transaction([
       this.prisma.integration.upsert({
         where: { key },
@@ -301,6 +311,30 @@ export class IntegrationsService {
       }),
     ]);
     return health;
+  }
+
+  /**
+   * Points the bot's webhook at us after a successful getMe. A failure keeps the integration
+   * CONNECTED (the login widget works without it) but is shown in `lastError`'s message and
+   * logged (`webhook.set`), which raises an admin alert.
+   */
+  private async telegramWebhook(
+    creds: Record<string, string>,
+    health: HealthResult,
+  ): Promise<HealthResult> {
+    const res = await telegramSetWebhook(
+      this.httpClient('telegram'),
+      creds.botToken ?? '',
+      telegramWebhookUrl(this.env.API_URL, creds.webhookSecret ?? ''),
+      creds.webhookSecret ?? '',
+    );
+    await this.log('telegram', {
+      direction: 'OUT',
+      kind: 'webhook.set',
+      ok: res.ok,
+      message: res.message,
+    }).catch((e: unknown) => this.logger.warn(`integration log failed: ${String(e)}`));
+    return res.ok ? health : { ok: true, message: `${health.message}; ${res.message}` };
   }
 
   async disconnect(key: string, staffId: string, ip: string | null): Promise<void> {
@@ -358,6 +392,13 @@ export class IntegrationsService {
     }
     if (key === 'telegram')
       return telegramGetMe(this.httpClient('telegram'), creds.botToken ?? '', creds.botUsername);
+    if (key === 'claude') {
+      const claude = this.claude(creds);
+      return claude ? claude.test() : { ok: false, message: 'apiKey is required' };
+    }
+    if (key === 'gsc' || key === 'ywm' || key === 'pagespeed')
+      return seoProviderTest(key, creds, this.httpClient(key, { maxRetries: 0 }));
+    if (isAdIntegration(key)) return adsHealth(key, creds, this.httpClient(`${key}:health`));
     return { ok: false, message: 'adapter not implemented yet' };
   }
 

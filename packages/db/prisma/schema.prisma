@@ -135,6 +135,8 @@ enum MessageStatus {
   FAILED
   SKIPPED_CAP
   SKIPPED_NO_CONSENT
+  /// Not sent for another reason (no channel, unapproved SMS text, no longer relevant) — see `error`.
+  SKIPPED
 }
 
 enum IntegrationStatus {
@@ -426,21 +428,21 @@ model CartItem {
 // ───────────────────────── Orders ─────────────────────────
 
 model Order {
-  id              String           @id @default(cuid())
+  id              String             @id @default(cuid())
   number          String           @unique @default(dbgenerated("('F-'::text || nextval('order_number_seq'::regclass))")) // F-10482
   /// Unguessable id for the "order received" URL (number is sequential, never used in URLs).
   publicId        String           @unique
   trackingToken   String           @unique
   customerId      String
-  customer        Customer         @relation(fields: [customerId], references: [id])
+  customer        Customer           @relation(fields: [customerId], references: [id])
   status          OrderStatus      @default(NEW)
-  locale          Locale           @default(uz)
+  locale          Locale             @default(uz)
   contactName     String
   contactPhone    String
   address         Json // snapshot {region, district, line, lat, lng}
   comment         String?
   subtotalTiyin   BigInt
-  discountTiyin   BigInt           @default(0)
+  discountTiyin   BigInt             @default(0)
   shippingTiyin   BigInt           @default(0)
   totalTiyin      BigInt
   promoCode       String?
@@ -454,8 +456,8 @@ model Order {
   sessionId       String?
   source          String           @default("web") // web | bot | admin
   cancelReason    String?
-  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime         @updatedAt @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(3)
   items           OrderItem[]
   payments        Payment[]
   shipments       Shipment[]
@@ -468,6 +470,8 @@ model Order {
   @@index([status, createdAt])
   @@index([customerId, createdAt])
   @@index([slaDueAt])
+  /// Purchasing sessions (funnel, goals) and the A7 purchase session.
+  @@index([sessionId])
 }
 
 /// MoySklad `customerorder` mirror of an Order (apps/api/src/moysklad): created once, then its
@@ -687,6 +691,8 @@ model Visitor {
   firstSeenAt DateTime  @default(now()) @db.Timestamptz(3)
   lastSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
   firstTouch  Json?
+  /// Touch of the latest session start (tracker ingest, docs/07).
+  lastTouch        Json?
   deviceHash  String?
 
   @@index([customerId])
@@ -722,6 +728,8 @@ model Session {
   @@index([startedAt])
   @@index([anonymousId, startedAt])
   @@index([channel, startedAt])
+  /// Journeys (A5) and attribution: a customer's sessions.
+  @@index([customerId, startedAt])
 }
 
 // NOTE: high-volume table. Create as PARTITION BY RANGE (ts) monthly via raw SQL migration;
@@ -764,24 +772,95 @@ model AdSpendDaily {
 }
 
 model Segment {
-  id           String          @id @default(cuid())
-  name         String
-  rules        Json // rule tree, see docs/08-admin-panel.md A8
-  autoMessage  Json? // optional automation (template, delay, channel)
+  id                 String                     @id @default(cuid())
+  /// Preset key (docs/07 presets, seeded); null for segments created in admin.
+  key                String?                    @unique
+  name               String
+  description        String?
+  rules              Json // rule tree: contracts `audienceRulesSchema` (CLAUDE.md §6 "Audiences")
+  autoMessage        Json? // optional automation (template, delay, channel) — runs in Phase 5
   destinations String[] // meta, google, tiktok, yandex, telegram, sms
   size         Int             @default(0)
   refreshedAt  DateTime?       @db.Timestamptz(3)
-  active       Boolean         @default(true)
+  refreshError       String?
+  lastAdded          Int                        @default(0)
+  lastRemoved        Int                        @default(0)
+  active             Boolean                    @default(true)
+  createdAt          DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
   members      SegmentMember[]
+  destinationStates  SegmentDestination[]
+  destinationMembers SegmentDestinationMember[]
 }
 
 model SegmentMember {
   segmentId  String
   customerId String
-  addedAt    DateTime @default(now()) @db.Timestamptz(3)
+  /// Join time of the current (or last) membership.
+  addedAt    DateTime  @default(now()) @db.Timestamptz(3)
+  /// Left the segment (kept 90 days for the 30-day result); null = current member.
+  removedAt  DateTime? @db.Timestamptz(3)
   segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
   @@id([segmentId, customerId])
+  @@index([segmentId, removedAt])
+}
+
+/// Sync state of one ad destination of a segment (A8 "Qayerga yuboriladi").
+model SegmentDestination {
+  segmentId  String
+  destination String // meta | google | tiktok | yandex
+  /// Platform audience id (Meta custom audience id, Google user list resource name…).
+  externalId  String?
+  status      String    @default("pending") // pending | ok | error | not_connected | too_small | off
+  members     Int       @default(0)
+  lastSyncAt  DateTime? @db.Timestamptz(3)
+  lastError   String?
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@id([segmentId, destination])
+}
+
+/// What a platform audience currently holds: one row per uploaded member (hash = what was sent).
+model SegmentDestinationMember {
+  segmentId  String
+  destination String
+  customerId  String
+  hash        String
+  syncedAt    DateTime @default(now()) @db.Timestamptz(3)
+  segment    Segment  @relation(fields: [segmentId], references: [id], onDelete: Cascade)
+
+  @@id([segmentId, destination, customerId])
+}
+
+/// Server-side ad signal outbox (Meta CAPI, Google Ads conversions, TikTok Events API).
+model AdSignal {
+  id            String    @id @default(cuid())
+  platform      String // meta | google | tiktok
+  /// Event row id = the browser pixel's event_id (dedupe).
+  eventId       String
+  eventName     String
+  eventTs       DateTime  @db.Timestamptz(3)
+  customerId    String?
+  status        String    @default("PENDING") // PENDING | SENDING | SENT | FAILED | DEAD | SKIPPED
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now()) @db.Timestamptz(3)
+  lastError     String?
+  sentAt      DateTime?      @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@unique([platform, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([platform, createdAt])
+}
+
+/// Keyset cursors of polling jobs (e.g. `ads.signals` over Event).
+model JobCursor {
+  key         String   @id
+  ts          DateTime @db.Timestamptz(3)
+  ref       String   @default("")
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 }
 
 // ───────────────────────── Messaging & bot ─────────────────────────
@@ -794,6 +873,8 @@ model MessageTemplate {
   delayMin    Int      @default(0)
   smsFallback Boolean  @default(true)
   active      Boolean  @default(true)
+  /// The SMS text is approved in the Eskiz cabinet; unapproved texts are never sent by SMS.
+  smsApproved Boolean  @default(false)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 }
 
@@ -811,9 +892,20 @@ model Message {
   createdAt   DateTime       @default(now()) @db.Timestamptz(3)
   sentAt      DateTime?      @db.Timestamptz(3)
   deliveredAt DateTime?      @db.Timestamptz(3)
+  /// service | requested | marketing (contracts `MessageKind`); `marketing` mirrors it.
+  kind        String         @default("service")
+  /// Deferred (quiet hours): `messaging.outbox.flush` re-decides the row at this time.
+  sendAfter   DateTime?      @db.Timestamptz(3)
+  /// Set when a sender took the row (lease); counts toward the daily cap while in flight.
+  claimedAt   DateTime?      @db.Timestamptz(3)
+  /// Idempotency of producers (jobs): one row per logical message.
+  dedupeKey   String?        @unique
+  /// Refs and rendering data for delivery: {locale, buttons, photoUrl, flow, guard, orderId…}.
+  payload     Json?
 
   @@index([customerId, createdAt])
   @@index([channel, providerId])
+  @@index([status, sendAfter])
 }
 
 model Conversation {
@@ -828,6 +920,8 @@ model Conversation {
   messages       ConversationMessage[]
 
   @@index([status, lastMessageAt])
+  /// The bot finds a chat's open conversation (5A).
+  @@index([telegramChatId, lastMessageAt])
 }
 
 model ConversationMessage {
@@ -838,13 +932,42 @@ model ConversationMessage {
   staffId        String?
   text           String?
   fileIds        String[]
+  /// {operator?, product?: {variantId, name}, tgMessageId?} — rendering details only (5A).
+  meta           Json?
   createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+
+  @@index([conversationId, createdAt])
+}
+
+/// A Telegram chat that started the bot (docs/09). Linked to a customer only through a
+/// Telegram-verified phone (request_contact). KPIs of A12 (subscribers, phones, unsubscribes).
+model BotSubscriber {
+  telegramId    BigInt    @id
+  customerId    String?
+  username      String?
+  firstName     String?
+  /// Explicit `/til` choice; null = automatic (customer locale, else language_code).
+  locale        Locale?
+  languageCode  String?
+  /// Start payload source (popup, site, lead…) and the visitor's touch at /start.
+  source        String?
+  utm           Json?
+  startedAt     DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt    DateTime  @default(now()) @db.Timestamptz(3)
+  phoneSharedAt DateTime? @db.Timestamptz(3)
+  /// The user blocked the bot (403 / my_chat_member kicked); cleared by their next update.
+  blockedAt     DateTime? @db.Timestamptz(3)
+  /// `/stop` or "Eslatmani o'chirish": marketing consent revoked.
+  stoppedAt     DateTime? @db.Timestamptz(3)
+
+  @@index([customerId])
+  @@index([startedAt])
 }
 
 // ───────────────────────── SEO & content ─────────────────────────
 
 model SeoMeta {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   path        String // route pattern or concrete path, e.g. "/", "/p/chalk-white"
   locale      Locale
   title       String
@@ -852,17 +975,19 @@ model SeoMeta {
   ogImageId   String?
   noindex     Boolean @default(false)
   canonical   String?
+  updatedAt   DateTime @default(now()) @updatedAt @db.Timestamptz(3)
 
   @@unique([path, locale])
 }
 
 model Redirect {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   from      String   @unique
   to        String
   code      Int      @default(301)
   hits      Int      @default(0)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  lastHitAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model NotFoundLog {
@@ -882,6 +1007,37 @@ model SearchQueryLog {
   @@index([results, createdAt])
 }
 
+/// Search engine query stats per day (A9): Google Search Console / Yandex Webmaster daily sync.
+model SearchQueryDaily {
+  source      String // gsc | ywm
+  date        DateTime @db.Date
+  query     String
+  clicks      Int
+  impressions Int
+  /// Average position as reported by the provider for that day (lower is better).
+  position    Float?
+  syncedAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([source, date, query])
+  @@index([source, date])
+}
+
+/// PageSpeed Insights lab runs started from A9 (optional adapter).
+model PageSpeedRun {
+  id        String   @id @default(cuid())
+  url       String
+  strategy  String // mobile | desktop
+  score     Int? // performance 0..100
+  lcpMs     Int?
+  cls       Float?
+  tbtMs     Int?
+  fcpMs     Int?
+  staffId   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([url, createdAt])
+}
+
 model Page {
   id        String   @id @default(cuid())
   kind      String // LEGAL | ARTICLE | FAQ | HOME_BLOCK
@@ -896,6 +1052,7 @@ model Page {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   @@unique([kind, slug, locale])
+  @@index([kind, locale, published])
 }
 
 // ───────────────────────── Integrations, settings, staff ─────────────────────────
@@ -925,13 +1082,66 @@ model IntegrationLog {
   @@index([integrationKey, createdAt])
 }
 
+/// Outbound webhook subscriber (A10, CLAUDE.md §6). Events: WEBHOOK_EVENTS in contracts.
 model WebhookEndpoint {
-  id        String   @id @default(cuid())
-  url       String
-  events    String[] // order.created, order.paid, order.shipped, cart.abandoned, customer.created, stock.low
-  secret    String // HMAC-SHA256 signing secret (encrypted at rest)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  id                  String            @id @default(cuid())
+  name                String            @default("")
+  url                 String
+  events              String[]
+  /// HMAC-SHA256 signing secret sealed with the integrations SecretBox (AAD `webhook:<id>`).
+  secret              Bytes
+  secretLast4         String            @default("")
+  active              Boolean           @default(true)
+  /// Set when the endpoint was switched off automatically (consecutive failed deliveries).
+  disabledAt          DateTime?         @db.Timestamptz(3)
+  disabledReason      String?
+  /// FAILED deliveries in a row (reset by any success); auto-disable threshold in contracts.
+  consecutiveFailures Int               @default(0)
+  createdById         String?
+  createdAt           DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+  deliveries          WebhookDelivery[]
+}
+
+/// Outbox row: one source event for one endpoint (unique), retried with backoff.
+model WebhookDelivery {
+  id             String          @id @default(cuid())
+  endpointId     String
+  endpoint       WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  event          String
+  /// Source of the event (`OrderEvent:<id>`, `Customer:<id>`, `AuditLog:<id>`, `test:<cuid>`).
+  eventKey       String
+  payload        Json
+  status         String          @default("PENDING") // PENDING | DELIVERED | FAILED
+  attempts       Int             @default(0)
+  nextAttemptAt  DateTime?       @default(now()) @db.Timestamptz(3)
+  lastAttemptAt  DateTime?       @db.Timestamptz(3)
+  lastStatusCode Int?
+  lastError      String?
+  durationMs     Int?
+  deliveredAt    DateTime?       @db.Timestamptz(3)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+
+  @@unique([endpointId, eventKey])
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}
+
+/// Partner REST API key (CLAUDE.md §6): only the sha256 of the key is stored.
+model ApiKey {
+  id              String    @id @default(cuid())
+  name            String
+  /// Public lookup part (`fk_live_<prefix>_…`).
+  prefix          String    @unique
+  keyHash         String    @unique
+  last4           String
+  scopes          String[]
+  rateLimitPerMin Int       @default(60)
+  lastUsedAt      DateTime? @db.Timestamptz(3)
+  createdById     String?
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  revokedAt       DateTime? @db.Timestamptz(3)
+  revokedById     String?
 }
 
 model Setting {
@@ -1044,4 +1254,56 @@ model IdempotencyKey {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([createdAt])
+}
+
+/// A3 click heatmap: counts per page × device × Tashkent day × kind (click | rage | dead) in
+/// 20‰ (of document width) × 20 px bins. Rebuilt per day by the `heatmaps.aggregate` job.
+model HeatmapCell {
+  day    DateTime @db.Date
+  path   String // locale-less pathname
+  device String // mobile | desktop
+  kind   String
+  x      Int // bin start, ‰ of document width
+  y      Int // bin start, document px
+  count  Int
+
+  @@id([day, path, device, kind, x, y])
+}
+
+/// A3 "most clicked elements" and problem rules: per CSS selector of a page × device × day.
+model HeatmapElement {
+  day      DateTime @db.Date
+  path        String
+  device   String
+  selector String
+  label    String?
+  clicks   Int      @default(0)
+  rage     Int      @default(0)
+  dead     Int      @default(0)
+  exits    Int      @default(0) // clicks that were the session's last interaction
+
+  @@id([day, path, device, selector])
+}
+
+/// A3 page totals per device × day: sessions, scroll reach, click kinds, LCP samples.
+model HeatmapPage {
+  day       DateTime @db.Date
+  path        String
+  device    String
+  sessions  Int      @default(0) // distinct sessions with a page_view
+  pageviews   Int      @default(0)
+  reach25   Int      @default(0) // distinct sessions reaching the depth
+  reach50   Int      @default(0)
+  reach75   Int      @default(0)
+  reach100  Int      @default(0)
+  scrollSum Int      @default(0) // Σ max depth per session
+  clicks    Int      @default(0)
+  rage      Int      @default(0)
+  dead      Int      @default(0)
+  lcpCount  Int      @default(0)
+  lcpSlow   Int      @default(0) // samples > 2.5 s
+  lcpSumMs  BigInt   @default(0)
+
+  @@id([day, path, device])
+  @@index([day, device])
 }

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
+import { TrackView } from '@/components/analytics/track-view';
 import { ProductCard } from '@/components/product/product-card';
 import { apiGetOptional } from '@/lib/api';
 import { alternates } from '@/lib/seo';
@@ -82,6 +83,19 @@ export default async function SearchPage({ params, searchParams }: Props) {
               {t('toCatalog')}
             </Link>
           </p>
+        ) : null}
+        {result ? (
+          <TrackView name="search" props={{ q: result.query, results: result.products.length }} />
+        ) : null}
+        {result?.products.length ? (
+          <TrackView
+            name="view_item_list"
+            props={{
+              list: 'search',
+              items: result.products.slice(0, 60).map((p) => p.id),
+              count: result.products.length,
+            }}
+          />
         ) : null}
         {result ? (
           <p

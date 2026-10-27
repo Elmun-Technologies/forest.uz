@@ -15,6 +15,7 @@ import {
 import type { Prisma } from '@forest/db';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
+import { signDeepLink, telegramDeepLink } from '../customer/deeplink';
 import { yandexClaimLive } from '../delivery/shipment-state';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -234,9 +235,11 @@ export class OrdersService {
       createdAt: o.createdAt.toISOString(),
       timeline: this.timeline(o, locale),
       trackingUrl: `${this.env.APP_URL}/t/${o.trackingToken}`,
-      telegramDeepLink: store.telegramBot
-        ? `https://t.me/${store.telegramBot}?start=o_${o.trackingToken}`
-        : null,
+      // Signed `o` start payload: the bot answers with this order's status (CLAUDE.md §6, 5A).
+      telegramDeepLink: telegramDeepLink(
+        store.telegramBot,
+        signDeepLink({ kind: 'order', token: o.trackingToken }, this.env.SESSION_SECRET),
+      ),
       canRetryPayment:
         o.status === 'NEW' &&
         o.paymentMethod !== 'COD' &&

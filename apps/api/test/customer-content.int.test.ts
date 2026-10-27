@@ -240,23 +240,29 @@ describe('search, content, SEO feeds (integration)', () => {
 
   // ───────── SEO ─────────
 
-  it('serves sitemap data for active products, categories and published pages', async () => {
-    const res = await http().get('/v1/seo/sitemap-data').expect(200);
-    expect(res.body.products).toHaveLength(8);
-    expect(res.body.products[0]).toEqual({
-      slug: expect.any(String),
-      updatedAt: expect.any(String),
-    });
-    expect(res.body.categories.map((c: { slug: string }) => c.slug)).toEqual([
+  it('serves sitemaps for active products, categories and published pages', async () => {
+    const index = await http().get('/v1/seo/sitemap.xml').expect(200);
+    for (const file of [
+      'uz-pages',
+      'uz-categories',
+      'uz-products',
+      'ru-pages',
+      'ru-categories',
+      'ru-products',
+    ])
+      expect(index.text).toContain(`/sitemaps/${file}.xml</loc>`);
+    const products = (await http().get('/v1/seo/sitemaps/uz-products.xml').expect(200)).text;
+    expect(products.match(/<url>/g)).toHaveLength(8);
+    const categories = (await http().get('/v1/seo/sitemaps/uz-categories.xml').expect(200)).text;
+    expect([...categories.matchAll(/\/uz\/katalog\/([a-z-]+)<\/loc>/g)].map((m) => m[1])).toEqual([
       'mebel-uchun',
       'mato-uchun',
       'aksessuarlar',
       'toplamlar',
     ]);
-    expect(res.body.pages).toContainEqual(
-      expect.objectContaining({ kind: 'LEGAL', slug: 'oferta', locales: ['uz', 'ru'] }),
-    );
-    expect(res.body.pages.some((p: { kind: string }) => p.kind === 'FAQ')).toBe(false);
+    const pages = (await http().get('/v1/seo/sitemaps/ru-pages.xml').expect(200)).text;
+    expect(pages).toContain('/ru/oferta</loc>');
+    expect(pages).not.toContain('FAQ');
   });
 
   it('resolves redirects (query ignored, trailing-slash tolerant) and counts hits', async () => {

@@ -18,6 +18,8 @@
 		Referrer-Policy strict-origin-when-cross-origin
 		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
 	}
+	# Only the API calls it, over the internal network (signed anyway; CLAUDE.md §6).
+	respond /api/revalidate 404
 	reverse_proxy web:3000
 }
 

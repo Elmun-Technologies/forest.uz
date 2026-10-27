@@ -88,6 +88,7 @@ export function ProfileForm({ me, telegramBot }: { me: MeDto; telegramBot: strin
               {...p}
               value={name}
               autoComplete="name"
+              data-private
               maxLength={80}
               onChange={(e) => setName(e.target.value)}
             />

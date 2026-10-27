@@ -1,7 +1,8 @@
 /**
  * Integration registry: drives admin A10 (cards, filters, launch kit, credential forms).
  * Adding an integration = add a definition here (+ an adapter when implemented); no UI work.
- * The 46 entries mirror design/source/Admin-Integratsiya.dc.html.
+ * 46 entries mirror design/source/Admin-Integratsiya.dc.html; Phase 4 added PageSpeed Insights (A9)
+ * and Yandex Audiences (A8).
  */
 export type IntegrationCategory =
   | 'payment'
@@ -503,13 +504,13 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     fields: [
       secret('botToken', 'Bot token', 'Токен бота'),
       text('botUsername', 'Bot username', 'Username бота'),
-      // Needed for admin alerts (Phase 5), not for the login widget.
+      // Admin alerts group (new order, payment failed, SLA risk, ≤3★, complaint, errors).
       text('adminChatId', 'Admin guruh chat ID', 'Chat ID админ-группы', false),
     ],
     launchKit: true,
     availability: 'available',
-    // Login widget verification + getMe health check are implemented; bot messaging is Phase 5.
-    implemented: false,
+    // Login widget + bot (webhook set on connect with a generated secret, flows 1–5, alerts).
+    implemented: true,
     webhookPath: '/v1/webhooks/telegram',
     docsUrl: 'https://core.telegram.org/bots/api',
   },
@@ -599,10 +600,18 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       text('pixelId', 'Pixel ID', 'Pixel ID'),
       secret('accessToken', 'Access token', 'Access token'),
       text('testEventCode', 'Test event code', 'Test event code', false),
+      // Custom Audiences (A8) live in an ad account; CAPI needs only the pixel.
+      text(
+        'adAccountId',
+        'Reklama hisobi ID (auditoriyalar)',
+        'ID рекламного аккаунта (аудитории)',
+        false,
+      ),
     ],
     launchKit: false,
     availability: 'available',
-    implemented: false,
+    // CAPI + Custom Audiences (docs/runbooks/ads.md).
+    implemented: true,
   },
   {
     key: 'google_ads',
@@ -613,12 +622,27 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     fields: [
       secret('developerToken', 'Developer token', 'Developer token'),
       text('customerId', 'Customer ID', 'Customer ID'),
+      text('loginCustomerId', 'Manager (MCC) customer ID', 'ID управляющего аккаунта (MCC)', false),
+      text('oauthClientId', 'OAuth client ID', 'OAuth client ID'),
+      secret('oauthClientSecret', 'OAuth client secret', 'OAuth client secret'),
       secret('refreshToken', 'OAuth refresh token', 'OAuth refresh token'),
-      text('conversionActionId', 'Conversion action ID', 'Conversion action ID'),
+      text(
+        'conversionActionId',
+        'Xarid konversiyasi (action ID)',
+        'Конверсия «покупка» (action ID)',
+        false,
+      ),
+      text(
+        'leadConversionActionId',
+        'Lead konversiyasi (action ID)',
+        'Конверсия «лид» (action ID)',
+        false,
+      ),
     ],
     launchKit: false,
     availability: 'available',
-    implemented: false,
+    // Offline/enhanced conversions + Customer Match (docs/runbooks/ads.md).
+    implemented: true,
   },
   {
     key: 'tiktok_pixel',
@@ -629,10 +653,13 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     fields: [
       text('pixelId', 'Pixel ID', 'Pixel ID'),
       secret('accessToken', 'Access token', 'Access token'),
+      text('advertiserId', 'Advertiser ID (auditoriyalar)', 'Advertiser ID (аудитории)', false),
+      text('testEventCode', 'Test event code', 'Test event code', false),
     ],
     launchKit: false,
     availability: 'available',
-    implemented: false,
+    // Events API + customer-file audiences (docs/runbooks/ads.md).
+    implemented: true,
   },
   {
     key: 'yandex_metrika',
@@ -650,6 +677,20 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     launchKit: false,
     availability: 'available',
     implemented: false,
+  },
+  {
+    key: 'yandex_audience',
+    name: 'Yandex Audience',
+    category: 'ads',
+    icon: 'yandexmetrika',
+    description: L(
+      'Yandex Direct uchun auditoriyalar: rozilik bergan mijozlar telefonining xeshi.',
+      'Аудитории для Яндекс Директа: хеши телефонов клиентов с согласием.',
+    ),
+    fields: [secret('oauthToken', 'OAuth token (audience)', 'OAuth-токен (audience)')],
+    launchKit: false,
+    availability: 'available',
+    implemented: true,
   },
   {
     key: 'gtm',
@@ -695,7 +736,8 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     ],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
+    docsUrl: 'https://developers.google.com/webmaster-tools/v1/searchanalytics/query',
   },
   {
     key: 'ywm',
@@ -713,18 +755,38 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     ],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
+    docsUrl: 'https://yandex.ru/dev/webmaster/doc/',
   },
   {
     key: 'bing',
     name: 'Bing Webmaster',
     category: 'seo',
     icon: 'bing',
-    description: L('Bing va ChatGPT qidiruvi uchun indeks.', 'Индекс для Bing и поиска ChatGPT.'),
-    fields: [secret('indexNowKey', 'IndexNow kaliti', 'Ключ IndexNow', false)],
+    description: L(
+      'Bing va ChatGPT qidiruvi uchun indeks. IndexNow kaliti avtomatik (SEO markazi).',
+      'Индекс для Bing и поиска ChatGPT. Ключ IndexNow создаётся автоматически (SEO-центр).',
+    ),
+    // IndexNow needs no credentials: the key is generated on install (setting `seo.indexnow`).
+    fields: [],
     launchKit: false,
     availability: 'available',
     implemented: false,
+  },
+  {
+    key: 'pagespeed',
+    name: 'PageSpeed Insights',
+    category: 'seo',
+    mark: 'PSI',
+    description: L(
+      "Laboratoriya CWV o'lchovi (mobil). Kalitsiz ham ishlaydi, kalit kvotani oshiradi.",
+      'Лабораторный замер CWV (мобильный). Работает и без ключа, ключ увеличивает квоту.',
+    ),
+    fields: [secret('apiKey', 'API kalit', 'API-ключ', false)],
+    launchKit: false,
+    availability: 'available',
+    implemented: true,
+    docsUrl: 'https://developers.google.com/speed/docs/insights/v5/get-started',
   },
   {
     key: 'cloudflare',
@@ -786,10 +848,12 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       'Mahsulot tavsifi UZ/RU, operatorga javob qoralamasi.',
       'Описания товаров UZ/RU, черновики ответов оператору.',
     ),
+    // model blank = AI_DRAFT_POLICY.defaultModel (contracts).
     fields: [secret('apiKey', 'API kalit', 'API-ключ'), text('model', 'Model', 'Модель', false)],
     launchKit: false,
     availability: 'available',
-    implemented: false,
+    implemented: true,
+    docsUrl: 'https://platform.claude.com/docs/',
   },
   {
     key: 'openai',

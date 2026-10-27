@@ -105,7 +105,7 @@ export default async function OrderPage({ params }: Props) {
                 t('cancelledTitle')
               ) : (
                 <>
-                  {t('thanks', { name: o.contactName })}
+                  <span data-private>{t('thanks', { name: o.contactName })}</span>
                   <br />
                   {t('received')}
                 </>
@@ -229,7 +229,11 @@ export default async function OrderPage({ params }: Props) {
         <div className="flex flex-[1_1_300px] flex-col gap-2.5 rounded-lg bg-panel p-6 lg:rounded-[32px] lg:p-8">
           <span className={label}>{t('addressTitle')}</span>
           <b className="text-lg font-semibold">{placeName(o.address, locale)}</b>
-          {o.address.line ? <span className="text-[15px] text-muted">{o.address.line}</span> : null}
+          {o.address.line ? (
+            <span className="text-[15px] text-muted" data-private>
+              {o.address.line}
+            </span>
+          ) : null}
           {carrier ? (
             <span className="mt-1 inline-flex items-center gap-2.5 text-[13px] text-muted">
               <Logo
@@ -243,7 +247,9 @@ export default async function OrderPage({ params }: Props) {
         </div>
         <div className="flex flex-[1_1_300px] flex-col gap-2.5 rounded-lg bg-panel p-6 lg:rounded-[32px] lg:p-8">
           <span className={label}>{t('recipient')}</span>
-          <b className="text-lg font-semibold">{o.contactName}</b>
+          <b className="text-lg font-semibold" data-private>
+            {o.contactName}
+          </b>
           <span className="tabular text-[15px] text-muted" data-private>
             {o.contactPhone}
           </span>

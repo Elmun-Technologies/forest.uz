@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { RateLimiter } from '../customer/common/rate-limit';
+import { AdminAudiencesModule } from './audiences/audiences.controller';
+import { AdminBotModule } from './bot/admin-bot.controller';
 import { AdminAuditController } from './audit/audit.controller';
 import { AuditEnforcementInterceptor } from './audit/audit.interceptor';
 import { AuditService } from './audit/audit.service';
@@ -18,6 +20,11 @@ import { AdminReviewsModule } from './reviews/reviews.controller';
 import { AdminStaffController } from './staff/staff.controller';
 import { StaffService } from './staff/staff.service';
 import { AdminMoyskladModule } from './moysklad/admin-moysklad.module';
+import { AdminSeoModule } from './seo/admin-seo.controller';
+import { AdminHeatmapsModule } from './heatmaps/heatmaps.controller';
+import { AdminAnalyticsModule } from './analytics/admin-analytics.controller';
+import { AdminMessagingModule } from './messaging/admin-messaging.controller';
+import { AdminAutomationModule } from './automation/automation-admin.module';
 
 /**
  * Admin building blocks every admin controller needs (guards' dependencies, audit). Global so
@@ -56,6 +63,13 @@ export class AdminCoreModule {}
     AdminReviewsModule,
     AdminPromoModule,
     AdminMoyskladModule,
+    AdminSeoModule,
+    AdminHeatmapsModule,
+    AdminAnalyticsModule,
+    AdminAudiencesModule,
+    AdminBotModule,
+    AdminMessagingModule,
+    AdminAutomationModule,
   ],
   controllers: [
     AdminAuthController,

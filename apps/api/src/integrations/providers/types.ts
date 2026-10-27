@@ -236,29 +236,26 @@ export interface InventoryProvider {
   ): Promise<{ created: number; existing: number }>;
 }
 
-// ── Ads & AI ──
-export interface AdSignalEvent {
-  eventId: string;
-  name: 'PageView' | 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Lead' | 'Purchase';
-  at: Date;
-  valueTiyin?: bigint;
-  hashedPhone?: string;
-  clickIds?: Record<string, string>;
-  ip?: string | null;
-  userAgent?: string | null;
-  url?: string;
-}
-
-export interface AdSignalProvider {
-  readonly key: 'meta_capi' | 'google_ads' | 'tiktok_pixel' | 'yandex_metrika';
-  send(events: AdSignalEvent[]): Promise<{ accepted: number }>;
+// ── Ads & AI ── (ad platform ports: `ads/types.ts`)
+export interface AiCompletion {
+  /** With `schema`: the JSON document (already a string, parse it). */
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Model that produced the answer (a refusal fallback may differ from the requested one). */
+  model: string;
+  /** The answer is a refusal or was cut off: no usable draft. */
+  stopped: 'refusal' | 'max_tokens' | null;
 }
 
 export interface AiProvider {
   readonly key: 'claude' | 'openai';
+  readonly fake: boolean;
   complete(input: {
     system: string;
     prompt: string;
     maxTokens: number;
-  }): Promise<{ text: string; inputTokens: number; outputTokens: number }>;
+    /** JSON schema of the answer (structured output). */
+    schema?: Record<string, unknown>;
+  }): Promise<AiCompletion>;
 }

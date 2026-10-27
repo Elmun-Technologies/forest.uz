@@ -1,4 +1,10 @@
-import { UZ_REGIONS, type SettingKey, type SettingValue } from '@forest/contracts';
+import { randomBytes } from 'node:crypto';
+import {
+  BOT_COMPLAINT_KEYWORDS,
+  UZ_REGIONS,
+  type SettingKey,
+  type SettingValue,
+} from '@forest/contracts';
 
 const allWeek = [0, 1, 2, 3, 4, 5, 6];
 const regionsExceptTashkentCity = UZ_REGIONS.map((r) => r.code).filter(
@@ -89,9 +95,28 @@ export const settings: { [K in SettingKey]: SettingValue<K> } = {
     operatorEnd: '21:00',
     abandonedCartMinutes: 120,
     reviewRequestDays: 3,
+    operatorIds: [],
+    languages: ['uz', 'ru'],
+    scenarios: { abandonedCart: true, reviewRequest: true, waitlist: true },
+  },
+  // Same values as migration 20261027160000_telegram_bot.
+  'bot.rules': {
+    scenarios: { lead: true, orderStatus: true, advice: true },
+    complaintKeywords: BOT_COMPLAINT_KEYWORDS,
   },
   'seo.verification': { google: null, yandex: null, bing: null },
-  'tracking.rules': { replaySamplePct: 30, replayCheckoutPct: 100 },
+  'seo.robots': { custom: null },
+  'seo.schema': {
+    product: true,
+    organization: true,
+    breadcrumb: true,
+    faq: true,
+    howTo: false,
+    video: false,
+  },
+  // Generated per install (the migration does the same); `--force` re-seeding issues a new key.
+  'seo.indexnow': { enabled: true, key: randomBytes(16).toString('hex') },
+  'tracking.rules': { replayEnabled: true, replaySamplePct: 30, replayCheckoutPct: 100 },
   'returns.rules': { returnDays: 14, defectReportHours: 48, refundBusinessDays: '3–10' },
   // Stock photos (design/assets/photos) until the owner uploads real ones; no how-to video yet.
   'home.media': {

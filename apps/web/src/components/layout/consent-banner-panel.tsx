@@ -8,8 +8,9 @@ import { routes } from '@/config/site';
 import { writeConsent } from '@/lib/consent';
 
 /**
- * Cookie consent (analytics vs marketing, docs/07). UI only: stores the choice in `fr_consent`
- * and emits `fr:consent`; the Phase 4 tracker reads it. Shown until the visitor decides.
+ * Cookie consent (analytics, session recording, marketing — docs/07). UI only: stores the choice
+ * in `fr_consent` and emits `fr:consent`; the tracker and the replay gate read it. Shown until the
+ * visitor decides. Recording is opt-in: "Sozlash" starts with it off.
  */
 export default function ConsentBanner() {
   const t = useTranslations('consent');
@@ -17,12 +18,14 @@ export default function ConsentBanner() {
   const [custom, setCustom] = useState(false);
   const [analytics, setAnalytics] = useState(true);
   const [marketing, setMarketing] = useState(false);
+  const [replay, setReplay] = useState(false);
   const titleId = useId();
   const aId = useId();
   const mId = useId();
+  const rId = useId();
 
   if (!open) return null;
-  const decide = (choice: { analytics: boolean; marketing: boolean }) => {
+  const decide = (choice: { analytics: boolean; marketing: boolean; replay: boolean }) => {
     writeConsent(choice);
     setOpen(false);
   };
@@ -55,6 +58,22 @@ export default function ConsentBanner() {
           </div>
           <div className="flex items-start justify-between gap-4">
             <span className="flex flex-col gap-0.5">
+              <label htmlFor={rId} className="font-semibold">
+                {t('replay')}
+              </label>
+              <span className="text-xs text-muted">{t('replayHint')}</span>
+            </span>
+            {/* Recording needs analytics: off and locked while analytics is off. */}
+            <Switch
+              id={rId}
+              checked={analytics && replay}
+              disabled={!analytics}
+              onCheckedChange={setReplay}
+              data-testid="consent-replay"
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4">
+            <span className="flex flex-col gap-0.5">
               <label htmlFor={mId} className="font-semibold">
                 {t('marketing')}
               </label>
@@ -62,19 +81,25 @@ export default function ConsentBanner() {
             </span>
             <Switch id={mId} checked={marketing} onCheckedChange={setMarketing} />
           </div>
-          <Button size="sm" onClick={() => decide({ analytics, marketing })}>
+          <Button
+            size="sm"
+            onClick={() => decide({ analytics, marketing, replay: analytics && replay })}
+          >
             {t('save')}
           </Button>
         </div>
       ) : (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => decide({ analytics: true, marketing: true })}>
+          <Button
+            size="sm"
+            onClick={() => decide({ analytics: true, marketing: true, replay: true })}
+          >
             {t('acceptAll')}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => decide({ analytics: false, marketing: false })}
+            onClick={() => decide({ analytics: false, marketing: false, replay: false })}
           >
             {t('necessary')}
           </Button>

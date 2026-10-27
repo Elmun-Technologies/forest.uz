@@ -8,15 +8,19 @@ import {
   legalComplete,
   type SettingKey,
   settingSchemas,
+  type ReplaySettingsDto,
+  type ReplaySettingsInput,
   type StoreSettingsDto,
   type StoreSettingsInput,
 } from '@forest/contracts';
 import type { Prisma } from '@forest/db';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SeoEventsService } from '../../seo/seo-events.service';
 import { SettingsService } from '../../settings/settings.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
 
 const STORE_KEYS = ['store.info'] as const satisfies readonly SettingKey[];
+const TRACKING_KEYS = ['tracking.rules'] as const satisfies readonly SettingKey[];
 const DELIVERY_KEYS = [
   'delivery.zones',
   'delivery.rules',
@@ -45,6 +49,7 @@ export class AdminSettingsService {
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly seoEvents: SeoEventsService,
   ) {}
 
   /** Version token = newest `updatedAt` of the document's keys (optimistic concurrency). */
@@ -97,6 +102,30 @@ export class AdminSettingsService {
     return this.delivery();
   }
 
+  /** A3 replay kill switch and sample rates (`tracking.rules`). */
+  async tracking(): Promise<ReplaySettingsDto> {
+    const { byKey, version } = await this.rows(TRACKING_KEYS);
+    const v = settingSchemas['tracking.rules'].parse(byKey.get('tracking.rules'));
+    return {
+      value: {
+        replayEnabled: v.replayEnabled,
+        replaySamplePct: v.replaySamplePct,
+        replayCheckoutPct: v.replayCheckoutPct,
+      },
+      version,
+    };
+  }
+
+  async saveTracking(actor: AuditActor, input: ReplaySettingsInput): Promise<ReplaySettingsDto> {
+    const { byKey } = await this.rows(TRACKING_KEYS);
+    // Keep any other `tracking.rules` fields; only the replay ones are edited here.
+    const current = (byKey.get('tracking.rules') ?? {}) as Record<string, unknown>;
+    await this.save(actor, 'settings.tracking.update', TRACKING_KEYS, input.version, {
+      'tracking.rules': { ...current, ...input.value },
+    });
+    return this.tracking();
+  }
+
   private async save(
     actor: AuditActor,
     action: string,
@@ -138,5 +167,7 @@ export class AdminSettingsService {
       );
     });
     this.settings.invalidate();
+    // Storefront pages read these through `/settings/public` (fetch tag `settings`).
+    this.seoEvents.settingsChanged(['settings']);
   }
 }

@@ -55,6 +55,7 @@ export default async function AccountLayout({
           <span className="flex min-w-0 flex-1 flex-col gap-1">
             <span
               data-testid="account-identity"
+              data-private
               className="truncate text-xl font-semibold tracking-[-0.02em] lg:text-2xl"
             >
               {title}

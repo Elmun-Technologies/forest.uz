@@ -31,6 +31,7 @@ import { notFoundWithRedirect } from '@/lib/not-found';
 import { getSettings } from '@/lib/data';
 import { expressZone, regionsZone } from '@/lib/delivery';
 import { absoluteUrl, alternates, metaDescription } from '@/lib/seo';
+import { getSchemaToggles, getSeoOverride, withSeoOverride } from '@/lib/seo-meta';
 
 type Props = { params: Promise<{ locale: Locale; slug: string }> };
 
@@ -50,25 +51,32 @@ const loadProduct = cache(async (slug: string, locale: Locale): Promise<ProductD
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, slug } = await params;
   const p = await loadProduct(slug, locale);
-  const t = await getTranslations({ locale, namespace: 'product' });
+  const [t, override] = await Promise.all([
+    getTranslations({ locale, namespace: 'product' }),
+    // Admin SEO (product editor / A9); blank fields keep the docs/10 template below.
+    getSeoOverride(locale, routes.product(p.slug), p.slug),
+  ]);
   const title = t('metaTitle', { name: p.name });
   const description = metaDescription(`${p.shortDesc} ${t('metaDescriptionTail')}`);
-  return {
-    title,
-    description,
-    alternates: alternates(locale, routes.product(p.slug)),
-    openGraph: {
+  return withSeoOverride(
+    {
       title,
       description,
-      type: 'website',
-      images: p.images.slice(0, 1).map((i) => ({
-        url: i.url,
-        width: i.width ?? undefined,
-        height: i.height ?? undefined,
-        alt: i.alt,
-      })),
+      alternates: alternates(locale, routes.product(p.slug)),
+      openGraph: {
+        title,
+        description,
+        type: 'website',
+        images: p.images.slice(0, 1).map((i) => ({
+          url: i.url,
+          width: i.width ?? undefined,
+          height: i.height ?? undefined,
+          alt: i.alt,
+        })),
+      },
     },
-  };
+    override,
+  );
 }
 
 const dryLabel = (t: (k: string, v: Record<string, number>) => string, minutes: number) =>
@@ -79,9 +87,10 @@ const dryLabel = (t: (k: string, v: Record<string, number>) => string, minutes: 
 export default async function ProductPage({ params }: Props) {
   const { locale, slug } = await params;
   setRequestLocale(locale);
-  const [p, settings, reviews] = await Promise.all([
+  const [p, settings, schema, reviews] = await Promise.all([
     loadProduct(slug, locale),
     getSettings(locale),
+    getSchemaToggles(locale),
     // Verified, approved reviews only; the section stays hidden until there is at least one.
     apiGetOptional<ProductReviewsDto>(
       `/catalog/products/${encodeURIComponent(slug)}/reviews`,
@@ -190,75 +199,80 @@ export default async function ProductPage({ params }: Props) {
         coverage={p.coverageM2PerL}
         express={express}
       >
-        <JsonLd
-          data={{
-            '@context': 'https://schema.org',
-            '@type': 'Product',
-            name: p.name,
-            description: p.shortDesc,
-            image: images.map((i) => i.url),
-            sku: p.variants[0]?.sku,
-            url,
-            brand: { '@type': 'Brand', name: p.seller.name },
-            offers:
-              p.variants.length > 1
-                ? {
-                    '@type': 'AggregateOffer',
-                    priceCurrency: 'UZS',
-                    lowPrice: Math.min(...prices),
-                    highPrice: Math.max(...prices),
-                    offerCount: p.variants.length,
-                    availability: inStock.length
-                      ? 'https://schema.org/InStock'
-                      : 'https://schema.org/OutOfStock',
-                    url,
-                  }
-                : {
-                    '@type': 'Offer',
-                    priceCurrency: 'UZS',
-                    price: p.variants[0]?.priceSoum ?? p.priceFromSoum,
-                    availability: inStock.length
-                      ? 'https://schema.org/InStock'
-                      : 'https://schema.org/OutOfStock',
-                    url,
-                    seller: { '@type': 'Organization', name: p.seller.name },
-                  },
-            ...(p.rating
-              ? {
-                  aggregateRating: {
-                    '@type': 'AggregateRating',
-                    ratingValue: p.rating.average,
-                    reviewCount: p.rating.count,
-                  },
-                }
-              : {}),
-          }}
-        />
-        <JsonLd
-          data={{
-            '@context': 'https://schema.org',
-            '@type': 'BreadcrumbList',
-            itemListElement: [
-              {
-                '@type': 'ListItem',
-                position: 1,
-                name: tc('home'),
-                item: absoluteUrl(locale, '/'),
-              },
-              ...(p.categorySlug && p.categoryName
-                ? [
-                    {
-                      '@type': 'ListItem',
-                      position: 2,
-                      name: p.categoryName,
-                      item: absoluteUrl(locale, routes.category(p.categorySlug)),
+        {schema.product ? (
+          <JsonLd
+            data={{
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: p.name,
+              description: p.shortDesc,
+              image: images.map((i) => i.url),
+              sku: p.variants[0]?.sku,
+              url,
+              brand: { '@type': 'Brand', name: p.seller.name },
+              offers:
+                p.variants.length > 1
+                  ? {
+                      '@type': 'AggregateOffer',
+                      priceCurrency: 'UZS',
+                      lowPrice: Math.min(...prices),
+                      highPrice: Math.max(...prices),
+                      offerCount: p.variants.length,
+                      availability: inStock.length
+                        ? 'https://schema.org/InStock'
+                        : 'https://schema.org/OutOfStock',
+                      url,
+                    }
+                  : {
+                      '@type': 'Offer',
+                      priceCurrency: 'UZS',
+                      price: p.variants[0]?.priceSoum ?? p.priceFromSoum,
+                      availability: inStock.length
+                        ? 'https://schema.org/InStock'
+                        : 'https://schema.org/OutOfStock',
+                      url,
+                      seller: { '@type': 'Organization', name: p.seller.name },
                     },
-                  ]
-                : []),
-              { '@type': 'ListItem', position: p.categorySlug ? 3 : 2, name: p.name, item: url },
-            ],
-          }}
-        />
+              // Only real approved reviews (API: rating null without them).
+              ...(p.rating
+                ? {
+                    aggregateRating: {
+                      '@type': 'AggregateRating',
+                      ratingValue: p.rating.average,
+                      reviewCount: p.rating.count,
+                    },
+                  }
+                : {}),
+            }}
+          />
+        ) : null}
+        {schema.breadcrumb ? (
+          <JsonLd
+            data={{
+              '@context': 'https://schema.org',
+              '@type': 'BreadcrumbList',
+              itemListElement: [
+                {
+                  '@type': 'ListItem',
+                  position: 1,
+                  name: tc('home'),
+                  item: absoluteUrl(locale, '/'),
+                },
+                ...(p.categorySlug && p.categoryName
+                  ? [
+                      {
+                        '@type': 'ListItem',
+                        position: 2,
+                        name: p.categoryName,
+                        item: absoluteUrl(locale, routes.category(p.categorySlug)),
+                      },
+                    ]
+                  : []),
+                { '@type': 'ListItem', position: p.categorySlug ? 3 : 2, name: p.name, item: url },
+              ],
+            }}
+          />
+        ) : null}
 
         <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pb-24 lg:gap-6 lg:px-6 lg:pt-2 lg:pb-16">
           <nav

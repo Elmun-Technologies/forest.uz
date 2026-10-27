@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   DomainError,
+  tashkentDayKey,
   type LeadResultDto,
   type Locale,
   leadSchema,
@@ -11,6 +12,8 @@ import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
+import { IdentityService } from '../../tracking/identity.service';
+import { recordLeadEvent } from '../../tracking/server-events';
 import { ConsentsService } from '../common/consents';
 import { TemplateSms } from '../common/messaging';
 import { RateLimiter } from '../common/rate-limit';
@@ -29,6 +32,7 @@ export class LeadsService {
     private readonly consents: ConsentsService,
     private readonly sms: TemplateSms,
     private readonly limiter: RateLimiter,
+    private readonly identity: IdentityService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -40,6 +44,7 @@ export class LeadsService {
     input: z.infer<typeof leadSchema>,
     ip: string | null,
     locale: Locale,
+    tracking?: { anonymousId: string | null; sessionId: string | null; path: string | null },
   ): Promise<LeadResultDto> {
     await this.limiter.consume('lead:ip', ip ?? 'unknown', 10, 3600);
     await this.limiter.consume('lead:phone', input.phone, 5, 86_400);
@@ -61,6 +66,7 @@ export class LeadsService {
         await this.consents.record(tx, c.id, { smsMarketing: true }, input.source);
       return c.id;
     });
+    if (tracking) await this.trackLead(customerId, input.source, tracking, now);
 
     const store = await this.settings.get('store.info');
     if (await this.limiter.once('lead:sms', input.phone, 86_400)) {
@@ -86,6 +92,27 @@ export class LeadsService {
       promoCode: LEAD_PROMO_CODE,
       telegramDeepLink: telegramDeepLink(store.telegramBot, token),
     };
+  }
+
+  /** docs/07: server-side `lead` event + identity link of this browser (never fails the lead). */
+  private async trackLead(
+    customerId: string,
+    source: string,
+    tracking: { anonymousId: string | null; sessionId: string | null; path: string | null },
+    now: Date,
+  ): Promise<void> {
+    try {
+      await recordLeadEvent(this.prisma, {
+        customerId,
+        source,
+        ...tracking,
+        at: now,
+        day: tashkentDayKey(now),
+      });
+    } catch (e) {
+      this.logger.warn(`lead event failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    await this.identity.link(tracking.anonymousId, customerId);
   }
 
   /** Idempotent per (variant, phone) while the entry is not yet notified. */

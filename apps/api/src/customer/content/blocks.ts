@@ -80,6 +80,13 @@ function fillBlock(block: ContentBlock, vars: ContentVars): ContentBlock | null 
       });
       return items.length ? { ...block, items } : null;
     }
+    case 'quote': {
+      const text = f(block.text);
+      return text === null ? null : { ...block, text, cite: f(block.cite) ?? '' };
+    }
+    case 'image':
+      // A caption/alt with a missing variable is dropped; the picture itself stays.
+      return { ...block, alt: f(block.alt) ?? '', caption: f(block.caption) ?? '' };
     case 'table': {
       const head = block.head.map(f);
       if (head.some((h) => h === null)) return null;

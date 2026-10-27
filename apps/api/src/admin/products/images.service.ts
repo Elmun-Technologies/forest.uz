@@ -65,7 +65,7 @@ export class AdminProductImagesService {
       await this.uploads.discardObject(stored.key);
       throw e;
     }
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   async updateAlt(
@@ -88,7 +88,7 @@ export class AdminProductImagesService {
         tx,
       );
     });
-    return this.products.get(image.productId);
+    return this.products.changed(image.productId);
   }
 
   async reorder(
@@ -121,7 +121,7 @@ export class AdminProductImagesService {
         tx,
       );
     });
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   async remove(actor: AuditActor, imageId: string): Promise<AdminProductDto> {
@@ -141,7 +141,7 @@ export class AdminProductImagesService {
       );
     });
     await this.uploads.discardUnreferenced([image.fileId]);
-    return this.products.get(image.productId);
+    return this.products.changed(image.productId);
   }
 
   private async find(imageId: string) {

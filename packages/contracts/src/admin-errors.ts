@@ -1,7 +1,14 @@
+import { ADMIN_ANALYTICS_ERROR_MESSAGES } from './admin-analytics-errors';
+import { AUTOMATION_ERROR_MESSAGES } from './automation-errors';
+import { ADMIN_AUDIENCES_ERROR_MESSAGES } from './admin-audiences-errors';
 import { ADMIN_CATALOG_ERROR_MESSAGES } from './admin-catalog-errors';
+import { BOT_ERROR_MESSAGES } from './bot-errors';
 import { ADMIN_CRM_ERROR_MESSAGES } from './admin-crm-errors';
 import { ADMIN_MOYSKLAD_ERROR_MESSAGES } from './admin-moysklad-errors';
+import { HEATMAP_ERROR_MESSAGES } from './heatmap-errors';
 import { ADMIN_ORDERS_ERROR_MESSAGES } from './admin-orders-errors';
+import { ADMIN_SEO_ERROR_MESSAGES } from './admin-seo-errors';
+import { MESSAGING_ERROR_MESSAGES } from './messaging-errors';
 
 /**
  * Admin error codes, merged into `ERROR_MESSAGES` (errors.ts). Kept apart so the admin area grows
@@ -78,4 +85,11 @@ export const ADMIN_ERROR_MESSAGES = {
   ...ADMIN_CRM_ERROR_MESSAGES,
   ...ADMIN_ORDERS_ERROR_MESSAGES,
   ...ADMIN_MOYSKLAD_ERROR_MESSAGES,
+  ...HEATMAP_ERROR_MESSAGES,
+  ...ADMIN_ANALYTICS_ERROR_MESSAGES,
+  ...ADMIN_AUDIENCES_ERROR_MESSAGES,
+  ...ADMIN_SEO_ERROR_MESSAGES,
+  ...MESSAGING_ERROR_MESSAGES,
+  ...AUTOMATION_ERROR_MESSAGES,
+  ...BOT_ERROR_MESSAGES,
 } as const satisfies Record<string, { http: number; uz: string; ru: string }>;

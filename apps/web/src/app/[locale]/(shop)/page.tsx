@@ -21,6 +21,7 @@ import { telegramUrl } from '@/config/site';
 import { apiGetOptional } from '@/lib/api';
 import { getHomeContent, getSettings } from '@/lib/data';
 import { absoluteUrl, alternates, siteUrl } from '@/lib/seo';
+import { getSchemaToggles, getSeoOverride, withSeoOverride } from '@/lib/seo-meta';
 
 export async function generateMetadata({
   params,
@@ -28,27 +29,40 @@ export async function generateMetadata({
   params: Promise<{ locale: Locale }>;
 }): Promise<Metadata> {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'meta' });
-  return {
-    title: { absolute: t('title') },
-    description: t('description'),
-    alternates: alternates(locale, '/'),
-    openGraph: { title: t('title'), description: t('description'), url: absoluteUrl(locale, '/') },
-  };
+  const [t, override] = await Promise.all([
+    getTranslations({ locale, namespace: 'meta' }),
+    getSeoOverride(locale, '/'),
+  ]);
+  return withSeoOverride(
+    {
+      title: { absolute: t('title') },
+      description: t('description'),
+      alternates: alternates(locale, '/'),
+      openGraph: {
+        title: t('title'),
+        description: t('description'),
+        url: absoluteUrl(locale, '/'),
+      },
+    },
+    override,
+  );
 }
 
 export default async function HomePage({ params }: { params: Promise<{ locale: Locale }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
-  const [content, settings, t] = await Promise.all([
+  const [content, settings, t, schema] = await Promise.all([
     getHomeContent(locale),
     getSettings(locale),
     getTranslations('home.selector'),
+    getSchemaToggles(locale),
   ]);
   // Until GET /content/home exists the page still sells: bestsellers come from the catalog.
   const bestsellers =
     content?.bestsellers ??
-    (await apiGetOptional<ProductCardDto[]>('/catalog/bestsellers', locale)) ??
+    (await apiGetOptional<ProductCardDto[]>('/catalog/bestsellers', locale, {
+      tags: ['catalog'],
+    })) ??
     [];
   const faq = renderableFaq(content?.faq ?? []);
   const store = settings?.store;
@@ -57,7 +71,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
   return (
     <ClientMessages namespaces={['home']}>
       <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pt-0 lg:gap-6 lg:px-6 lg:pt-2">
-        {store ? (
+        {store && schema.organization ? (
           <JsonLd
             data={{
               '@context': 'https://schema.org',
@@ -81,7 +95,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: L
             }}
           />
         ) : null}
-        {faq.length > 0 ? (
+        {faq.length > 0 && schema.faq ? (
           <JsonLd
             data={{
               '@context': 'https://schema.org',

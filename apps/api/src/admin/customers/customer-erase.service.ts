@@ -8,6 +8,7 @@ import {
 import { Prisma } from '@forest/db';
 import { SessionService } from '../../common/session';
 import { ConsentsService } from '../../customer/common/consents';
+import { ReplayRetentionService } from '../../heatmaps/replay-retention.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
 import { AdminUploadService } from '../files/upload.service';
@@ -29,10 +30,11 @@ export class CustomerEraseService {
     private readonly consents: ConsentsService,
     private readonly sessions: SessionService,
     private readonly uploads: AdminUploadService,
+    private readonly replays: ReplayRetentionService,
   ) {}
 
   async erase(actor: AuditActor, id: string, confirm: string): Promise<CustomerEraseResultDto> {
-    const { result, photoIds } = await this.prisma.$transaction(async (tx) => {
+    const { result, photoIds, replayKeys } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${id} FOR UPDATE`;
       const c = await tx.customer.findUnique({ where: { id } });
       if (!c) throw new DomainError('NOT_FOUND');
@@ -57,13 +59,40 @@ export class CustomerEraseService {
       const notes = await tx.customerNote.deleteMany({ where: { customerId: id } });
       const carts = await tx.cart.deleteMany({ where: { customerId: id } });
       if (c.phone) await tx.otpCode.deleteMany({ where: { phone: c.phone } });
+      // Session recordings of this person (their sessions and their visitors' ones) go too.
+      const visitorIds = (
+        await tx.visitor.findMany({ where: { customerId: id }, select: { anonymousId: true } })
+      ).map((v) => v.anonymousId);
+      const replayWhere = {
+        hasReplay: true,
+        OR: [{ customerId: id }, { anonymousId: { in: visitorIds } }],
+      };
+      const replayKeys = (
+        await tx.session.findMany({ where: replayWhere, select: { replayKey: true } })
+      ).flatMap((r) => (r.replayKey ? [r.replayKey] : []));
+      await tx.session.updateMany({
+        where: replayWhere,
+        data: { hasReplay: false, replayKey: null },
+      });
       await tx.visitor.updateMany({ where: { customerId: id }, data: { customerId: null } });
       await tx.session.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      // Analytics events stamped by identity stitching / server events (no index on customerId:
+      // erase is a rare Owner action, the scan is acceptable).
+      await tx.$executeRaw`UPDATE "Event" SET "customerId" = NULL WHERE "customerId" = ${id}`;
       await tx.message.updateMany({ where: { customerId: id }, data: { body: '' } });
+      // Photos sent to the bot inbox (private bucket) go with the texts (5A).
+      const chatFileIds = (
+        await tx.conversationMessage.findMany({
+          where: { conversation: { customerId: id }, NOT: { fileIds: { isEmpty: true } } },
+          select: { fileIds: true },
+        })
+      ).flatMap((m) => m.fileIds);
       await tx.conversationMessage.updateMany({
         where: { conversation: { customerId: id } },
         data: { text: null, fileIds: [] },
       });
+      // Bot subscriber rows hold the Telegram name/username.
+      await tx.botSubscriber.deleteMany({ where: { customerId: id } });
       await tx.segmentMember.deleteMany({ where: { customerId: id } });
       // Telegram chat id identifies the person; the column is NOT NULL, 0 = erased (no real chat).
       await tx.conversation.updateMany({ where: { customerId: id }, data: { telegramChatId: 0n } });
@@ -74,7 +103,7 @@ export class CustomerEraseService {
         where: { customerId: id },
         select: { id: true, photoFileIds: true, beforeFileId: true },
       });
-      const photoIds: string[] = [];
+      const photoIds: string[] = [...chatFileIds];
       for (const r of reviews) {
         const own = r.beforeFileId !== null && r.photoFileIds.includes(r.beforeFileId);
         if (r.photoFileIds.length === 0) continue;
@@ -168,11 +197,15 @@ export class CustomerEraseService {
         photosRemoved: photoIds.length,
         external,
       };
-      return { result: done, photoIds };
+      return { result: done, photoIds, replayKeys };
     });
     // After commit: photo files nothing else references go (rows + objects; best effort).
     await this.uploads.discardUnreferenced([...new Set(photoIds)]).catch((e: unknown) => {
       this.logger.error(`photo cleanup failed after erasure: ${String(e)}`);
+    });
+    // After commit: their replay objects (flags already cleared; retention would catch leftovers).
+    await this.replays.removePrefixes(replayKeys).catch((e: unknown) => {
+      this.logger.error(`replay cleanup failed after erasure: ${String(e)}`);
     });
     // After commit: any live storefront session of this customer ends.
     await this.sessions.revokeCustomer(id).catch((e: unknown) => {

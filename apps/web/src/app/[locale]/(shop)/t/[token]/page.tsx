@@ -255,7 +255,7 @@ export default async function TrackingPage({ params }: Props) {
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-muted">{t('address')}</dt>
-                <dd className="text-right font-semibold">
+                <dd className="text-right font-semibold" data-private>
                   {[placeName(o.address, locale), o.address.line].filter(Boolean).join(', ')}
                 </dd>
               </div>

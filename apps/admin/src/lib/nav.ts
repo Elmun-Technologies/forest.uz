@@ -32,14 +32,14 @@ export const NAV: NavGroup[] = [
       {
         id: 'analytics',
         label: 'Analitika',
-        href: null,
+        href: '/analytics',
         icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
         permissions: ['analytics.view'],
       },
       {
         id: 'heatmap',
         label: 'Heatmap va sessiyalar',
-        href: null,
+        href: '/heatmaps',
         icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
         permissions: ['analytics.view'],
       },
@@ -65,14 +65,14 @@ export const NAV: NavGroup[] = [
       {
         id: 'audiences',
         label: 'Auditoriyalar',
-        href: null,
+        href: '/audiences',
         icon: 'M12 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 2v3M12 15v7M2 12h3M19 12h3',
         permissions: ['audiences.edit'],
       },
       {
         id: 'bot',
         label: 'Telegram bot',
-        href: null,
+        href: '/bot',
         icon: 'M21 4 3 11l6 2 2 6 3-4 5 4z',
         permissions: ['bot.inbox', 'bot.edit'],
       },
@@ -117,9 +117,16 @@ export const NAV: NavGroup[] = [
       {
         id: 'seo',
         label: 'SEO markazi',
-        href: null,
+        href: '/seo',
         icon: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-5-5M8 11h6M11 8v6',
         permissions: ['seo.edit'],
+      },
+      {
+        id: 'content',
+        label: 'Ilhom va Brend',
+        href: '/content',
+        icon: 'M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M15 9h.01',
+        permissions: ['content.edit'],
       },
       {
         id: 'integrations',

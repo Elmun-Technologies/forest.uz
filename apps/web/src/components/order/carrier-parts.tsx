@@ -68,7 +68,8 @@ export async function CourierCard({
         </span>
       ) : null}
       {phone && !masked ? (
-        <span className="flex flex-col items-start gap-1 sm:items-end">
+        // The courier's number is in the tel: link: blocked from session recordings entirely.
+        <span className="flex flex-col items-start gap-1 sm:items-end" data-private="block">
           <a
             href={telHref(phone, courier.phoneExt)}
             data-testid="courier-call"

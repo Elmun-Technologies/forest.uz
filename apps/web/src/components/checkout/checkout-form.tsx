@@ -24,6 +24,7 @@ import { readRegion, storeRegion, useDeliveryQuote } from '@/components/cart/use
 import { logoAlt, logos } from '@/components/ui/brand-logos';
 import { Logo } from '@/components/ui/logo';
 import { ClientApiError, clientApi, type CheckoutRequest } from '@/lib/client-api';
+import { track } from '@/lib/track';
 import { soum, uuid } from '@/lib/format';
 
 type Method = CheckoutRequest['paymentMethod'];
@@ -126,6 +127,28 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
     if (method === 'COD' && (codOverLimit || !codEnabled)) setMethod('PAYME');
   }, [method, codOverLimit, codEnabled]);
 
+  // Funnel events (docs/07): begin_checkout once the cart is known; shipping/payment info once
+  // each, on the visitor's explicit choice or at the latest when the form is submitted.
+  const sent = useRef({ begin: false, shipping: false, payment: false });
+  useEffect(() => {
+    if (sent.current.begin || !cart?.lines.length) return;
+    sent.current.begin = true;
+    track('begin_checkout', {
+      itemsCount: cart.totals.itemsCount,
+      valueSoum: cart.totals.totalSoum,
+    });
+  }, [cart]);
+  const shippingInfo = (key: string) => {
+    if (sent.current.shipping) return;
+    sent.current.shipping = true;
+    track('add_shipping_info', { zoneKey: key, region });
+  };
+  const paymentInfo = (m: Method) => {
+    if (sent.current.payment) return;
+    sent.current.payment = true;
+    track('add_payment_info', { method: m });
+  };
+
   if (status === 'loading' && !cart) return <CheckoutSkeleton />;
   if (!cart || cart.lines.length === 0) {
     return (
@@ -184,6 +207,8 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
       offerVersion,
       consents: { smsMarketing: marketing, telegram: false },
     };
+    shippingInfo(body.zoneKey);
+    paymentInfo(body.paymentMethod);
     const serialized = JSON.stringify(body);
     if (!attempt.current || attempt.current.body !== serialized)
       attempt.current = { key: uuid(), body: serialized };
@@ -291,6 +316,7 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
                     }}
                     name="name"
                     autoComplete="name"
+                    data-private
                     value={name}
                     maxLength={80}
                     onChange={(e) => setName(e.target.value)}
@@ -372,6 +398,7 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
                       value={district}
                       maxLength={80}
                       autoComplete="address-level3"
+                      data-private
                       onChange={(e) => setDistrict(e.target.value)}
                     />
                   )
@@ -449,7 +476,10 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
                   key={o.zoneKey}
                   option={o}
                   checked={o.zoneKey === zoneKey}
-                  onSelect={() => setZoneKey(o.zoneKey)}
+                  onSelect={() => {
+                    setZoneKey(o.zoneKey);
+                    shippingInfo(o.zoneKey);
+                  }}
                   priceSoum={
                     o.zoneKey === zoneKey && cart.totals.shippingSoum !== null
                       ? cart.totals.shippingSoum
@@ -492,7 +522,10 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
                   method={m}
                   checked={method === m}
                   disabled={m === 'COD' && codOverLimit}
-                  onSelect={() => setMethod(m)}
+                  onSelect={() => {
+                    setMethod(m);
+                    paymentInfo(m);
+                  }}
                 />
               ))}
             </fieldset>
@@ -511,6 +544,7 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
                 <Textarea
                   {...p}
                   name="comment"
+                  data-private
                   value={comment}
                   maxLength={500}
                   placeholder={t('commentPlaceholder')}

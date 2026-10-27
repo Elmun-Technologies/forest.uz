@@ -12,6 +12,7 @@
     "test:integration": "vitest run --project integration"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0",
     "@aws-sdk/client-s3": "^3.917.0",
     "@aws-sdk/s3-request-presigner": "^3.917.0",
     "@forest/contracts": "workspace:*",
@@ -23,6 +24,7 @@
     "argon2": "^0.44.0",
     "bullmq": "^5.61.0",
     "cookie-parser": "^1.4.7",
+    "grammy": "1.46.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.8.1",
     "nestjs-pino": "^4.4.1",

@@ -63,7 +63,10 @@ export const COPY = {
   save: 'Saqlash',
   saved: 'Saqlandi',
   aiDraft: 'AI tavsif',
-  aiDraftHint: 'AI integratsiyasi keyingi bosqichda ulanadi',
+  aiDraftHint: "Claude qoralama yozadi: maydonlarga qo'yiladi, tekshirib saqlaysiz",
+  aiDraftReady: "AI qoralamasi maydonlarga qo'yildi. O'qib, tuzatib, keyin «Saqlash»ni bosing.",
+  aiDraftFake:
+    "Sinov rejimi (fake): matn namunaviy, haqiqiy AI emas. O'zingiz yozing yoki Claude'ni ulang.",
   readOnly: "Faqat ko'rish: o'zgartirish huquqi yo'q.",
   priceLocked:
     "Narx MoySklad'da o'zgartiriladi. IKPU (MXIK) kodi fiskal chek uchun to'lov tizimiga yuboriladi.",
@@ -79,8 +82,7 @@ export const COPY = {
   archiveHint: "Sotilgan mahsulotni o'chirib bo'lmaydi — holatini «Arxiv» qiling.",
   slugWarn: "Manzil o'zgarsa eski havolalar avtomatik 301 bilan yangisiga yo'naltiriladi.",
   seoCenter: 'SEO markazida tahrirlash',
-  seoCenterLater: 'SEO markazi tez orada',
   seoStorefrontNote:
-    'Sahifa sarlavhasi hozircha andozadan olinadi; bu yerda saqlangan qiymatlar SEO markazi bilan saytga ulanadi.',
+    "Saqlangan sarlavha va tavsif saytda darhol ko'rinadi (sahifa keshi yangilanadi). OG rasm, noindex va canonical —",
   seoTemplateHint: "Bo'sh qoldirilsa andoza ishlatiladi",
 } as const;

@@ -116,7 +116,7 @@ export class AdminVariantsService {
     } catch (e) {
       throw mapIkpuTrigger(mapUniqueError(e));
     }
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   async update(
@@ -234,7 +234,7 @@ export class AdminVariantsService {
     } catch (e) {
       throw mapIkpuTrigger(mapUniqueError(e));
     }
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   /** Never-sold variants only; a sold one is deactivated instead (order history keeps it). */
@@ -277,7 +277,7 @@ export class AdminVariantsService {
         tx,
       );
     });
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   async reorder(
@@ -310,7 +310,7 @@ export class AdminVariantsService {
         tx,
       );
     });
-    return this.products.get(productId);
+    return this.products.changed(productId);
   }
 
   private async productIdOf(variantId: string): Promise<string> {

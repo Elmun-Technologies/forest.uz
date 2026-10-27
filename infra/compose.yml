@@ -84,6 +84,8 @@ services:
       DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://storage:8333
+      # On-demand storefront revalidation after admin saves (POST web:3000/api/revalidate).
+      WEB_INTERNAL_URL: http://web:3000
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -119,6 +121,8 @@ services:
     environment:
       PORT: 3001
       API_INTERNAL_URL: http://api:4000
+      # A3 heatmap backdrop: the admin server fetches storefront pages and assets (runtime env).
+      WEB_INTERNAL_URL: http://web:3000
     depends_on: [api]
 
   caddy:

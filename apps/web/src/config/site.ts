@@ -23,11 +23,11 @@ export const routes = {
 
 /**
  * Pages that exist. Cart, checkout, order, tracking, login, cabinet and the four legal pages
- * shipped in Phase 1 and are always linked; Ilhom/Brend are v1.1.
+ * shipped in Phase 1 and are always linked; Ilhom/Brend shipped in Phase 5 (CMS, CLAUDE.md §6).
  */
 export const pageReady = {
-  inspiration: false,
-  brand: false,
+  inspiration: true,
+  brand: true,
 } as const;
 
 /** Category slugs used by the header nav ("Mebel uchun", "Divan uchun"). */
@@ -44,6 +44,11 @@ export const quietRoutes = [
   '/fake-pay',
 ];
 
+/**
+ * Telegram button href. With a source label it goes through `/tg` (start link carrying the
+ * source + this visit for the bot's lead attribution, CLAUDE.md §6 5A); `b` = fallback bot.
+ */
 export function telegramUrl(bot: string, start?: string): string {
-  return `https://t.me/${bot}${start ? `?start=${encodeURIComponent(start)}` : ''}`;
+  if (start) return `/tg?s=${encodeURIComponent(start)}&b=${encodeURIComponent(bot)}`;
+  return `https://t.me/${bot}`;
 }

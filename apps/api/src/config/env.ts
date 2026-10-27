@@ -20,10 +20,21 @@ export const envSchema = z.object({
   APP_URL: z.url().default('http://localhost:3000'),
   ADMIN_URL: z.url().default('http://localhost:3001'),
   API_URL: z.url().default('http://localhost:4000'),
+  /**
+   * Where the API reaches the storefront server for on-demand revalidation (`POST /api/revalidate`).
+   * Default APP_URL (dev); compose sets the internal `http://web:3000`. Tests set it only when they
+   * stub the web endpoint.
+   */
+  WEB_INTERNAL_URL: z.url().optional(),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
+  /**
+   * Path-style bucket addressing (`<endpoint>/<bucket>/<key>`): SeaweedFS/MinIO need it; Tigris
+   * (demo on Fly) refuses it for buckets created since 2025-02 → `false` (virtual-hosted).
+   */
+  S3_FORCE_PATH_STYLE: z.stringbool().default(true),
   S3_BUCKET_PUBLIC: z.string().default('forest-public'),
   S3_BUCKET_PRIVATE: z.string().default('forest-private'),
   S3_ACCESS_KEY: z.string().default(''),

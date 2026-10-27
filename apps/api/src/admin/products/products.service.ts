@@ -22,8 +22,10 @@ import {
 } from '@forest/contracts';
 import { Prisma } from '@forest/db';
 import { availableQty } from '../../catalog/catalog.mapper';
+import { saveRedirect } from '../../customer/seo/redirects';
 import { redirectCandidates } from '../../customer/seo/seo-paths';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SeoEventsService } from '../../seo/seo-events.service';
 import { SettingsService } from '../../settings/settings.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
 import { AdminUploadService } from '../files/upload.service';
@@ -91,7 +93,17 @@ export class AdminProductsService {
     private readonly source: CatalogSourceService,
     private readonly settings: SettingsService,
     private readonly uploads: AdminUploadService,
+    private readonly seoEvents: SeoEventsService,
   ) {}
+
+  /**
+   * After a committed change to the product (variants, images…): storefront revalidation, sitemap
+   * and IndexNow (fire-and-forget), then the fresh DTO.
+   */
+  changed(id: string): Promise<AdminProductDto> {
+    void this.seoEvents.productChanged(id);
+    return this.get(id);
+  }
 
   async meta(): Promise<AdminProductsMetaDto> {
     const [variants, categories, seller, locks, checkedAt, rules] = await Promise.all([
@@ -329,6 +341,7 @@ export class AdminProductsService {
 
   async update(actor: AuditActor, id: string, input: ProductUpdateInput): Promise<AdminProductDto> {
     let heroMoved = false;
+    const seen = { slugs: [] as string[], wasPublic: false };
     try {
       await this.prisma.$transaction(async (tx) => {
         await lockProduct(tx, id);
@@ -337,6 +350,8 @@ export class AdminProductsService {
           include: { variants: true, categories: { select: { categoryId: true } } },
         });
         if (!before) throw new DomainError('PRODUCT_NOT_FOUND');
+        seen.slugs.push(before.slug);
+        seen.wasPublic = before.status === 'ACTIVE';
 
         const data: Prisma.ProductUpdateInput = {};
         const diff: { before: Record<string, unknown>; after: Record<string, unknown> } = {
@@ -432,12 +447,13 @@ export class AdminProductsService {
       throw mapUniqueError(e);
     }
     if (heroMoved) this.settings.invalidate();
+    void this.seoEvents.productChanged(id, seen);
     return this.get(id);
   }
 
   /** Only never-sold drafts can be deleted; everything else is archived (order history). */
   async remove(actor: AuditActor, id: string): Promise<void> {
-    const fileIds = await this.prisma.$transaction(async (tx) => {
+    const removed = await this.prisma.$transaction(async (tx) => {
       await lockProduct(tx, id);
       const p = await tx.product.findUnique({
         where: { id },
@@ -481,9 +497,10 @@ export class AdminProductsService {
         },
         tx,
       );
-      return p.images.map((i) => i.fileId);
+      return { files: p.images.map((i) => i.fileId), slug: p.slug };
     });
-    await this.uploads.discardUnreferenced(fileIds);
+    await this.uploads.discardUnreferenced(removed.files);
+    void this.seoEvents.productChanged(id, { slugs: [removed.slug] });
   }
 
   async setRelations(
@@ -519,7 +536,7 @@ export class AdminProductsService {
         tx,
       );
     });
-    return this.get(id);
+    return this.changed(id);
   }
 
   /** Product options for relation pickers (all statuses; archived marked in the UI). */
@@ -561,16 +578,12 @@ export class AdminProductsService {
    */
   private async moveSlug(tx: Tx, oldSlug: string, newSlug: string): Promise<boolean> {
     await this.claimPaths(tx, newSlug);
-    for (const l of LOCALES) {
-      const from = `/${l}/p/${oldSlug}`;
-      const to = `/${l}/p/${newSlug}`;
-      await tx.redirect.updateMany({ where: { to: from }, data: { to } });
-      await tx.redirect.upsert({
-        where: { from },
-        create: { from, to, code: 301 },
-        update: { to, code: 301 },
-      });
-    }
+    for (const l of LOCALES)
+      await saveRedirect(
+        tx,
+        { from: `/${l}/p/${oldSlug}`, to: `/${l}/p/${newSlug}`, code: 301 },
+        { siteHost: null },
+      );
     await tx.seoMeta.deleteMany({ where: { path: productSeoPath(newSlug) } });
     await tx.seoMeta.updateMany({
       where: { path: productSeoPath(oldSlug) },

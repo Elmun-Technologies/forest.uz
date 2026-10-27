@@ -33,7 +33,7 @@ export function AddToCartButton({
   async function add() {
     if (state === 'busy') return;
     setState('busy');
-    const ok = await addItems([{ variantId, qty: 1, priceSoum }]);
+    const ok = await addItems([{ variantId, qty: 1, priceSoum }], { list: trackList ?? 'card' });
     setState(ok ? 'done' : 'idle');
     if (ok) window.setTimeout(() => setState('idle'), 1500);
   }

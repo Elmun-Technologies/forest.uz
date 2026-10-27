@@ -94,10 +94,10 @@ export async function Footer({
                 <Link prefetch={false} href={routes.brand} className={link}>
                   {t('brand')}
                 </Link>
-                <Link prefetch={false} href={routes.brand} className={link}>
+                <Link prefetch={false} href={`${routes.brand}#hamkorlik`} className={link}>
                   {t('craftsmen')}
                 </Link>
-                <Link prefetch={false} href={routes.brand} className={link}>
+                <Link prefetch={false} href={`${routes.brand}#sotuvchi`} className={link}>
                   {t('seller')}
                 </Link>
               </nav>

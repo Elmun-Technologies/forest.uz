@@ -16,7 +16,10 @@ describe('Event partition maintenance (integration)', () => {
   it('creates monthly partitions ahead, in UTC, and reports DEFAULT rows', async () => {
     const prisma = app.get(PrismaService);
     const svc = app.get(MaintenanceService);
-    expect(await svc.ensureEventPartitions(6)).toEqual({ defaultRows: 0 });
+    // Shared DB: fixed-clock suites may leave past-dated events in DEFAULT; the report must match.
+    const [inDefault] = await prisma.$queryRaw<{ n: bigint }[]>`
+      SELECT count(*) AS n FROM event_parts.event_default`;
+    expect(await svc.ensureEventPartitions(6)).toEqual({ defaultRows: Number(inDefault?.n ?? 0n) });
     const parts = await prisma.$queryRaw<{ tablename: string }[]>`
       SELECT tablename FROM pg_tables WHERE schemaname = 'event_parts' ORDER BY tablename`;
     expect(parts.length).toBeGreaterThanOrEqual(8);

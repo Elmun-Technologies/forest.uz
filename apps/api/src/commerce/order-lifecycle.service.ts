@@ -15,6 +15,7 @@ import type { Env } from '../config/env';
 import { parcelWithCarrier } from '../delivery/shipment-state';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { recordPurchaseEvent } from '../tracking/server-events';
 import { fiscalEvidence } from './fiscal.service';
 import { orderPageUrl } from './ids';
 import { NotificationsService } from './notifications.service';
@@ -395,6 +396,8 @@ export class OrderLifecycleService {
         where: { id: p.orderId },
         data: { slaDueAt: await this.slaDueAt(tx, p.orderId, opts.now) },
       });
+      // docs/07 `purchase` (server-side, once per order: NEW → CONFIRMED happens once).
+      await recordPurchaseEvent(tx, p.orderId, opts.now);
     }
     return p.orderId;
   }
@@ -579,6 +582,8 @@ export class OrderLifecycleService {
         where: { id: orderId },
         data: { slaDueAt: await this.slaDueAt(tx, orderId, now) },
       });
+      // docs/07 `purchase` for COD = operator confirmation.
+      await recordPurchaseEvent(tx, orderId, now);
       await audit?.(tx);
     });
     // COD: nothing is paid yet — "confirmed, pay the courier" (not the order_paid text).

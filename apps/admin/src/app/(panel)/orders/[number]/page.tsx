@@ -1,6 +1,12 @@
-import { type AdminOrderDetailDto, hasPermission } from '@forest/contracts/core';
+import {
+  type AdminOrderDetailDto,
+  hasPermission,
+  type OrderJourneyDto,
+} from '@forest/contracts/core';
+import { Panel } from '@forest/ui';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { OrderJourney } from '../../../../components/analytics/order-journey';
 import { NoAccess, PageHeader } from '../../../../components/page';
 import { AutoRefresh } from '../../../../components/orders/auto-refresh';
 import { OrderDetail } from '../../../../components/orders/order-detail';
@@ -31,6 +37,12 @@ export default async function OrderPage({ params }: { params: Promise<Params> })
     if (e instanceof AdminApiError && e.status === 404) notFound();
     throw e;
   }
+  // A7 journey needs analytics.view too; a failure must not break the order page.
+  const journey = hasPermission(me.staff.role, 'analytics.view')
+    ? await adminGet<OrderJourneyDto>(
+        `/admin/analytics/orders/${encodeURIComponent(number)}/journey`,
+      ).catch(() => null)
+    : null;
   return (
     <>
       <AutoRefresh seconds={60} />
@@ -38,6 +50,13 @@ export default async function OrderPage({ params }: { params: Promise<Params> })
         key={`${order.status}-${order.timeline.length}`}
         order={order}
         canCancelPaidClaim={hasPermission(me.staff.role, 'orders.cancel_refund')}
+        journey={
+          journey ? (
+            <Panel className="p-5">
+              <OrderJourney j={journey} />
+            </Panel>
+          ) : null
+        }
       />
     </>
   );

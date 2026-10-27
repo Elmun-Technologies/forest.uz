@@ -7,6 +7,7 @@ import type { NavItem } from '../lib/nav';
 import { Icon } from './icon';
 import { OrdersBadge } from './orders/orders-badge';
 import { ReviewsBadge } from './reviews/reviews-badge';
+import { BotBadge } from './bot/bot-badge';
 
 const base =
   'flex items-center gap-3 rounded-sm px-3 py-[11px] text-sm font-medium transition-colors';
@@ -44,6 +45,7 @@ export function NavLink({ item }: { item: NavItem }) {
       {/* Live count of orders needing action (docs/08 sidebar). */}
       {item.id === 'orders' ? <OrdersBadge active={active} /> : null}
       {item.id === 'reviews' ? <ReviewsBadge active={active} /> : null}
+      {item.id === 'bot' ? <BotBadge active={active} /> : null}
     </Link>
   );
 }

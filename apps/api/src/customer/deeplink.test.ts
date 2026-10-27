@@ -48,3 +48,19 @@ describe('deep link tokens', () => {
     expect(telegramDeepLink('bad name', 'tok')).toBeNull();
   });
 });
+
+describe('deep link kinds (bot, 5A)', () => {
+  it('round-trips start references and order tokens within 64 chars', () => {
+    const ref = signDeepLink({ kind: 'ref', id: 'Ab3_-xYz0123' }, SECRET);
+    expect(ref.length).toBeLessThanOrEqual(DEEPLINK_MAX);
+    expect(verifyDeepLink(ref, SECRET)).toEqual({ kind: 'ref', id: 'Ab3_-xYz0123' });
+    const order = signDeepLink({ kind: 'order', token: 'abcdEFGH23' }, SECRET);
+    expect(order.length).toBeLessThanOrEqual(DEEPLINK_MAX);
+    expect(verifyDeepLink(order, SECRET)).toEqual({ kind: 'order', token: 'abcdEFGH23' });
+  });
+
+  it('refuses malformed payload values', () => {
+    expect(() => signDeepLink({ kind: 'ref', id: 'short' }, SECRET)).toThrow(RangeError);
+    expect(() => signDeepLink({ kind: 'order', token: 'a/b' }, SECRET)).toThrow(RangeError);
+  });
+});

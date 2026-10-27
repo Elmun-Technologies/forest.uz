@@ -1,6 +1,12 @@
-import { hasPermission, type IntegrationsHubDto } from '@forest/contracts/core';
+import {
+  type ApiKeyDto,
+  hasPermission,
+  type IntegrationsHubDto,
+  type WebhookListDto,
+} from '@forest/contracts/core';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { DeveloperSummary } from '../../../components/automation/developer-summary';
 import { IntegrationsHub } from '../../../components/integrations/integrations-hub';
 import { NoAccess, PageHeader } from '../../../components/page';
 import { adminGet, requireFullSession } from '../../../lib/api';
@@ -18,7 +24,11 @@ export default async function IntegrationsPage() {
       </>
     );
   }
-  const hub = await adminGet<IntegrationsHubDto>('/admin/integrations');
+  const [hub, hooks, keys] = await Promise.all([
+    adminGet<IntegrationsHubDto>('/admin/integrations'),
+    adminGet<WebhookListDto>('/admin/webhooks'),
+    adminGet<ApiKeyDto[]>('/admin/api-keys'),
+  ]);
   return (
     <>
       <PageHeader
@@ -34,7 +44,11 @@ export default async function IntegrationsPage() {
         }
       />
       <Suspense>
-        <IntegrationsHub hub={hub} canKeys={hasPermission(me.staff.role, 'integrations.keys')} />
+        <IntegrationsHub
+          hub={hub}
+          canKeys={hasPermission(me.staff.role, 'integrations.keys')}
+          developer={<DeveloperSummary hooks={hooks} keys={keys} />}
+        />
       </Suspense>
     </>
   );

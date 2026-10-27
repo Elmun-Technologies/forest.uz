@@ -48,13 +48,44 @@ export const settingSchemas = {
     operatorEnd: hm,
     abandonedCartMinutes: z.number().int().positive(),
     reviewRequestDays: z.number().int().positive(),
+    /** A12 (Phase 5): staff answering the bot inbox; rows saved before default to none. */
+    operatorIds: z.array(z.string()).default([]),
+    /** Bot languages; the customer's locale (else Telegram `language_code`) picks one. */
+    languages: z.array(z.enum(['uz', 'ru'])).default(['uz', 'ru']),
+    /** Marketing automation switches (A12 scenarios). */
+    scenarios: z
+      .object({ abandonedCart: z.boolean(), reviewRequest: z.boolean(), waitlist: z.boolean() })
+      .default({ abandonedCart: true, reviewRequest: true, waitlist: true }),
+  }),
+  /** Telegram bot (5A, A12): flow switches owned by the bot and complaint keywords. */
+  'bot.rules': z.object({
+    scenarios: z.object({ lead: z.boolean(), orderStatus: z.boolean(), advice: z.boolean() }),
+    complaintKeywords: z.array(z.string().min(2).max(40)).max(100),
   }),
   'seo.verification': z.object({
     google: z.string().nullable(),
     yandex: z.string().nullable(),
     bing: z.string().nullable(),
   }),
+  /** robots.txt body edited in A9; null = the generated default. */
+  'seo.robots': z.object({ custom: z.string().nullable() }),
+  /** schema.org JSON-LD blocks rendered by the storefront (A9 toggles). */
+  'seo.schema': z.object({
+    product: z.boolean(),
+    organization: z.boolean(),
+    breadcrumb: z.boolean(),
+    faq: z.boolean(),
+    howTo: z.boolean(),
+    video: z.boolean(),
+  }),
+  /** IndexNow pings (Yandex, Bing); `key` is generated on install and served at /<key>.txt. */
+  'seo.indexnow': z.object({
+    enabled: z.boolean(),
+    key: z.string().regex(/^[a-zA-Z0-9-]{8,128}$/),
+  }),
   'tracking.rules': z.object({
+    /** Session replay kill switch (A3); rows saved before it existed read as on. */
+    replayEnabled: z.boolean().default(true),
     replaySamplePct: z.number().min(0).max(100),
     replayCheckoutPct: z.number().min(0).max(100),
   }),
@@ -126,4 +157,6 @@ export interface PublicSettingsDto {
   flags: { marketplace: boolean; cod: boolean; bnpl: boolean };
   /** `telegramBot`: bot username for the Telegram Login Widget; null = login widget unavailable. */
   auth: { telegramBot: string | null };
+  /** Session replay gate (`tracking.rules`): kill switch and sample rates in %. */
+  replay: { enabled: boolean; samplePct: number; checkoutPct: number };
 }
