@@ -98,6 +98,24 @@ export const YANDEX_TERMINAL_STATUSES: readonly YandexClaimStatus[] = [
   'cancelled_with_items_on_hands',
 ];
 
+/**
+ * FAILED statuses that prove a courier took the parcel (it is coming back / still with them). Seen
+ * without `pickuped` (polling skips statuses), they still mean the order left the warehouse.
+ */
+const PARCEL_OUT_FAILED: readonly YandexClaimStatus[] = [
+  'returning',
+  'return_arrived',
+  'ready_for_return_confirmation',
+  'cancelled_with_items_on_hands',
+];
+
+export function yandexParcelOutFailed(status: string): boolean {
+  return (PARCEL_OUT_FAILED as readonly string[]).includes(status);
+}
+
+/** Forwarded courier numbers without `ttl_seconds` are trusted this long. */
+export const COURIER_PHONE_DEFAULT_TTL_MS = 30 * 60_000;
+
 /** A courier is on the claim: ETA and the forwarded phone are worth asking for. */
 const COURIER_PHASES: readonly YandexClaimStatus[] = [
   'performer_found',
@@ -401,6 +419,11 @@ export type YandexLog = (entry: {
 
 export interface YandexProviderOptions {
   http: HttpClient;
+  /**
+   * Client for live checkout quotes: its own circuit breaker and no retries, so slow or failing
+   * `check-price` calls never open the breaker that claims and status sync depend on.
+   */
+  quoteHttp?: HttpClient;
   baseUrl?: string;
   /** Status callback URL (only sent when the `callbacks` field is on). */
   callbackUrl?: string | null;
@@ -435,11 +458,12 @@ export class YandexDeliveryProvider implements DeliveryProvider {
       body?: unknown;
       idempotent: boolean;
       timeoutMs?: number;
+      http?: HttpClient;
     },
   ): Promise<unknown> {
     const url = new URL(`${this.baseUrl}${PREFIX}/${path}`);
     for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, v);
-    const res = await this.opts.http.request({
+    const res = await (opts.http ?? this.opts.http).request({
       method,
       url: url.toString(),
       headers: {
@@ -523,7 +547,12 @@ export class YandexDeliveryProvider implements DeliveryProvider {
       weightGrams,
       this.config.taxiClass,
     );
-    const res = await this.call('POST', 'check-price', { body, idempotent: true, timeoutMs: 4000 });
+    const res = await this.call('POST', 'check-price', {
+      body,
+      idempotent: true,
+      timeoutMs: 3000,
+      http: this.opts.quoteHttp,
+    });
     if (!isObj(res)) return null;
     const rules = isObj(res.currency_rules) ? res.currency_rules : {};
     if (str(rules.code) !== 'UZS') return null;
@@ -601,7 +630,9 @@ export class YandexDeliveryProvider implements DeliveryProvider {
             courier.phone = str(phone.phone);
             courier.phoneExt = str(phone.ext);
             const ttl = int(phone.ttl_seconds);
-            courier.phoneExpiresAt = ttl ? new Date(Date.now() + ttl * 1000) : null;
+            courier.phoneExpiresAt = new Date(
+              Date.now() + (ttl ? ttl * 1000 : COURIER_PHONE_DEFAULT_TTL_MS),
+            );
           }
         }
       }

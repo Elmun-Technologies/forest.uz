@@ -230,6 +230,21 @@ describe('Telegram login widget + linking (integration)', () => {
       .set('Cookie', stubCookie)
       .send({ productId: product.id })
       .expect(204);
+    const variant = await prisma.variant.findUniqueOrThrow({ where: { sku: 'FR-RL-10' } });
+    await http()
+      .post('/v1/cart/items')
+      .set('Cookie', stubCookie)
+      .set('X-Forwarded-For', nextTestIp())
+      .send({ variantId: variant.id, qty: 3 })
+      .expect(201);
+    expect(
+      await prisma.cart.count({ where: { customerId: stubLogin.body.id, status: 'ACTIVE' } }),
+    ).toBe(1);
+    await prisma.consent.create({
+      data: { customerId: stubLogin.body.id, channel: 'TELEGRAM', granted: true, source: 'bot' },
+    });
+    // Still valid before the merge.
+    await http().get('/v1/me/orders').set('Cookie', stubCookie).expect(200);
 
     const phone = nextPhone();
     const cookie = await otpLogin(phone);
@@ -243,7 +258,19 @@ describe('Telegram login widget + linking (integration)', () => {
     const stub = await prisma.customer.findUniqueOrThrow({ where: { id: stubLogin.body.id } });
     expect(stub.telegramId).toBeNull();
     expect(stub.deletedAt).not.toBeNull();
-    // The stub's old session is dead.
+    // The stub's old session is dead everywhere (not only where the customer row is re-read).
     await http().get('/v1/me').set('Cookie', stubCookie).expect(401);
+    await http().get('/v1/me/orders').set('Cookie', stubCookie).expect(401);
+    // Its cart and consents now belong to the surviving customer.
+    const cart = await prisma.cart.findFirstOrThrow({
+      where: { customerId: res.body.id, status: 'ACTIVE' },
+      include: { items: true },
+    });
+    expect(cart.items).toEqual([expect.objectContaining({ variantId: variant.id, qty: 3 })]);
+    expect(await prisma.cart.count({ where: { customerId: stub.id, status: 'ACTIVE' } })).toBe(0);
+    expect(await prisma.consent.count({ where: { customerId: res.body.id } })).toBeGreaterThan(0);
+    expect(await prisma.consent.count({ where: { customerId: stub.id } })).toBe(0);
+    // The surviving customer's own session is untouched.
+    await http().get('/v1/me/orders').set('Cookie', cookie).expect(200);
   });
 });

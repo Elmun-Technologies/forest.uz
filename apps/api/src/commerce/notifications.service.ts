@@ -3,7 +3,9 @@ import { t } from '@forest/contracts';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { applyParkedEskizStatus } from '../messaging/eskiz-status';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.module';
 
 /** Fills `{ism}`-style variables; unknown variables are left empty rather than shown raw. */
 export function fillMessage(template: string, vars: Record<string, string>): string {
@@ -21,10 +23,13 @@ export function fillMessage(template: string, vars: Record<string, string>): str
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger('Notifications');
+  /** Missing/inactive template keys already reported by this process (one warning each). */
+  private readonly missingTemplates = new Set<string>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
+    private readonly redis: RedisService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -41,7 +46,14 @@ export class NotificationsService {
       const template = await this.prisma.messageTemplate.findUnique({
         where: { key: templateKey },
       });
-      if (!template?.active) return;
+      if (!template?.active) {
+        // Deploys run only migrations; a template the seed never reached means silent SMS loss.
+        if (!this.missingTemplates.has(templateKey)) {
+          this.missingTemplates.add(templateKey);
+          this.logger.warn(`message template "${templateKey}" is missing or inactive: SMS skipped`);
+        }
+        return;
+      }
       const text = fillMessage(t(template.body, order.locale), {
         ism: order.contactName.split(' ')[0] ?? '',
         raqam: order.number,
@@ -64,6 +76,10 @@ export class NotificationsService {
           where: { id: message.id },
           data: { status: 'SENT', providerId, sentAt: new Date() },
         });
+        // Eskiz may report delivery before this write landed (parked by the callback).
+        await applyParkedEskizStatus(this.redis, this.prisma, providerId).catch((e: unknown) =>
+          this.logger.warn(`parked status for ${templateKey} failed: ${String(e)}`),
+        );
         await this.prisma.orderEvent.create({
           data: {
             orderId,

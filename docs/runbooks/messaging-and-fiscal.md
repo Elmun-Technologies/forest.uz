@@ -65,7 +65,12 @@ core.telegram.org/bots/telegram-login) — not implemented, open question 53.
 - Callback URL sent with every SMS: `${API_URL}/v1/webhooks/eskiz/<callbackToken>`. Wrong/missing
   token or disconnected integration → 404. Authenticated callbacks always get 200 (unknown ids,
   junk and non-final statuses are acknowledged and ignored). Final states are never overwritten;
-  `deliveredAt` is set once. Payloads go to `IntegrationLog` redacted (phones masked).
+  `deliveredAt` is set once. Payloads go to `IntegrationLog` redacted (phones masked). A final
+  status for an id we haven't stored yet is parked in Redis (`eskiz:cb:<id>`, 10 min) and applied
+  when the sender stores `Message.providerId`. Access logs mask the token (`/webhooks/eskiz/***`).
+- Templates: every key the API sends is inserted by migration `message_templates_backfill`
+  (`ON CONFLICT DO NOTHING`, seed texts); a missing/inactive template is skipped with one warning
+  per key per process.
 - OTP texts are not stored in `Message` (secrets), so their callbacks are "unknown" — expected.
 - `ESKIZ_API_URL` (env, default `https://notify.eskiz.uz/api`) exists only so tests can point the
   adapter at a stub; the password is sent there, so it is not an admin field.
@@ -92,9 +97,13 @@ templates for every text (q.19, pitfall in CLAUDE.md §17).
 - Login: customer by `telegramId` (created on first login, name from first/last name, no phone,
   `leadSource = telegram_login`), session exactly like OTP (rotation, anonymous cart merge).
   `/me` returns `phone: null` and `telegram: { username }`.
-- Link (OTP session): attaches the Telegram id; a phone-less, order-less Telegram-only holder is
-  absorbed (addresses + favourites move, stub erased, `AuditLog customer.telegram_merged`); any other
-  holder → 409 `TELEGRAM_ALREADY_LINKED`.
+- Link (any customer session): attaches the Telegram id; a phone-less, order-less Telegram-only
+  holder is absorbed (active cart merged, addresses, favourites, consents, visitors, messages,
+  conversations and notes move; stub erased; its sessions revoked via `sess:revoked:<customerId>`;
+  `AuditLog customer.telegram_merged`); any other holder → 409 `TELEGRAM_ALREADY_LINKED`.
+- No replay protection on widget payloads beyond the 24 h `auth_date` window: the widget may
+  hand back the same signed payload on a legitimate re-login, which a one-use rule would break
+  (unverifiable while core.telegram.org is blocked — revisit with q.53).
 - Checkout still requires a phone in the body and attaches the order to that phone's customer — an
   unverified phone is never written onto a Telegram account.
 - Errors: 401 `TELEGRAM_AUTH_INVALID` (bad hash / another bot / malformed), 401
@@ -130,9 +139,11 @@ templates for every text (q.19, pitfall in CLAUDE.md §17).
   page), writes OrderEvent `DELIVERY_STATUS`, and `advanceForDelivery` walks the order
   (PICKED_UP/IN_TRANSIT/AT_BRANCH ⇒ HANDED_TO_COURIER via PACKING/READY; DELIVERED ⇒ DELIVERED;
   RETURNED ⇒ RETURNED; one STATUS_CHANGED event per step, actor = the operator).
-- SMS after commit: handed over → `order_shipped_bts` (`{trek}`), at branch → `order_at_branch`
-  (`{filial}`), delivered → `order_delivered`, failed → `order_delivery_failed`. In-transit scans
-  are silent.
+- SMS after commit: handed over (entry PICKED_UP / IN_TRANSIT / AT_BRANCH) → `order_shipped_bts`
+  (`{trek}`), at branch → `order_at_branch` (`{filial}`), delivered → `order_delivered`, failed →
+  `order_delivery_failed` only when the order is HANDED_TO_COURIER (BTS had the parcel) and at most
+  once per shipment (`DELIVERY_NOTICE` marker). A first entry straight to DELIVERED / RETURNED never
+  sends "shipped". In-transit scans are silent. RETURNED releases the stock hold.
 
 ## Before go-live checklist
 - [ ] Eskiz account activated, nickname approved, all templates approved (q.19, 48–49); connect in

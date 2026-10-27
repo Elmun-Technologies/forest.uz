@@ -20,10 +20,16 @@ import type {
 import {
   YandexApiError,
   YandexDeliveryProvider,
-  isYandexTerminal,
+  yandexParcelOutFailed,
 } from '../integrations/providers/yandex-delivery';
 import { PrismaService } from '../prisma/prisma.service';
 import { DEFAULT_ITEM_WEIGHT_GRAMS } from './delivery-quote.service';
+import {
+  type AcceptRequest,
+  acceptPending,
+  readAcceptRequest,
+  yandexClaimDead,
+} from './shipment-state';
 
 type Tx = Prisma.TransactionClient;
 
@@ -32,11 +38,23 @@ const CARRIER_ACTOR: Actor = { type: 'CARRIER', id: 'yandex_delivery' };
 const CLAIMABLE: readonly OrderStatus[] = ['CONFIRMED', 'PACKING', 'READY'];
 /** Claim statuses before acceptance; anything else means it was accepted (here or in the cabinet). */
 const PRE_ACCEPT = ['new', 'estimating', 'ready_for_approval'];
+/** Carrier statuses at which the parcel is on its way (the "shipped / courier" SMS moment). */
+const ON_THE_WAY: readonly DeliveryStatus[] = ['PICKED_UP', 'IN_TRANSIT', 'AT_BRANCH'];
+/** A CANCELLED order's parcel must never reach these: somebody has to look at it. */
+const PARCEL_MOVED: readonly DeliveryStatus[] = [
+  'PICKED_UP',
+  'IN_TRANSIT',
+  'AT_BRANCH',
+  'DELIVERED',
+  'RETURNED',
+];
 
 /** Polling cadence (CLAUDE.md §6); the lease keeps overlapping job runs off the same shipment. */
 export const SYNC_POLICY = {
   activeMs: 60_000,
   awaitingAcceptMs: 5 * 60_000,
+  /** A claim never accepted is not polled after this (no documented offer-expiry field). */
+  stopAwaitingAfterMs: 24 * 3600_000,
   leaseMs: 2 * 60_000,
   maxBackoffMs: 30 * 60_000,
   batch: 50,
@@ -59,6 +77,10 @@ export interface YandexShipmentData {
   updatedTs: string | null;
   costTiyin: string | null;
   errors: string[];
+  /** ISO time the current claim was created (polling of an un-accepted claim stops 24 h later). */
+  claimCreatedAt: string | null;
+  /** Staff accept in flight (see `acceptClaim`). */
+  acceptRequest: AcceptRequest | null;
 }
 
 function readData(raw: unknown): YandexShipmentData {
@@ -72,6 +94,8 @@ function readData(raw: unknown): YandexShipmentData {
     updatedTs: typeof d.updatedTs === 'string' ? d.updatedTs : null,
     costTiyin: typeof d.costTiyin === 'string' ? d.costTiyin : null,
     errors: Array.isArray(d.errors) ? d.errors : [],
+    claimCreatedAt: typeof d.claimCreatedAt === 'string' ? d.claimCreatedAt : null,
+    acceptRequest: readAcceptRequest(raw),
   };
 }
 
@@ -105,13 +129,15 @@ function phoneValid(c: StoredCourier | null, now: Date): boolean {
   );
 }
 
-function mergeCourier(
+export function mergeCourier(
   prev: StoredCourier | null,
   next: CourierInfo | null,
   now: Date,
 ): StoredCourier | null {
   if (!next) return prev;
-  const keepPhone = !next.phone && phoneValid(prev, now);
+  // Another courier took the claim: the old forwarded number and ETA belong to someone else.
+  const samePerformer = Boolean(prev && prev.name === next.name && prev.plate === next.plate);
+  const keepPhone = !next.phone && samePerformer && phoneValid(prev, now);
   return {
     name: next.name,
     phone: keepPhone ? prev!.phone : next.phone,
@@ -120,7 +146,7 @@ function mergeCourier(
     car: next.car,
     plate: next.plate,
     transport: next.transport ?? null,
-    etaAt: next.etaAt?.toISOString() ?? prev?.etaAt ?? null,
+    etaAt: next.etaAt?.toISOString() ?? (samePerformer ? (prev?.etaAt ?? null) : null),
     distanceKm: next.distanceKm,
   };
 }
@@ -201,17 +227,6 @@ export class YandexShipmentService {
     };
   }
 
-  /** A claim that can never move again before pickup: staff may create a new one. */
-  private isDead(s: {
-    externalId: string | null;
-    status: DeliveryStatus;
-    providerStatus: string | null;
-  }) {
-    return (
-      !s.externalId || (s.status === 'FAILED' && isYandexTerminal(s.providerStatus ?? 'failed'))
-    );
-  }
-
   async shipmentForOrder(orderId: string) {
     return this.prisma.shipment.findFirst({ where: { orderId, carrier: 'YANDEX' } });
   }
@@ -249,7 +264,7 @@ export class YandexShipmentService {
       }
       await this.lockShipment(tx, shipment.id);
       shipment = await tx.shipment.findUniqueOrThrow({ where: { id: shipment.id } });
-      if (!this.isDead(shipment)) return { existing: shipment, order, requestId: null };
+      if (!yandexClaimDead(shipment)) return { existing: shipment, order, requestId: null };
       const data = readData(shipment.providerData);
       let requestId = data.pendingRequestId;
       if (!requestId) {
@@ -330,6 +345,8 @@ export class YandexShipmentService {
       data.version = null;
       data.updatedTs = null;
       data.errors = [];
+      data.claimCreatedAt = now.toISOString();
+      data.acceptRequest = null;
       const history = (Array.isArray(s.history)
         ? s.history
         : []) as unknown as StoredHistoryEntry[];
@@ -373,65 +390,89 @@ export class YandexShipmentService {
 
   /**
    * Staff confirms the estimated claim: Yandex starts the courier search (real courier, real
-   * charge). Refused in test mode. Runs under the order → shipment locks, so two clicks can't
-   * accept twice; a claim already accepted (here or in the Yandex cabinet) is a no-op.
+   * charge). Refused in test mode. Three steps so no HTTP call runs inside a lock-holding
+   * transaction: (1) under the order → shipment locks record `acceptRequest` (a second click or
+   * another staff member within the lease is a no-op), (2) call Yandex, (3) record the outcome.
+   * A claim already accepted (here or in the Yandex cabinet) is a no-op.
    */
   async acceptClaim(shipmentId: string, actor: Actor): Promise<ShipmentSummary> {
     const provider = await this.provider();
     if (provider instanceof YandexDeliveryProvider && provider.isTestMode)
       throw new DomainError('DELIVERY_TEST_MODE');
-    await this.prisma.$transaction(
-      async (tx) => {
+    const claimId = await this.prisma.$transaction(async (tx) => {
+      const s = await this.lockBoth(tx, shipmentId);
+      if (s.carrier !== 'YANDEX' || !s.externalId || yandexClaimDead(s))
+        throw new DomainError('DELIVERY_CLAIM_NOT_READY');
+      if (s.acceptedAt || acceptPending(s, new Date())) return null;
+      if (!CLAIMABLE.includes(s.order.status))
+        throw new DomainError('SHIPMENT_ORDER_NOT_READY', { status: s.order.status });
+      const data = readData(s.providerData);
+      data.acceptRequest = {
+        by: actor.id ?? null,
+        at: new Date().toISOString(),
+        claimId: s.externalId,
+      };
+      await tx.shipment.update({ where: { id: s.id }, data: { providerData: json(data) } });
+      return s.externalId;
+    });
+    if (claimId) {
+      const failure = await this.dispatch(provider, claimId).then(
+        () => null,
+        (e: unknown) => toDomainError(e),
+      );
+      await this.prisma.$transaction(async (tx) => {
         const s = await this.lockBoth(tx, shipmentId);
-        if (s.carrier !== 'YANDEX' || !s.externalId || this.isDead(s))
-          throw new DomainError('DELIVERY_CLAIM_NOT_READY');
-        if (s.acceptedAt) return;
-        if (!CLAIMABLE.includes(s.order.status))
-          throw new DomainError('SHIPMENT_ORDER_NOT_READY', { status: s.order.status });
-        const state = await provider.getState(s.externalId).catch((e: unknown) => {
-          throw toDomainError(e);
-        });
-        const raw = state.providerStatus ?? null;
-        let accepted = raw !== null && !PRE_ACCEPT.includes(raw) && !state.terminal;
-        if (!accepted) {
-          if (raw !== null && raw !== 'ready_for_approval')
-            throw new DomainError('DELIVERY_CLAIM_NOT_READY', { providerStatus: raw });
-          if (!provider.accept) throw new DomainError('DELIVERY_CLAIM_NOT_READY');
-          try {
-            await provider.accept(s.externalId, state.version);
-            accepted = true;
-          } catch (e) {
-            // Unknown outcome (timeout) or a race with the cabinet: Yandex's own state decides.
-            const after = await provider.getState(s.externalId).catch(() => null);
-            const st = after?.providerStatus ?? null;
-            if (st !== null && !PRE_ACCEPT.includes(st) && !after?.terminal) accepted = true;
-            else if (e instanceof YandexApiError && e.status === 409)
-              throw new DomainError('DELIVERY_CLAIM_NOT_READY', { code: e.code });
-            else throw toDomainError(e);
-          }
-        }
+        const data = readData(s.providerData);
+        if (data.acceptRequest?.claimId === claimId) data.acceptRequest = null;
+        const accepted = !failure && s.externalId === claimId;
         await tx.shipment.update({
           where: { id: s.id },
-          data: { acceptedAt: new Date(), nextSyncAt: new Date() },
-        });
-        await tx.orderEvent.create({
           data: {
-            orderId: s.orderId,
-            type: 'DELIVERY_ACCEPTED',
-            actorType: actor.type,
-            actorId: actor.id ?? null,
-            data: { carrier: 'YANDEX', claimId: s.externalId },
+            providerData: json(data),
+            // A sync may have seen the acceptance first; the staff action is still recorded.
+            ...(accepted ? { acceptedAt: s.acceptedAt ?? new Date(), nextSyncAt: new Date() } : {}),
           },
         });
-      },
-      { timeout: 30_000 },
-    );
+        if (accepted)
+          await tx.orderEvent.create({
+            data: {
+              orderId: s.orderId,
+              type: 'DELIVERY_ACCEPTED',
+              actorType: actor.type,
+              actorId: actor.id ?? null,
+              data: { carrier: 'YANDEX', claimId },
+            },
+          });
+      });
+      if (failure) throw failure;
+    }
     await this.refresh(shipmentId).catch((e: unknown) =>
       this.logger.warn(`refresh after accept ${shipmentId} failed: ${String(e)}`),
     );
     return this.summary(
       await this.prisma.shipment.findUniqueOrThrow({ where: { id: shipmentId } }),
     );
+  }
+
+  /** claims/accept unless Yandex already shows the claim accepted; resolves only when it is. */
+  private async dispatch(provider: DeliveryProvider, claimId: string): Promise<void> {
+    const state = await provider.getState(claimId);
+    const raw = state.providerStatus ?? null;
+    if (raw !== null && !PRE_ACCEPT.includes(raw) && !state.terminal) return;
+    if (raw !== null && raw !== 'ready_for_approval')
+      throw new DomainError('DELIVERY_CLAIM_NOT_READY', { providerStatus: raw });
+    if (!provider.accept) throw new DomainError('DELIVERY_CLAIM_NOT_READY');
+    try {
+      await provider.accept(claimId, state.version);
+    } catch (e) {
+      // Unknown outcome (timeout) or a race with the cabinet: Yandex's own state decides.
+      const after = await provider.getState(claimId).catch(() => null);
+      const st = after?.providerStatus ?? null;
+      if (st !== null && !PRE_ACCEPT.includes(st) && !after?.terminal) return;
+      if (e instanceof YandexApiError && e.status === 409)
+        throw new DomainError('DELIVERY_CLAIM_NOT_READY', { code: e.code });
+      throw e;
+    }
   }
 
   /**
@@ -447,7 +488,7 @@ export class YandexShipmentService {
     await this.prisma.$transaction(
       async (tx) => {
         const s = await this.lockBoth(tx, shipmentId);
-        if (s.carrier !== 'YANDEX' || !s.externalId || this.isDead(s)) return;
+        if (s.carrier !== 'YANDEX' || !s.externalId || yandexClaimDead(s)) return;
         try {
           await provider.cancel(s.externalId, opts);
         } catch (e) {
@@ -551,6 +592,14 @@ export class YandexShipmentService {
         note: '',
       });
     const awaitingAccept = !s.acceptedAt && PRE_ACCEPT.includes(state.providerStatus ?? '');
+    // Nobody will accept this claim any more: the order is gone, or the estimate is a day old
+    // (accept / refresh restart polling).
+    const claimCreatedAt = Date.parse(data.claimCreatedAt ?? s.createdAt.toISOString());
+    const abandoned =
+      awaitingAccept &&
+      !acceptPending(s, now) &&
+      (s.order.status === 'CANCELLED' ||
+        now.getTime() - claimCreatedAt > SYNC_POLICY.stopAwaitingAfterMs);
     await tx.shipment.update({
       where: { id: s.id },
       data: {
@@ -561,14 +610,15 @@ export class YandexShipmentService {
         history: json(history),
         syncedAt: now,
         syncFailures: 0,
-        nextSyncAt: terminal
-          ? null
-          : new Date(
-              now.getTime() +
-                (awaitingAccept && state.providerStatus === 'ready_for_approval'
-                  ? SYNC_POLICY.awaitingAcceptMs
-                  : SYNC_POLICY.activeMs),
-            ),
+        nextSyncAt:
+          terminal || abandoned
+            ? null
+            : new Date(
+                now.getTime() +
+                  (awaitingAccept && state.providerStatus === 'ready_for_approval'
+                    ? SYNC_POLICY.awaitingAcceptMs
+                    : SYNC_POLICY.activeMs),
+              ),
         // Accepted in the Yandex cabinet: record it, so our accept button becomes a no-op.
         ...(!s.acceptedAt &&
         state.providerStatus &&
@@ -578,24 +628,64 @@ export class YandexShipmentService {
           : {}),
       },
     });
+    if (abandoned) this.logger.log(`shipment ${s.id}: claim never accepted, polling stopped`);
+
+    // Returning / items on hands without `pickuped` seen: the parcel did leave the warehouse.
+    const handedOver = to === 'FAILED' && yandexParcelOutFailed(state.providerStatus ?? '');
+    let entered: OrderStatus[] = [];
+    if (changes) {
+      await tx.orderEvent.create({
+        data: {
+          orderId: s.orderId,
+          type: 'DELIVERY_STATUS',
+          from,
+          to,
+          actorType: CARRIER_ACTOR.type,
+          actorId: CARRIER_ACTOR.id,
+          data: { carrier: 'YANDEX', claimId, providerStatus: state.providerStatus ?? null },
+        },
+      });
+      entered = await this.lifecycle.advanceForDelivery(tx, s.orderId, to, CARRIER_ACTOR, {
+        handedOver,
+      });
+    }
+    const orderNow = entered.at(-1) ?? s.order.status;
+
+    const attention: string[] = [];
+    if (changes && s.order.status === 'CANCELLED' && (PARCEL_MOVED.includes(to) || handedOver))
+      attention.push('cancelled_order_parcel_moved');
+    // The claim died with the parcel out (no return reported): staff must find it — markReturned.
+    if (
+      to === 'FAILED' &&
+      terminal &&
+      state.providerStatus !== s.providerStatus &&
+      orderNow === 'HANDED_TO_COURIER'
+    )
+      attention.push('failed_after_pickup');
+    for (const reason of attention) {
+      this.logger.error(
+        `shipment ${s.id} (order ${s.orderId}) needs attention: ${reason} (${state.providerStatus ?? '?'})`,
+      );
+      await tx.orderEvent.create({
+        data: {
+          orderId: s.orderId,
+          type: 'DELIVERY_NEEDS_ATTENTION',
+          actorType: CARRIER_ACTOR.type,
+          actorId: CARRIER_ACTOR.id,
+          data: {
+            carrier: 'YANDEX',
+            claimId,
+            reason,
+            providerStatus: state.providerStatus ?? null,
+          },
+        },
+      });
+    }
     if (!changes) return { notices: [], applied: true, status: to };
 
-    await tx.orderEvent.create({
-      data: {
-        orderId: s.orderId,
-        type: 'DELIVERY_STATUS',
-        from,
-        to,
-        actorType: CARRIER_ACTOR.type,
-        actorId: CARRIER_ACTOR.id,
-        data: { carrier: 'YANDEX', claimId, providerStatus: state.providerStatus ?? null },
-      },
-    });
-    const orderBefore = s.order.status;
-    const entered = await this.lifecycle.advanceForDelivery(tx, s.orderId, to, CARRIER_ACTOR);
-
     const notices: Notice[] = [];
-    if (entered.includes('HANDED_TO_COURIER') && !entered.includes('DELIVERED')) {
+    // "On the way" only while it is: never for a jump straight to delivered / failed / returned.
+    if (entered.includes('HANDED_TO_COURIER') && ON_THE_WAY.includes(to)) {
       notices.push(
         courier?.etaAt
           ? { template: 'order_courier', vars: { vaqt: formatTashkentHm(new Date(courier.etaAt)) } }
@@ -604,18 +694,55 @@ export class YandexShipmentService {
     }
     if (entered.includes('DELIVERED')) notices.push({ template: 'order_delivered' });
     // The parcel was with the courier and is coming back (or stuck): tell the customer once.
-    if (to === 'FAILED' && orderBefore === 'HANDED_TO_COURIER')
+    if (
+      to === 'FAILED' &&
+      orderNow === 'HANDED_TO_COURIER' &&
+      !(await this.lifecycle.deliveryNoticeSent(tx, s.orderId, s.id, 'order_delivery_failed'))
+    )
       notices.push({ template: 'order_delivery_failed' });
     for (const n of notices)
+      await this.lifecycle.recordDeliveryNotice(tx, s.orderId, s.id, n.template, to);
+    return { notices, applied: true, status: to };
+  }
+
+  /**
+   * Staff found the parcel of a failed claim back in the warehouse (e.g. the claim died after
+   * pickup — `DELIVERY_NEEDS_ATTENTION`): shipment and order → RETURNED, stock hold released.
+   */
+  async markReturned(shipmentId: string, actor: Actor, now = new Date()): Promise<ShipmentSummary> {
+    const saved = await this.prisma.$transaction(async (tx) => {
+      const s = await this.lockBoth(tx, shipmentId);
+      if (s.carrier !== 'YANDEX' || s.status !== 'FAILED' || s.order.status !== 'HANDED_TO_COURIER')
+        throw new DomainError('DELIVERY_INVALID_TRANSITION', { from: s.status, to: 'RETURNED' });
+      const history = (Array.isArray(s.history)
+        ? s.history
+        : []) as unknown as StoredHistoryEntry[];
+      history.push({
+        at: now.toISOString(),
+        status: 'RETURNED',
+        providerStatus: null,
+        place: '',
+        note: '',
+      });
+      const updated = await tx.shipment.update({
+        where: { id: s.id },
+        data: { status: 'RETURNED', history: json(history), nextSyncAt: null },
+      });
       await tx.orderEvent.create({
         data: {
           orderId: s.orderId,
-          type: 'DELIVERY_NOTICE',
-          actorType: 'SYSTEM',
-          data: { template: n.template, delivery: to },
+          type: 'DELIVERY_STATUS',
+          from: s.status,
+          to: 'RETURNED',
+          actorType: actor.type,
+          actorId: actor.id ?? null,
+          data: { carrier: 'YANDEX', claimId: s.externalId, manual: true },
         },
       });
-    return { notices, applied: true, status: to };
+      await this.lifecycle.advanceForDelivery(tx, s.orderId, 'RETURNED', actor);
+      return updated;
+    });
+    return this.summary(saved);
   }
 
   /**

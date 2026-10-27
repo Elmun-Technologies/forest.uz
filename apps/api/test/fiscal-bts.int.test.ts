@@ -274,6 +274,52 @@ describe('BTS manual shipments + fiscal receipt rule (integration)', () => {
     });
   });
 
+  it('SMS follow where the parcel is: no "shipped" for a jump to delivered/returned, "failed" once and only after hand-over', async () => {
+    const open = async (id: string) =>
+      (await prisma.reservation.findMany({ where: { orderId: id } })).filter((r) => !r.releasedAt)
+        .length;
+
+    // Booked, never handed over, then cancelled at BTS and the booking returned.
+    const a = await confirmed('COD');
+    await shipments.setManualShipment(
+      a.id,
+      { status: 'CREATED', trackNumber: 'BTS-7712101' },
+      staffId,
+    );
+    const notHanded = await shipments.setManualShipment(a.id, { status: 'FAILED' }, staffId);
+    expect(notHanded).toMatchObject({ orderStatus: 'CONFIRMED', notified: [] });
+    const back = await shipments.setManualShipment(a.id, { status: 'RETURNED' }, staffId);
+    expect(back).toMatchObject({ orderStatus: 'RETURNED', notified: [] });
+    expect(sms(a.phone, 'order_shipped_bts')).toHaveLength(0);
+    expect(sms(a.phone, 'order_delivery_failed')).toHaveLength(0);
+    expect(await open(a.id)).toBe(0); // RETURNED frees the stock hold
+
+    // Failed ↔ in transit bouncing: the customer is told once.
+    const b = await confirmed('COD');
+    await shipments.setManualShipment(
+      b.id,
+      { status: 'IN_TRANSIT', trackNumber: 'BTS-7712102' },
+      staffId,
+    );
+    expect(sms(b.phone, 'order_shipped_bts')).toHaveLength(1);
+    await shipments.setManualShipment(b.id, { status: 'FAILED' }, staffId);
+    await shipments.setManualShipment(b.id, { status: 'IN_TRANSIT' }, staffId);
+    const again = await shipments.setManualShipment(b.id, { status: 'FAILED' }, staffId);
+    expect(again.notified).toEqual([]);
+    expect(sms(b.phone, 'order_delivery_failed')).toHaveLength(1);
+    expect(sms(b.phone, 'order_shipped_bts')).toHaveLength(1);
+
+    // First entry already delivered: "delivered" only.
+    const c = await confirmed('COD');
+    const done = await shipments.setManualShipment(
+      c.id,
+      { status: 'DELIVERED', trackNumber: 'BTS-7712103' },
+      staffId,
+    );
+    expect(done).toMatchObject({ orderStatus: 'DELIVERED', notified: ['order_delivered'] });
+    expect(sms(c.phone, 'order_shipped_bts')).toHaveLength(0);
+  });
+
   it('online payments: Payme with receipt detail closes; Click needs a receipt (URL or manual)', async () => {
     const deliver = async (id: string, track: string) =>
       shipments.setManualShipment(id, { status: 'DELIVERED', trackNumber: track }, staffId);

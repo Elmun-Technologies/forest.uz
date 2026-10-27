@@ -28,6 +28,23 @@ export function safeUrl(url: string): string {
   }
 }
 
+/** Our own routes whose next path segment is a secret (Eskiz callback token). */
+const SECRET_SEGMENT_AFTER = /(\/webhooks\/eskiz\/)[^/]+/gi; // Express routes ignore case
+
+/**
+ * Request path for access logs: no query string (tracking links, Yandex callback key) and secret
+ * path segments masked. Unlike `safeUrl` there is no length heuristic: long product slugs and ids
+ * stay readable in access logs.
+ */
+export function requestLogPath(url: string): string {
+  return (url.split('?')[0] ?? '').replace(SECRET_SEGMENT_AFTER, '$1***');
+}
+
+/** Pino `serializers.req`: method + masked path only. */
+export function serializeRequestForLog(req: { id: string; method: string; url: string }) {
+  return { id: req.id, method: req.method, path: requestLogPath(req.url) };
+}
+
 export function maskPhonesInText(text: string): string {
   return text.replace(PHONE_IN_TEXT, '+998 $2 *** ** $3');
 }

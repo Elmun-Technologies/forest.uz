@@ -1,4 +1,5 @@
 import type { Provider } from '@nestjs/common';
+import type { Prisma } from '@forest/db';
 import { CartService } from '../commerce/cart.service';
 
 /**
@@ -7,6 +8,12 @@ import { CartService } from '../commerce/cart.service';
  */
 export interface CartMerger {
   mergeAnonymousCart(anonCartId: string | null, customerId: string): Promise<void>;
+  /** Moves a customer's active carts to another customer (account merge), in `tx`. */
+  absorbCustomerCarts(
+    tx: Prisma.TransactionClient,
+    fromCustomerId: string,
+    intoCustomerId: string,
+  ): Promise<void>;
 }
 
 export const CART_MERGER = Symbol('CART_MERGER');

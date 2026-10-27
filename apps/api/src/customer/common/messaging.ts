@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { type Locale, fillTemplate, t } from '@forest/contracts';
 import { IntegrationsService } from '../../integrations/integrations.service';
+import { applyParkedEskizStatus } from '../../messaging/eskiz-status';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../redis/redis.module';
 
 export interface TemplateSmsInput {
   phone: string;
@@ -20,6 +22,7 @@ export class TemplateSms {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
+    private readonly redis: RedisService,
   ) {}
 
   async render(
@@ -60,6 +63,10 @@ export class TemplateSms {
         templateKey: input.templateKey,
       });
       await record({ status: 'SENT', providerId });
+      // A delivery report that beat the write above was parked by the Eskiz callback.
+      // Best effort: the SMS went out, a Redis hiccup must not record it as failed.
+      if (input.record)
+        await applyParkedEskizStatus(this.redis, this.prisma, providerId).catch(() => false);
     } catch (e) {
       await record({ status: 'FAILED', error: e instanceof Error ? e.message : String(e) });
       throw e;

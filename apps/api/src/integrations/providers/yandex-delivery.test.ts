@@ -382,6 +382,50 @@ describe('YandexDeliveryProvider (HTTP)', () => {
     expect(await p.quote({ region: 'x', line: 'y', lat: 41.3, lng: 69.2 }, 1000)).toBeNull();
   });
 
+  it('quote goes through its own client (own breaker, no retries); claims keep theirs', async () => {
+    const main = stub((url) =>
+      url.pathname.endsWith('/claims/info') ? claim('accepted') : { status: 500, body: {} },
+    );
+    const quoteCalls: string[] = [];
+    const quoteHttp = new HttpClient('yandex_delivery:quote', {
+      maxRetries: 0,
+      fetchImpl: (async (u: string) => {
+        quoteCalls.push(u);
+        return new Response('{}', { status: 503 });
+      }) as unknown as typeof fetch,
+    });
+    const p = new YandexDeliveryProvider(creds, {
+      http: main.http,
+      quoteHttp,
+      baseUrl: 'http://yd.test',
+    });
+    for (let i = 0; i < 6; i++)
+      await expect(
+        p.quote({ region: 'x', line: 'y', lat: 41.3, lng: 69.2 }, 1000),
+      ).rejects.toThrow();
+    // One attempt per quote, and the quote breaker opened without touching the claims client.
+    expect(quoteCalls).toHaveLength(5);
+    expect(quoteHttp.isOpen).toBe(true);
+    expect(main.calls).toHaveLength(0);
+    expect(main.http.isOpen).toBe(false);
+    expect((await p.getState('claim-1')).providerStatus).toBe('accepted');
+  });
+
+  it('a forwarded number without ttl_seconds expires after 30 minutes', async () => {
+    const s = stub((url) => {
+      if (url.pathname.endsWith('/claims/points-eta')) return { status: 200, body: {} };
+      if (url.pathname.endsWith('/driver-voiceforwarding'))
+        return { status: 200, body: { phone: '+79099999998' } };
+      return claim('performer_found', { performer_info: { courier_name: 'Aziz' } });
+    });
+    const p = new YandexDeliveryProvider(creds, { http: s.http, baseUrl: 'http://yd.test' });
+    const before = Date.now();
+    const st = await p.getState('claim-1', { withPhone: true });
+    const ttl = st.courier!.phoneExpiresAt!.getTime() - before;
+    expect(ttl).toBeGreaterThanOrEqual(30 * 60_000);
+    expect(ttl).toBeLessThan(30 * 60_000 + 5_000);
+  });
+
   it('API errors surface code and HTTP status; health check reports a rejected token', async () => {
     const s = stub(() => ({ status: 401, body: { code: 'unauthorized', message: 'bad token' } }));
     const p = new YandexDeliveryProvider(creds, { http: s.http, baseUrl: 'http://yd.test' });

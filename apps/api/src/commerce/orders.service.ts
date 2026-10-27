@@ -15,9 +15,11 @@ import {
 import type { Prisma } from '@forest/db';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
+import { yandexClaimLive } from '../delivery/shipment-state';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 
 const orderInclude = {
   items: {
@@ -105,13 +107,9 @@ const DELIVERY_LABELS: Record<Locale, Record<DeliveryStatus, string>> = {
   },
 };
 
-/** A carrier claim that is alive (Yandex claim not dead): the address can no longer change. */
-function hasLiveClaim(
-  shipments: { carrier: string; externalId: string | null; status: DeliveryStatus }[],
-): boolean {
-  return shipments.some(
-    (s) => s.carrier === 'YANDEX' && s.externalId !== null && s.status !== 'FAILED',
-  );
+/** Yandex has (or may have, after a lost create answer) the address: it can no longer change. */
+function hasLiveClaim(shipments: Parameters<typeof yandexClaimLive>[0][]): boolean {
+  return shipments.some(yandexClaimLive);
 }
 
 /** Masks every digit except the last two (forwarded numbers may be foreign: +7…). */
@@ -128,6 +126,7 @@ export class OrdersService {
     private readonly files: FilesService,
     private readonly settings: SettingsService,
     @Inject(ENV) private readonly env: Env,
+    private readonly lifecycle: OrderLifecycleService,
   ) {}
 
   private eventAt(o: OrderRow, to: string): string | null {
@@ -325,40 +324,50 @@ export class OrdersService {
     };
   }
 
+  /**
+   * Customer address correction before hand-over. Runs under the order lock, so it can't race a
+   * claim creation (which reads the address under the same lock). The checkout pin is dropped:
+   * the new line has no coordinates and Yandex routes by them.
+   */
   async changeAddress(
     token: string,
     viewerCustomerId: string | null,
     addressLine: string,
     district: string | null,
   ): Promise<void> {
-    const o = await this.prisma.order.findUnique({
+    const found = await this.prisma.order.findUnique({
       where: { trackingToken: token },
-      include: { shipments: true },
+      select: { id: true },
     });
-    if (!o) throw new DomainError('ORDER_NOT_FOUND');
-    // Only the signed-in owner may change the address (the link alone is not proof of identity).
-    if (!viewerCustomerId || viewerCustomerId !== o.customerId)
-      throw new DomainError('UNAUTHORIZED');
-    // Once a carrier claim exists the carrier already has the address (CLAUDE.md §6).
-    if (!canChangeAddress(o.status) || hasLiveClaim(o.shipments))
-      throw new DomainError('ADDRESS_LOCKED');
-    const prev = o.address as Record<string, unknown>;
-    await this.prisma.$transaction([
-      this.prisma.order.update({
+    if (!found) throw new DomainError('ORDER_NOT_FOUND');
+    await this.prisma.$transaction(async (tx) => {
+      await this.lifecycle.lockOrder(tx, found.id);
+      const o = await tx.order.findUniqueOrThrow({
+        where: { id: found.id },
+        include: { shipments: true },
+      });
+      // Only the signed-in owner may change the address (the link alone is not proof of identity).
+      if (!viewerCustomerId || viewerCustomerId !== o.customerId)
+        throw new DomainError('UNAUTHORIZED');
+      // Once a carrier claim exists the carrier already has the address (CLAUDE.md §6).
+      if (!canChangeAddress(o.status) || hasLiveClaim(o.shipments))
+        throw new DomainError('ADDRESS_LOCKED');
+      const { lat: _lat, lng: _lng, ...prev } = o.address as Record<string, unknown>;
+      await tx.order.update({
         where: { id: o.id },
         data: {
           address: { ...prev, line: addressLine, district: district ?? prev.district ?? null },
         },
-      }),
-      this.prisma.orderEvent.create({
+      });
+      await tx.orderEvent.create({
         data: {
           orderId: o.id,
           type: 'ADDRESS_CHANGED',
           actorType: 'CUSTOMER',
           actorId: viewerCustomerId,
         },
-      }),
-    ]);
+      });
+    });
   }
 
   /** GET /me/orders (cabinet history). */

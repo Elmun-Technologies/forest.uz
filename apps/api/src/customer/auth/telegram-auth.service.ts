@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DomainError, type Locale, type TelegramAuthInput } from '@forest/contracts';
 import { Prisma } from '@forest/db';
+import { SessionService } from '../../common/session';
 import { IntegrationsService } from '../../integrations/integrations.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CART_MERGER, type CartMerger } from '../cart-merger';
 import { RateLimiter } from '../common/rate-limit';
 import { TELEGRAM_LOGIN_POLICY, type TelegramUser, verifyTelegramLogin } from './telegram-login';
 
@@ -20,6 +22,8 @@ export class TelegramAuthService {
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
     private readonly limiter: RateLimiter,
+    private readonly sessions: SessionService,
+    @Inject(CART_MERGER) private readonly carts: CartMerger,
   ) {}
 
   /** Throws RATE_LIMITED / INTEGRATION_NOT_CONFIGURED / TELEGRAM_AUTH_INVALID / _EXPIRED. */
@@ -86,13 +90,14 @@ export class TelegramAuthService {
   }
 
   /**
-   * Attaches the Telegram account to `customerId`. A phone-less Telegram-only customer holding it
-   * (an earlier widget login) is absorbed: its addresses and favourites move over and it is
-   * erased. Any other holder → TELEGRAM_ALREADY_LINKED (an operator decides).
+   * Attaches the Telegram account to `customerId`. A phone-less, order-less Telegram-only customer
+   * holding it (an earlier widget login) is absorbed: its cart, addresses, favourites, consents,
+   * visitors and messages move over, it is erased and its sessions end. Any other holder →
+   * TELEGRAM_ALREADY_LINKED (an operator decides).
    */
   async link(customerId: string, user: TelegramUser): Promise<void> {
     try {
-      await this.prisma.$transaction(async (tx) => {
+      const absorbed = await this.prisma.$transaction(async (tx) => {
         const holder = await tx.customer.findUnique({
           where: { telegramId: user.id },
           include: { _count: { select: { orders: true } } },
@@ -106,7 +111,10 @@ export class TelegramAuthService {
           where: { id: customerId },
           data: { telegramId: user.id, telegramUsername: user.username },
         });
+        return holder && holder.id !== customerId ? holder.id : null;
       });
+      // After commit: the stub's browser sessions (widget logins) must not outlive it.
+      if (absorbed) await this.sessions.revokeCustomer(absorbed);
     } catch (e) {
       if (isUniqueViolation(e)) throw new DomainError('TELEGRAM_ALREADY_LINKED');
       throw e;
@@ -134,6 +142,19 @@ export class TelegramAuthService {
         skipDuplicates: true,
       });
     await tx.favorite.deleteMany({ where: { customerId: stubId } });
+    await this.carts.absorbCustomerCarts(tx, stubId, intoId);
+    // History and consent records keep their timestamps/sources; they now describe the survivor.
+    await tx.consent.updateMany({ where: { customerId: stubId }, data: { customerId: intoId } });
+    await tx.visitor.updateMany({ where: { customerId: stubId }, data: { customerId: intoId } });
+    await tx.message.updateMany({ where: { customerId: stubId }, data: { customerId: intoId } });
+    await tx.conversation.updateMany({
+      where: { customerId: stubId },
+      data: { customerId: intoId },
+    });
+    await tx.customerNote.updateMany({
+      where: { customerId: stubId },
+      data: { customerId: intoId },
+    });
     await tx.customer.update({
       where: { id: stubId },
       data: { telegramId: null, telegramUsername: null, name: null, deletedAt: new Date() },

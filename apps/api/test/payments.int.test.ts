@@ -440,6 +440,50 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       expect((await rpc('CheckTransaction', { id })).result).toMatchObject({ state: 2 });
     });
 
+    it('a dispatched Yandex courier blocks the refund (-31007) until staff cancel the claim', async () => {
+      const o = await placeOrder('PAYME');
+      const { id } = await createTxn(o);
+      await rpc('PerformTransaction', { id });
+      // Staff accepted the claim: the order is still CONFIRMED but a courier is on the way.
+      const shipment = await prisma.shipment.create({
+        data: {
+          orderId: o.id,
+          sellerId: o.items[0]!.sellerId,
+          carrier: 'YANDEX',
+          externalId: `claim-${id}`,
+          status: 'CREATED',
+          providerStatus: 'performer_lookup',
+          acceptedAt: new Date(),
+        },
+      });
+      expect((await rpc('CancelTransaction', { id, reason: 5 })).error).toMatchObject({
+        code: -31007,
+      });
+      let p = await paymentByTxn('PAYME', id);
+      expect(p.status).toBe('PAID');
+      expect(p.order.status).toBe('CONFIRMED');
+      expect(p.order.reservations).toHaveLength(1);
+      // The same rule guards any cancellation of the order.
+      await expect(
+        prisma.$transaction((tx) =>
+          lifecycle.transition(tx, o.id, 'CANCELLED', { type: 'STAFF', id: ownerId }),
+        ),
+      ).rejects.toMatchObject({ code: 'DELIVERY_IN_PROGRESS' });
+
+      // Claim cancelled (dead): the refund goes through and cancels the order.
+      await prisma.shipment.update({
+        where: { id: shipment.id },
+        data: { status: 'FAILED', providerStatus: 'cancelled' },
+      });
+      expect((await rpc('CancelTransaction', { id, reason: 5 })).result).toMatchObject({
+        state: -2,
+      });
+      p = await paymentByTxn('PAYME', id);
+      expect(p.status).toBe('REFUNDED');
+      expect(p.order.status).toBe('CANCELLED');
+      expect(p.order.reservations.every((r) => r.releasedAt !== null)).toBe(true);
+    });
+
     it('times out created transactions after 12 h: cancel with reason 4, then -31008', async () => {
       const o = await placeOrder('PAYME');
       const { id } = await createTxn(o);

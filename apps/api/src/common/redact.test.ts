@@ -1,4 +1,10 @@
-import { maskPhonesInText, redact, REDACTED } from './redact';
+import {
+  maskPhonesInText,
+  redact,
+  REDACTED,
+  requestLogPath,
+  serializeRequestForLog,
+} from './redact';
 
 describe('redact', () => {
   it('redacts sensitive keys recursively', () => {
@@ -49,5 +55,22 @@ describe('safeUrl', () => {
       mobile_phone: REDACTED,
       message: REDACTED,
     });
+  });
+});
+
+describe('access log request serializer', () => {
+  it('masks the Eskiz callback token and drops query strings', () => {
+    const token = 'Zx9_aB-cD3eF5gH7iJ9kL1mN3oP5qR7sT9uV1wX3yZ5';
+    expect(
+      serializeRequestForLog({ id: 'r1', method: 'POST', url: `/v1/webhooks/eskiz/${token}` }),
+    ).toEqual({ id: 'r1', method: 'POST', path: '/v1/webhooks/eskiz/***' });
+    expect(requestLogPath(`/v1/Webhooks/ESKIZ/${token}/?x=1`)).toBe('/v1/Webhooks/ESKIZ/***/');
+    expect(requestLogPath('/v1/webhooks/yandex-delivery?key=secret&claim_id=c1')).toBe(
+      '/v1/webhooks/yandex-delivery',
+    );
+    // Ordinary paths stay readable (long slugs are not mistaken for secrets).
+    expect(requestLogPath('/v1/catalog/products/mebel-boyogi-chalk-paint-white-1l')).toBe(
+      '/v1/catalog/products/mebel-boyogi-chalk-paint-white-1l',
+    );
   });
 });

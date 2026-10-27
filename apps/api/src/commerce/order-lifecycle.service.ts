@@ -12,6 +12,7 @@ import {
 import type { ActorType, Prisma } from '@forest/db';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
+import { parcelWithCarrier } from '../delivery/shipment-state';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { fiscalEvidence } from './fiscal.service';
@@ -55,8 +56,15 @@ const FULFILMENT_PATH: readonly OrderStatus[] = [
   'DELIVERED',
 ];
 
-/** Order status a carrier status implies; null = no fulfilment change. */
-export function orderTargetForDelivery(delivery: DeliveryStatus): OrderStatus | null {
+/**
+ * Order status a carrier status implies; null = no fulfilment change. `handedOver`: the carrier
+ * status proves the parcel left the warehouse even though it maps to FAILED (Yandex `returning`,
+ * `cancelled_with_items_on_hands` seen without `pickuped` in between).
+ */
+export function orderTargetForDelivery(
+  delivery: DeliveryStatus,
+  handedOver = false,
+): OrderStatus | null {
   switch (delivery) {
     case 'PICKED_UP':
     case 'IN_TRANSIT':
@@ -66,9 +74,11 @@ export function orderTargetForDelivery(delivery: DeliveryStatus): OrderStatus | 
       return 'DELIVERED';
     case 'RETURNED':
       return 'RETURNED';
+    case 'FAILED':
+      // Retry or return follows; only a proven hand-over moves the order.
+      return handedOver ? 'HANDED_TO_COURIER' : null;
     default:
-      // NOT_CREATED / CREATED / COURIER_ASSIGNED: still in the warehouse. FAILED: the parcel is
-      // with the carrier (retry or return follows) — the order status doesn't change.
+      // NOT_CREATED / CREATED / COURIER_ASSIGNED: still in the warehouse.
       return null;
   }
 }
@@ -78,8 +88,12 @@ export function orderTargetForDelivery(delivery: DeliveryStatus): OrderStatus | 
  * already there or beyond, unconfirmed (NEW — a carrier never confirms an order), or a closed /
  * return branch (CANCELLED, COMPLETED, RETURN_REQUESTED, RETURNED).
  */
-export function deliveryOrderSteps(from: OrderStatus, delivery: DeliveryStatus): OrderStatus[] {
-  const target = orderTargetForDelivery(delivery);
+export function deliveryOrderSteps(
+  from: OrderStatus,
+  delivery: DeliveryStatus,
+  handedOver = false,
+): OrderStatus[] {
+  const target = orderTargetForDelivery(delivery, handedOver);
   const at = FULFILMENT_PATH.indexOf(from);
   if (!target || at < 0) return [];
   if (target === 'RETURNED') {
@@ -133,6 +147,11 @@ export class OrderLifecycleService {
     // Closing the order needs fiscal evidence of the sale (docs/06 Fiscal, CLAUDE.md §6).
     if (to === 'COMPLETED' && !(await fiscalEvidence(tx, orderId)))
       throw new DomainError('FISCAL_RECEIPT_REQUIRED');
+    // A courier is coming for (or has) the parcel: staff cancel the claim first (CLAUDE.md §6).
+    if (to === 'CANCELLED' && (await this.parcelOut(tx, orderId)))
+      throw new DomainError('DELIVERY_IN_PROGRESS');
+    // Every exit from fulfilment frees the stock hold (idempotent).
+    if (to === 'CANCELLED' || to === 'RETURNED') await this.reservations.release(tx, orderId);
     await tx.order.update({
       where: { id: orderId },
       data: {
@@ -153,6 +172,12 @@ export class OrderLifecycleService {
     });
   }
 
+  /** Caller holds the order lock (shipment rows change only under it). */
+  private async parcelOut(tx: Tx, orderId: string): Promise<boolean> {
+    const shipments = await tx.shipment.findMany({ where: { orderId } });
+    return parcelWithCarrier(shipments, new Date());
+  }
+
   /**
    * Moves the order along its fulfilment path as far as a carrier status implies (one transition
    * and OrderEvent per step, `data.cause = 'delivery'`). Caller holds the order lock (re-locking
@@ -163,16 +188,55 @@ export class OrderLifecycleService {
     orderId: string,
     delivery: DeliveryStatus,
     actor: Actor,
+    opts: { handedOver?: boolean } = {},
   ): Promise<OrderStatus[]> {
     await this.lockOrder(tx, orderId);
     const { status } = await tx.order.findUniqueOrThrow({
       where: { id: orderId },
       select: { status: true },
     });
-    const steps = deliveryOrderSteps(status, delivery);
+    const steps = deliveryOrderSteps(status, delivery, opts.handedOver);
     for (const to of steps)
       await this.transition(tx, orderId, to, actor, { cause: 'delivery', delivery });
     return steps;
+  }
+
+  /** A carrier SMS (`DELIVERY_NOTICE` marker) was already decided for this shipment. */
+  async deliveryNoticeSent(
+    tx: Tx,
+    orderId: string,
+    shipmentId: string,
+    template: string,
+  ): Promise<boolean> {
+    const n = await tx.orderEvent.count({
+      where: {
+        orderId,
+        type: 'DELIVERY_NOTICE',
+        AND: [
+          { data: { path: ['template'], equals: template } },
+          { data: { path: ['shipmentId'], equals: shipmentId } },
+        ],
+      },
+    });
+    return n > 0;
+  }
+
+  /** Marker written in the status transaction; the SMS itself goes out after commit. */
+  async recordDeliveryNotice(
+    tx: Tx,
+    orderId: string,
+    shipmentId: string,
+    template: string,
+    delivery: DeliveryStatus,
+  ): Promise<void> {
+    await tx.orderEvent.create({
+      data: {
+        orderId,
+        type: 'DELIVERY_NOTICE',
+        actorType: 'SYSTEM',
+        data: { template, delivery, shipmentId },
+      },
+    });
   }
 
   /**
@@ -388,8 +452,9 @@ export class OrderLifecycleService {
 
   /**
    * Refund of a PAID payment (Payme cancel after perform, or a manual Click/COD refund).
-   * Full refund before shipping cancels the order and releases its stock. Caller holds the
-   * payment lock. Throws REFUND_NOT_ALLOWED / REFUND_AMOUNT_INVALID.
+   * Full refund before shipping cancels the order and releases its stock — refused while a
+   * courier is dispatched for / has the parcel (staff cancel the claim first). Caller holds the
+   * order → payment locks. Throws REFUND_NOT_ALLOWED / REFUND_AMOUNT_INVALID.
    */
   async refundInTx(
     tx: Tx,
@@ -416,6 +481,9 @@ export class OrderLifecycleService {
     if (input.amountTiyin <= 0n || input.amountTiyin > remaining)
       throw new DomainError('REFUND_AMOUNT_INVALID', { remainingTiyin: remaining.toString() });
     const full = input.amountTiyin === remaining;
+    const cancels = full && CANCEL_ON_FULL_REFUND.includes(p.order.status);
+    if (cancels && (await this.parcelOut(tx, p.order.id)))
+      throw new DomainError('REFUND_NOT_ALLOWED', { delivery: 'in_progress' });
     const refund = await tx.refund.create({
       data: {
         paymentId,
@@ -431,10 +499,7 @@ export class OrderLifecycleService {
       actor,
       input.extra,
     );
-    if (full && CANCEL_ON_FULL_REFUND.includes(p.order.status)) {
-      await this.reservations.release(tx, p.order.id);
-      await this.transition(tx, p.order.id, 'CANCELLED', actor, { reason: 'refunded' });
-    }
+    if (cancels) await this.transition(tx, p.order.id, 'CANCELLED', actor, { reason: 'refunded' });
     return { refundId: refund.id, full };
   }
 
@@ -574,7 +639,6 @@ export class OrderLifecycleService {
           )) {
             await this.setPaymentStatus(tx, p.id, 'EXPIRED', { type: 'SYSTEM' });
           }
-          await this.reservations.release(tx, id);
           await this.transition(
             tx,
             id,

@@ -4,7 +4,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import { CommerceModule } from './commerce/commerce.module';
 import { CustomerModule } from './customer/customer.module';
 import { DeliveryModule } from './delivery/delivery.module';
-import { PINO_REDACT_PATHS } from './common/redact';
+import { PINO_REDACT_PATHS, serializeRequestForLog } from './common/redact';
 import { SessionModule } from './common/session';
 import { ConfigModule, ENV } from './config/config.module';
 import type { Env } from './config/env';
@@ -27,13 +27,9 @@ import { SettingsModule } from './settings/settings.module';
         pinoHttp: {
           level: env.LOG_LEVEL,
           redact: { paths: PINO_REDACT_PATHS, censor: '[redacted]' },
-          // Query strings may carry tokens (tracking links); log path only.
+          // Query strings and some path segments carry secrets; log the masked path only.
           serializers: {
-            req: (req: { id: string; method: string; url: string }) => ({
-              id: req.id,
-              method: req.method,
-              path: req.url.split('?')[0],
-            }),
+            req: serializeRequestForLog,
             res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
           },
           autoLogging: {

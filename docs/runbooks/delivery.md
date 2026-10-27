@@ -53,31 +53,49 @@ by `seq + 1`.
 | performer_found, pickup_arrived, ready_for_pickup_confirmation | COURIER_ASSIGNED | — | — |
 | pickuped | PICKED_UP | → HANDED_TO_COURIER (walks CONFIRMED → PACKING → READY first) | `order_courier` with `{vaqt}` = ETA (points-eta), else `order_shipped` |
 | delivery_arrived, ready_for_delivery_confirmation, pay_waiting | IN_TRANSIT | → HANDED_TO_COURIER | (as above if first) |
-| delivered, delivered_finish | DELIVERED | → DELIVERED | `order_delivered` |
-| returning, return_arrived, ready_for_return_confirmation | FAILED | — (stays HANDED_TO_COURIER) | `order_delivery_failed` (once, only if the parcel was with the courier) |
-| returned, returned_finish | RETURNED | → RETURNED | — |
-| estimating_failed, performer_not_found, failed, cancelled, cancelled_with_payment, cancelled_by_taxi, cancelled_with_items_on_hands | FAILED | — | — (staff decides; a new claim can be created) |
+| delivered, delivered_finish | DELIVERED | → DELIVERED | `order_delivered` only (no "on the way" for a jump) |
+| returning, return_arrived, ready_for_return_confirmation | FAILED | → HANDED_TO_COURIER (the parcel left even if `pickuped` was never seen) | `order_delivery_failed` — at most once per shipment, never "on the way" |
+| returned, returned_finish | RETURNED | → RETURNED (stock hold released) | — |
+| cancelled_with_items_on_hands | FAILED (terminal) | → HANDED_TO_COURIER + `DELIVERY_NEEDS_ATTENTION` | `order_delivery_failed` (once) |
+| estimating_failed, performer_not_found, failed, cancelled, cancelled_with_payment, cancelled_by_taxi | FAILED | — before pickup (staff may create a new claim); after pickup `DELIVERY_NEEDS_ATTENTION` | — |
 | unknown status | unchanged (warning logged) | — | — |
 
 Transitions are checked against the delivery state machine (`canTransitionDelivery`); an
 impossible jump is ignored with a warning. Every change appends `Shipment.history`
 (`{at, status, providerStatus}`), writes `OrderEvent` `DELIVERY_STATUS` (actor CARRIER) and, for
-SMS, a `DELIVERY_NOTICE` marker in the same transaction.
+SMS, a `DELIVERY_NOTICE` marker (`{template, delivery, shipmentId}`) in the same transaction.
+A CANCELLED order whose parcel still moves (pickup or later) gets `DELIVERY_NEEDS_ATTENTION`
+(`reason cancelled_order_parcel_moved`) and an error log — the order is not changed.
+
+**Cancel / refund guard:** while a claim is accepted (or an accept is in flight) and not dead, or
+any shipment is COURIER_ASSIGNED…DELIVERED, the order can't be cancelled (`DELIVERY_IN_PROGRESS`)
+and a full refund is refused (`REFUND_NOT_ALLOWED`, Payme `-31007`). Cancel the claim first
+(`cancelClaim`), then refund.
 
 ## Operations
 - **Create claim** (Phase 3 admin "Kuryer chaqirish"): `YandexShipmentService.createClaim(orderId,
   actor)` — order must be CONFIRMED/PACKING/READY and carrier YANDEX; COD only with `allowCod=on`.
   Yandex estimates the claim (`ready_for_approval`); nothing is dispatched.
 - **Accept**: `acceptClaim(shipmentId, actor)` — refused with `DELIVERY_TEST_MODE` while the
-  integration is in `mode=test`; serialized under the order → shipment locks; a claim accepted in
-  the Yandex cabinet is detected and recorded. The offer is valid ~10 minutes: accept soon after
-  creating, else `DELIVERY_CLAIM_NOT_READY` → cancel and create again.
+  integration is in `mode=test`. Step 1 under the order → shipment locks writes
+  `providerData.acceptRequest {by, at, claimId}` (a second click within 2 min is a no-op); step 2
+  calls Yandex outside any transaction; step 3 records `acceptedAt` + `DELIVERY_ACCEPTED` (staff
+  actor) and clears the marker (also on failure). A claim accepted in the Yandex cabinet is
+  detected and recorded. The offer is valid ~10 minutes: accept soon after creating, else
+  `DELIVERY_CLAIM_NOT_READY` → cancel and create again.
 - **Cancel**: `cancelClaim(shipmentId, actor, { allowPaid })` — `DELIVERY_CANCEL_PAID` until staff
   confirms the fee, `DELIVERY_CANCEL_UNAVAILABLE` after the courier has the parcel (Yandex support).
 - **Sync**: queue `delivery`, job `delivery.shipments.sync` every minute: shipments whose
   `nextSyncAt` is due (≤ 50 per run), each leased by a conditional update. Cadence 1 min, 5 min while
   waiting for acceptance, stop on a terminal status; errors back off 1 → 2 → 4 … ≤ 30 min
-  (`syncFailures`). Answers older than the stored `updated_ts` are ignored.
+  (`syncFailures`). Answers older than the stored `updated_ts` are ignored. A claim still awaiting
+  acceptance stops being polled 24 h after creation (`providerData.claimCreatedAt`; no offer-expiry
+  field is documented) or once its order is CANCELLED; accept/refresh restart it.
+- **Failed after pickup** (`DELIVERY_NEEDS_ATTENTION`, `reason failed_after_pickup`): the claim
+  died while the parcel was out and no return was reported. Find the parcel; once it is back in the
+  warehouse call `markReturned(shipmentId, actor)` (shipment + order RETURNED, stock hold
+  released). No new claim is allowed for a HANDED_TO_COURIER order (conservative: re-delivery of a
+  parcel whose whereabouts are unknown is a Phase 3 admin decision).
 - **Callback** (optional, `callbacks=on`): `POST https://<API_DOMAIN>/v1/webhooks/yandex-delivery?key=<secret>&`
   is sent as `callback_properties.callback_url`; Yandex appends `claim_id`/`updated_ts`. Wrong key →
   403, unknown claim → 200; a known claim enqueues `delivery.shipment.refresh` (deduplicated). The
@@ -85,11 +103,16 @@ SMS, a `DELIVERY_NOTICE` marker in the same transaction.
   changes the URL of claims created afterwards.
 - **Live quote** (zone `liveQuote: true`, default off): `check-price` from the warehouse to the
   customer's pin; cached 10 min in Redis (`dq:yandex:<zone>:<lat4>:<lng4>:<0.5 kg step>`); any miss →
-  zone price.
+  zone price. Own HTTP client/breaker (`yandex_delivery:quote`, no retries, 3 s), so quotes never
+  open the claims breaker; a failed pin (3-decimal rounding) is cached 60 s; requests with a pin
+  (`GET /cart?zone&lat&lng`, `GET /cart/quote?…&lat&lng`) are limited to 30/min per IP.
 - **Tracking page**: courier first name, car, plate, ETA window, carrier history; the forwarded
   courier number (+ext) only to the order owner (session customer or the placing browser's `fr_ord`
   cookie), masked for anyone else holding the link, hidden outside COURIER_ASSIGNED…IN_TRANSIT or
-  after its TTL. Once a live claim exists the address can't be changed online (`ADDRESS_LOCKED`).
+  after its TTL (30 min when Yandex sends none; dropped when the performer changes). Once a live
+  claim exists — or a create whose answer was lost (`pendingRequestId`) — the address can't be
+  changed online (`ADDRESS_LOCKED`). An address change runs under the order lock and drops the
+  checkout pin (the new line has no coordinates).
 
 ## Owner must provide (admin → Integrations → Yandex Dostavka)
 `oauthToken`, `sourceAddress`, `sourceLat`, `sourceLng`, `sourceContactName`, `sourceContactPhone`,

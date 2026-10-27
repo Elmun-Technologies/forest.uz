@@ -57,9 +57,26 @@ export class SessionService {
     if (!id) return null;
     const raw = await this.redis.get(`sess:${id}`);
     if (!raw) return null;
-    // Sliding expiry.
-    await this.redis.expire(`sess:${id}`, SESSION_TTL_SEC);
-    return JSON.parse(raw) as SessionData;
+    const data = JSON.parse(raw) as SessionData;
+    const [revokedAt] = await Promise.all([
+      this.redis.get(revokedKey(data.customerId)),
+      // Sliding expiry.
+      this.redis.expire(`sess:${id}`, SESSION_TTL_SEC),
+    ]);
+    if (revokedAt !== null && data.createdAt <= Number(revokedAt)) {
+      await this.redis.del(`sess:${id}`);
+      return null;
+    }
+    return data;
+  }
+
+  /**
+   * Ends every existing session of a customer (account merged / erased). Sessions aren't indexed
+   * by customer in Redis, so `read` drops sessions created before this marker; it lives as long
+   * as the longest session could.
+   */
+  async revokeCustomer(customerId: string, now = Date.now()): Promise<void> {
+    await this.redis.set(revokedKey(customerId), String(now), 'EX', SESSION_TTL_SEC);
   }
 
   async destroy(req: Request, res: Response): Promise<void> {
@@ -81,6 +98,8 @@ export class SessionService {
     return id;
   }
 }
+
+const revokedKey = (customerId: string) => `sess:revoked:${customerId}`;
 
 function cookieValue(req: Request, name: string): string | null {
   const v = (req.cookies as Record<string, unknown> | undefined)?.[name];

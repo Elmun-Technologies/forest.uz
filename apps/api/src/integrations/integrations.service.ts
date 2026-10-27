@@ -180,10 +180,11 @@ export class IntegrationsService {
       : this.real<AdSignalProvider>(key, () => null);
   }
 
-  httpClient(key: string): HttpClient {
+  /** `key` names the breaker; a provider may use a second one (`<integration>:<purpose>`). */
+  httpClient(key: string, options: { maxRetries?: number } = {}): HttpClient {
     let client = this.httpClients.get(key);
     if (!client) {
-      client = new HttpClient(key, { maxRetries: 2 });
+      client = new HttpClient(key, { maxRetries: options.maxRetries ?? 2 });
       this.httpClients.set(key, client);
     }
     return client;
@@ -193,6 +194,8 @@ export class IntegrationsService {
   private yandexDelivery(credentials: Record<string, string>): YandexDeliveryProvider {
     return new YandexDeliveryProvider(credentials, {
       http: this.httpClient('yandex_delivery'),
+      // Checkout quotes must answer fast or fall back to the zone price: no retries, own breaker.
+      quoteHttp: this.httpClient('yandex_delivery:quote', { maxRetries: 0 }),
       baseUrl: this.env.YANDEX_DELIVERY_API_URL,
       callbackUrl: yandexCallbackUrl(this.env.API_URL, this.env.APP_ENCRYPTION_KEY),
       log: (e) =>

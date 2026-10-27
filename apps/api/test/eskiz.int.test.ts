@@ -22,6 +22,7 @@ function eskizStub() {
   let sends = 0;
   const state = { rejectNextSend: false, password: 'eskiz-secret' };
   const valid = new Set<string>();
+  const idFor = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
   const read = (req: IncomingMessage) =>
     new Promise<string>((resolve) => {
       let body = '';
@@ -51,14 +52,14 @@ function eskizStub() {
       }
       if (!valid.has(token)) return reply(401, { message: 'Expired', status: 'token-expired' });
       return reply(200, {
-        id: `00000000-0000-4000-8000-${String(++sends).padStart(12, '0')}`,
+        id: idFor(++sends),
         message: 'Waiting for SMS provider',
         status: 'waiting',
       });
     }
     reply(404, { message: 'not found' });
   });
-  return { server, calls, state, logins: () => logins };
+  return { server, calls, state, logins: () => logins, nextId: () => idFor(sends + 1) };
 }
 
 describe('Eskiz SMS adapter + delivery callbacks (integration)', () => {
@@ -240,6 +241,18 @@ describe('Eskiz SMS adapter + delivery callbacks (integration)', () => {
       orderBy: { createdAt: 'desc' },
     });
     expect(JSON.stringify(log.payload)).not.toContain('998901234572');
+  });
+
+  it('a delivery report that beats our providerId write is parked and applied', async () => {
+    const id = stub.nextId();
+    await http()
+      .post(`/v1/webhooks/eskiz/${callbackToken}`)
+      .send({ request_id: id, message_id: '9', status: 'DELIVRD', phone_number: '998901234574' })
+      .expect(200);
+    expect(await sendOrderSms('+998901234574')).toBe(id);
+    const msg = await prisma.message.findFirstOrThrow({ where: { providerId: id } });
+    expect(msg.status).toBe('DELIVERED');
+    expect(msg.deliveredAt).not.toBeNull();
   });
 
   it('rejects callbacks without the secret token', async () => {

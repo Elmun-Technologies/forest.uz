@@ -48,23 +48,29 @@ function clean(v: string | null | undefined, max: number, field: string): string
   return s;
 }
 
+const ON_THE_WAY: readonly DeliveryStatus[] = ['PICKED_UP', 'IN_TRANSIT', 'AT_BRANCH'];
+
 /**
  * Service SMS for what the customer must know (docs/02, docs/09): the parcel left with BTS (track
  * number), it waits at a branch, it was delivered, or delivery failed. In-transit scans stay
- * silent (tracking page only).
+ * silent (tracking page only). "Shipped" only while the parcel is on its way (not for a first
+ * entry straight to DELIVERED / RETURNED); "failed" only once, and only when BTS had the parcel
+ * (`orderStatus` HANDED_TO_COURIER after this update).
  */
 export function manualShipmentNotices(
   to: DeliveryStatus,
   orderSteps: readonly OrderStatus[],
   vars: { trek: string; filial: string },
+  ctx: { orderStatus: OrderStatus; failedNoticeSent: boolean },
 ): { template: string; vars: Record<string, string> }[] {
   const out: { template: string; vars: Record<string, string> }[] = [];
-  if (orderSteps.includes('HANDED_TO_COURIER'))
+  if (orderSteps.includes('HANDED_TO_COURIER') && ON_THE_WAY.includes(to))
     out.push({ template: 'order_shipped_bts', vars: { trek: vars.trek } });
   if (to === 'AT_BRANCH' && vars.filial)
     out.push({ template: 'order_at_branch', vars: { filial: vars.filial } });
   if (to === 'DELIVERED') out.push({ template: 'order_delivered', vars: {} });
-  if (to === 'FAILED') out.push({ template: 'order_delivery_failed', vars: {} });
+  if (to === 'FAILED' && ctx.orderStatus === 'HANDED_TO_COURIER' && !ctx.failedNoticeSent)
+    out.push({ template: 'order_delivery_failed', vars: {} });
   return out;
 }
 
@@ -124,7 +130,7 @@ export class ManualShipmentService {
       }
       const fieldsChanged = trackNumber !== shipment.trackNumber || branch !== prevBranch;
       if (path.length === 0 && !fieldsChanged && !note)
-        return { changed: false as const, orderStatus: order.status, trackNumber, branch };
+        return { changed: false as const, orderStatus: order.status };
 
       const history = [...((shipment.history as HistoryEntry[] | null) ?? [])];
       const at = now.toISOString();
@@ -160,14 +166,32 @@ export class ManualShipmentService {
         },
       });
       const orderSteps = await this.lifecycle.advanceForDelivery(tx, orderId, input.status, actor);
-      return {
-        changed: true as const,
-        reached: path.length ? input.status : null,
-        orderSteps,
-        orderStatus: orderSteps.at(-1) ?? order.status,
-        trackNumber,
-        branch,
-      };
+      const orderStatus = orderSteps.at(-1) ?? order.status;
+      const notices = path.length
+        ? manualShipmentNotices(
+            input.status,
+            orderSteps,
+            { trek: trackNumber, filial: branch ?? '' },
+            {
+              orderStatus,
+              failedNoticeSent: await this.lifecycle.deliveryNoticeSent(
+                tx,
+                orderId,
+                shipment.id,
+                'order_delivery_failed',
+              ),
+            },
+          )
+        : [];
+      for (const n of notices)
+        await this.lifecycle.recordDeliveryNotice(
+          tx,
+          orderId,
+          shipment.id,
+          n.template,
+          input.status,
+        );
+      return { changed: true as const, notices, orderSteps, orderStatus };
     });
 
     if (!outcome.changed)
@@ -178,12 +202,7 @@ export class ManualShipmentService {
         notified: [],
         changed: false,
       };
-    const notices = outcome.reached
-      ? manualShipmentNotices(outcome.reached, outcome.orderSteps, {
-          trek: outcome.trackNumber,
-          filial: outcome.branch ?? '',
-        })
-      : [];
+    const { notices } = outcome;
     // After commit; NotificationsService never throws.
     for (const n of notices) await this.notifications.orderStatus(orderId, n.template, n.vars);
     return {

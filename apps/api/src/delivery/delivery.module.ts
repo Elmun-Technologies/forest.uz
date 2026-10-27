@@ -49,6 +49,12 @@ export class DeliveryScheduler implements OnApplicationBootstrap {
   }
 }
 
+/** Express parses `?a=1&a=2` into an array (and `a[x]=` into an object): take one string. */
+export function firstString(v: unknown): string | undefined {
+  const first: unknown = Array.isArray(v) ? v[0] : v;
+  return typeof first === 'string' ? first : undefined;
+}
+
 function safeEqual(a: string, b: string): boolean {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -71,9 +77,11 @@ export class YandexDeliveryWebhookController {
   @Post()
   @HttpCode(200)
   async callback(
-    @Query('key') key: string | undefined,
-    @Query('claim_id') claimId: string | undefined,
+    @Query('key') rawKey: unknown,
+    @Query('claim_id') rawClaimId: unknown,
   ): Promise<{ ok: true }> {
+    const key = firstString(rawKey);
+    const claimId = firstString(rawClaimId);
     if (!key || !safeEqual(key, yandexCallbackKey(this.env.APP_ENCRYPTION_KEY)))
       throw new ForbiddenException();
     const shipmentId = claimId ? await this.yandex.shipmentIdForClaim(claimId.slice(0, 128)) : null;

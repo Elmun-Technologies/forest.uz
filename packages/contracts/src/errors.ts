@@ -266,6 +266,11 @@ export const ERROR_MESSAGES = {
     uz: "Bekor qilish pullik. Tasdiqlasangiz, to'lov bilan bekor qilinadi.",
     ru: 'Отмена платная. Подтвердите, чтобы отменить с оплатой.',
   },
+  DELIVERY_IN_PROGRESS: {
+    http: 409,
+    uz: 'Kuryer buyurtmani olib ketmoqda yoki olib ketgan. Avval kuryer chaqiruvini bekor qiling yoki qaytishini kuting.',
+    ru: 'Курьер уже едет за заказом или забрал его. Сначала отмените вызов курьера или дождитесь возврата.',
+  },
   DELIVERY_PROVIDER_ERROR: {
     http: 502,
     uz: "Yetkazish xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",

@@ -26,7 +26,11 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { ReqLocale, ZodPipe } from '../common/http';
 import { SessionService, visitorId } from '../common/session';
+import { RateLimiter } from '../customer/common/rate-limit';
 import { CartService } from './cart.service';
+
+/** Requests with a map pin may trigger a live carrier quote (paid upstream call): per IP. */
+export const PIN_QUOTE_POLICY = { perIpPerMinute: 30 } as const;
 
 function hashVisitor(aid: string): string {
   return createHash('sha256').update(aid).digest('hex').slice(0, 32);
@@ -43,7 +47,17 @@ export class CartController {
   constructor(
     private readonly carts: CartService,
     private readonly sessions: SessionService,
+    private readonly limiter: RateLimiter,
   ) {}
+
+  private async limitPin(req: Request): Promise<void> {
+    await this.limiter.consume(
+      'cart-pin:ip',
+      req.ip ?? 'unknown',
+      PIN_QUOTE_POLICY.perIpPerMinute,
+      60,
+    );
+  }
 
   /** Every cart write makes sure the browser carries a visitor id (device rule for promo codes). */
   private device(req: Request, res: Response): string {
@@ -60,10 +74,11 @@ export class CartController {
     const cart = await this.carts.current(req);
     const zone = q.zone ? await this.carts.zoneByKey(q.zone) : undefined;
     // With a map pin the checkout totals use the same live price as /cart/quote and the order.
-    const priced =
-      zone && q.lat !== undefined && q.lng !== undefined
-        ? await this.carts.pricedZone(zone, cart, { lat: q.lat, lng: q.lng })
-        : zone;
+    const pinned = zone && q.lat !== undefined && q.lng !== undefined;
+    if (pinned) await this.limitPin(req);
+    const priced = pinned
+      ? await this.carts.pricedZone(zone, cart, { lat: q.lat!, lng: q.lng! })
+      : zone;
     return this.carts.toDto(cart, locale, priced);
   }
 
@@ -138,6 +153,7 @@ export class CartController {
     @Query(new ZodPipe(quoteQuerySchema)) q: z.infer<typeof quoteQuerySchema>,
     @ReqLocale() locale: Locale,
   ): Promise<DeliveryOptionDto[]> {
+    if (q.lat !== undefined && q.lng !== undefined) await this.limitPin(req);
     return this.carts.quote(
       await this.carts.current(req),
       q.region,

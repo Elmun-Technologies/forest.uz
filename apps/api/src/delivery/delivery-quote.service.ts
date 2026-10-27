@@ -7,6 +7,8 @@ import { RedisService } from '../redis/redis.module';
 /** A line without a known weight counts as 1 kg (paint tins: 0.5–2.5 L). */
 export const DEFAULT_ITEM_WEIGHT_GRAMS = 1000;
 const CACHE_SECONDS = 600;
+/** A failed pin (~110 m) isn't asked again for a minute: retyping/re-rendering can't hammer Yandex. */
+const FAILURE_CACHE_SECONDS = 60;
 
 export function cartWeightGrams(lines: { qty: number; weightGrams: number | null }[]): number {
   return lines.reduce((sum, l) => sum + l.qty * (l.weightGrams ?? DEFAULT_ITEM_WEIGHT_GRAMS), 0);
@@ -16,7 +18,8 @@ export function cartWeightGrams(lines: { qty: number; weightGrams: number | null
  * Live carrier price for zones that have it switched on (`liveQuote`, YANDEX only). Any miss —
  * no coordinates, provider error, non-UZS answer — keeps the zone price from settings, so
  * checkout never fails because of the carrier. Results are cached per zone + ~11 m pin + 0.5 kg
- * step, so the price shown in the cart is the price charged at checkout.
+ * step, so the price shown in the cart is the price charged at checkout. Failures are cached
+ * briefly per rounded pin (zone price meanwhile).
  */
 @Injectable()
 export class DeliveryQuoteService {
@@ -35,12 +38,22 @@ export class DeliveryQuoteService {
     if (zone.carrier !== 'YANDEX' || !zone.liveQuote || dest.lat == null || dest.lng == null)
       return zone;
     const key = `dq:yandex:${zone.key}:${dest.lat.toFixed(4)}:${dest.lng.toFixed(4)}:${Math.ceil(weightGrams / 500)}`;
+    const failKey = `dq:yandex:fail:${zone.key}:${dest.lat.toFixed(3)}:${dest.lng.toFixed(3)}`;
+    const failed = () =>
+      this.redis.set(failKey, '1', 'EX', FAILURE_CACHE_SECONDS).catch(() => undefined);
     try {
-      const cached = await this.redis.get(key);
-      if (cached !== null && /^\d+$/.test(cached)) return { ...zone, priceSoum: Number(cached) };
+      const [cached, recentFailure] = await this.redis.mget(key, failKey);
+      if (cached != null && /^\d+$/.test(cached)) return { ...zone, priceSoum: Number(cached) };
+      if (recentFailure) return zone;
       const provider = await this.integrations.delivery('yandex_delivery');
-      const quote = await provider.quote(dest, weightGrams);
-      if (!quote) return zone;
+      const quote = await provider.quote(dest, weightGrams).catch(async (e: unknown) => {
+        await failed();
+        throw e;
+      });
+      if (!quote) {
+        await failed();
+        return zone;
+      }
       // Customers pay whole so'm; a fractional carrier price rounds up.
       const priceSoum = Number((quote.priceTiyin + 99n) / 100n);
       await this.redis.set(key, String(priceSoum), 'EX', CACHE_SECONDS);

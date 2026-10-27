@@ -63,7 +63,9 @@ behaviour) without side effects. Amount (so'm decimal string) → tiyin only in 
 - Payme `-1` (cancel before perform) → payment FAILED, order stays NEW until the reservation expires
   (the template cancels the order instead). Payme `-2` = refund: payment REFUNDED + `Refund`
   (`staffId = "provider:payme"`); if the order wasn't handed to the courier it is cancelled and stock
-  released; HANDED_TO_COURIER / DELIVERED / COMPLETED → `-31007` (do a return first).
+  released; HANDED_TO_COURIER / DELIVERED / COMPLETED → `-31007` (do a return first). Also `-31007`
+  while a Yandex courier is dispatched (accepted claim) or any carrier holds the parcel — staff
+  cancel the claim first (same rule for manual Click/COD refunds: `REFUND_NOT_ALLOWED`).
 - Refunds: **Payme** — cancel the transaction in the Payme merchant cabinet; the resulting
   `CancelTransaction` records the refund. **Click** — reversal in the Click merchant cabinet, then
   record it with `OrderLifecycleService.recordManualRefund` (admin UI in Phase 3; full/partial).

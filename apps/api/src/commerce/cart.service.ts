@@ -189,27 +189,53 @@ export class CartService {
         return;
       }
       if (anon.customerId) return; // someone else's cart — never merge across customers
-      const target = await tx.cart.findFirst({
-        where: { customerId, status: 'ACTIVE' },
-        orderBy: { updatedAt: 'desc' },
-      });
-      if (!target) {
-        await tx.cart.update({ where: { id: anon.id }, data: { customerId } });
-        return;
-      }
-      for (const item of anon.items) {
-        await tx.cartItem.upsert({
-          where: { cartId_variantId: { cartId: target.id, variantId: item.variantId } },
-          update: { qty: { increment: item.qty } },
-          create: { cartId: target.id, variantId: item.variantId, qty: item.qty },
-        });
-      }
-      await tx.cart.update({
-        where: { id: target.id },
-        data: { promoCode: target.promoCode ?? anon.promoCode, updatedAt: new Date() },
-      });
-      await tx.cart.update({ where: { id: anon.id }, data: { status: 'MERGED' } });
+      await this.mergeInto(tx, anon, customerId);
     });
+  }
+
+  /**
+   * Telegram link absorbing a stub customer: its active carts join the surviving customer's cart
+   * (inside the caller's transaction).
+   */
+  async absorbCustomerCarts(
+    tx: Prisma.TransactionClient,
+    fromCustomerId: string,
+    intoCustomerId: string,
+  ): Promise<void> {
+    const carts = await tx.cart.findMany({
+      where: { customerId: fromCustomerId, status: 'ACTIVE' },
+      include: { items: true },
+      orderBy: { updatedAt: 'asc' },
+    });
+    for (const cart of carts) await this.mergeInto(tx, cart, intoCustomerId);
+  }
+
+  /** `source` becomes the customer's cart, or its items are added to the customer's latest one. */
+  private async mergeInto(
+    tx: Prisma.TransactionClient,
+    source: { id: string; promoCode: string | null; items: { variantId: string; qty: number }[] },
+    customerId: string,
+  ): Promise<void> {
+    const target = await tx.cart.findFirst({
+      where: { customerId, status: 'ACTIVE', id: { not: source.id } },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (!target) {
+      await tx.cart.update({ where: { id: source.id }, data: { customerId } });
+      return;
+    }
+    for (const item of source.items) {
+      await tx.cartItem.upsert({
+        where: { cartId_variantId: { cartId: target.id, variantId: item.variantId } },
+        update: { qty: { increment: item.qty } },
+        create: { cartId: target.id, variantId: item.variantId, qty: item.qty },
+      });
+    }
+    await tx.cart.update({
+      where: { id: target.id },
+      data: { promoCode: target.promoCode ?? source.promoCode, updatedAt: new Date() },
+    });
+    await tx.cart.update({ where: { id: source.id }, data: { status: 'MERGED' } });
   }
 
   /** Pricing input from cart rows; shared with checkout so both price identically. */

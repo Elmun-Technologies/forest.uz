@@ -1,11 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { MessageStatus } from '@forest/db';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { eskizCallbackTokenMatches, parseEskizCallback } from '../integrations/providers/eskiz';
 import { PrismaService } from '../prisma/prisma.service';
-
-/** Final states are never overwritten (Eskiz may repeat or reorder callbacks). */
-const OPEN: MessageStatus[] = ['QUEUED', 'SENT'];
+import { RedisService } from '../redis/redis.module';
+import { applyEskizStatus, parkEskizStatus } from './eskiz-status';
 
 export type EskizCallbackResult = 'updated' | 'unchanged' | 'unknown' | 'ignored';
 
@@ -20,6 +18,7 @@ export class EskizCallbackService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly integrations: IntegrationsService,
+    private readonly redis: RedisService,
   ) {}
 
   async handle(token: string, body: unknown): Promise<EskizCallbackResult> {
@@ -34,15 +33,8 @@ export class EskizCallbackService {
       return 'ignored';
     }
     if (cb.outcome === 'PENDING') return 'unchanged';
-    const now = new Date();
-    const res = await this.prisma.message.updateMany({
-      where: { channel: 'SMS', providerId: cb.requestId, status: { in: OPEN } },
-      data:
-        cb.outcome === 'DELIVERED'
-          ? { status: 'DELIVERED', deliveredAt: now }
-          : { status: 'FAILED', error: `eskiz: ${cb.status}` },
-    });
-    if (res.count > 0) {
+    const final = { outcome: cb.outcome, status: cb.status };
+    if ((await applyEskizStatus(this.prisma, cb.requestId, final)) > 0) {
       await this.audit(true, `${cb.status} → ${cb.outcome}`, body);
       return 'updated';
     }
@@ -50,8 +42,11 @@ export class EskizCallbackService {
       where: { channel: 'SMS', providerId: cb.requestId },
     });
     // Unknown ids are normal: OTP texts are not stored (secrets), and a callback may beat our
-    // providerId write by milliseconds.
-    if (!known) this.logger.debug(`callback for unknown request ${cb.requestId}`);
+    // providerId write — parked, the sender applies it once the id is stored.
+    if (!known) {
+      this.logger.debug(`callback for unknown request ${cb.requestId}`);
+      await parkEskizStatus(this.redis, cb.requestId, final);
+    }
     return known ? 'unchanged' : 'unknown';
   }
 
