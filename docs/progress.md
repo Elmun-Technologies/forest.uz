@@ -1,16 +1,37 @@
 # Progress
 
-Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — in progress** (admin auth/RBAC first).
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — done** (MoySklad verified only against a fake server — open questions 60–69) · **Phase 4 — next**.
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0 Foundation | done | see report below |
 | 1 Storefront | done | see report below; Product perf 89 (target 90) |
 | 2 Payments/delivery/SMS/auth | done | see report below; real provider runs need owner credentials + sandbox |
-| 3 Admin core | in progress | admin auth (password + TOTP), RBAC, audit, shell first |
+| 3 Admin core | done | see report below; MoySklad needs owner token + account setup |
 | 4 Analytics/heatmaps/audiences/SEO | pending | |
 | 5 Bot/automations/content | pending | |
 | 6 Hardening & launch | pending | |
+
+## Phase 3 — Admin core (done, 2026-10-27)
+
+### Built
+- **Auth & access**: staff login (argon2 password + mandatory TOTP for Owner/Manager, in-repo RFC 6238 with replay guard), invites, 12 h absolute sessions, double-submit CSRF, lockout after 10 failures (password or TOTP), RBAC permission map from docs/02 enforced server-side (default-deny guard + test walking every `/admin` route), audit log in the same transaction as each change, PII only via audited POST reveals.
+- **A6/A7 Orders**: tabs mapped to the order/payment/delivery state machines, SLA countdown and risk tab, filters/search/sort with keyset cursors, detail with server-computed actions (confirm COD, packing, ready, BTS status, Yandex create/accept/cancel/refresh/returned, COD cash received, receipt, complete, cancel, refunds with Idempotency-Key), timeline + internal notes, CSV export, manual phone order through the real checkout transaction.
+- **A11 Products / A14 Promo / A15 Reviews**: product editor (variants, images with magic-byte upload, SEO, keywords, relations), MoySklad field locks, IKPU and price ≥ 1 so'm guards for ACTIVE, slug change → 301 redirects; promo codes with margin guard and usage stats; review moderation, replies and before/after gallery.
+- **A4/A5 Customers**: segments, filters, 360 view (KPIs from payments, timeline, consents, notes, tags), masked by default, CSV export (Owner), data export, erase with legal record retention.
+- **A16 Settings**: store/legal info, delivery zones + rules + returns with a live storefront-promise preview, versioned saves; staff and audit pages.
+- **A10 Integrations hub** (launch-kit readiness, masked secrets, test/connect/disconnect, secret callback URLs Owner-only) and **A13 MoySklad**: catalog/price/stock pull (hourly + stock poll + webhooks), kits from components, order push with counterparty lookup and status mirror, stock-hold hand-over to the MoySklad reserve, sync log, admin page. Runbook: `docs/runbooks/moysklad.md`.
+
+### Verified
+- contracts 107, api 206 unit + 307 integration (Testcontainers; incl. admin-rbac 63, admin-orders, admin-products/promo/reviews, admin-customers/settings/integrations, moysklad 20 against a gzip-only fake MoySklad server), admin 8 component; admin e2e 16/16 (owner login + TOTP, invites, role-filtered nav, order flow COD→complete, Warehouse limits, product create/activate/edit → storefront, promo applies in cart, delivery price → storefront quote, PII reveal → audit, Manager can't touch keys, MoySklad sync now → log).
+- Phase 3 acceptance: each role sees only permitted actions (RBAC integration tests per role + e2e nav); MoySklad sync against the fake: product/price/stock pull, order push, webhook handling, log; all admin lists filter/paginate server-side.
+
+### Independent review — fixed
+High: MoySklad price 0 no longer imported (products could sell for free); stock holds always end (released when MoySklad owns stock, consumed otherwise at hand-over; MoySklad reserve dropped on every cancel/return). Medium: TOTP lockout survives re-login; empty/partial stock reports and non-UZS prices ignored; MoySklad-linked variants' SKU/active and linked drafts' delete refused; active price ≥ 1 so'm. Low: MoySklad lock lease renewal, counterparty reuse, idempotency keys kept after commit, Warehouse phone search, pickup delivery via the state machine, one LTV definition, Yandex cancel without HTTP inside the lock (Phase 2 follow-up closed), https-only links, orphaned photos, home hero after slug change, exact promo times, erase also clears photos/notes/chat ids and lists external copies, clearable integration fields, admin error page, bounded 360 view, CSV phones as digits.
+
+### Not verified / owner input
+- MoySklad protocol from open-source clients + a Lognex-generated SDK (doc host unreachable): open questions 60–69 (incl. q.68 personal data in a Russian service). Needs: admin-rights API token, UZS account, price type/store/organization, IKPU attribute name, state names, matching SKUs, public HTTPS API URL for webhooks.
+- SMS templates for order cancellation / phone-order confirmation (none sent yet); real 17-digit IKPU for all seed variants; storefront doesn't read admin SEO overrides yet and refreshes within 30–60 s (Phase 4); production `REVOKE UPDATE, DELETE ON "AuditLog"`.
 
 ## Phase 2 — Payments, fiscal, delivery, SMS, auth (done, 2026-10-27)
 
