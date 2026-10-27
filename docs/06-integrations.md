@@ -72,6 +72,7 @@ Payme · Click · COD · Yandex Delivery · BTS · MoySklad · Fiscal (OFD) · I
 - Places Autocomplete + map pin in checkout (mobile). Browser key restricted by HTTP referrer; server geocoding key separate.
 
 ## Inventory — MoySklad (JSON API 1.2)
+> Implemented (Phase 3, A13): sources, fields relied on, mapping, jobs, go-live checklist and unverified points are in `docs/runbooks/moysklad.md` — it supersedes the notes below.
 - Base `https://api.moysklad.ru/api/remap/1.2`, bearer token, **gzip required** (`Accept-Encoding: gzip`), respect rate limits (per-account request window and parallel limit — check docs) → queue with concurrency 2 and backoff on 429.
 - Pull: `entity/product`, `entity/variant`, `entity/bundle` (or `entity/assortment`), stock via `report/stock/all` (or by store), prices from `salePrices` (price type "Chakana" configurable).
 - Push: `entity/counterparty` (customer by phone), `entity/customerorder` (with positions, reserve, state, delivery/payment attributes), update state on paid/shipped/cancelled.

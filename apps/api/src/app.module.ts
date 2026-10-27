@@ -14,6 +14,7 @@ import { HealthModule } from './health/health.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { JobsModule } from './jobs/jobs.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { MoyskladModule } from './moysklad/moysklad.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.service';
 import { RedisModule } from './redis/redis.module';
@@ -56,6 +57,7 @@ import { SettingsModule } from './settings/settings.module';
     PaymentsModule,
     MessagingModule,
     DeliveryModule,
+    MoyskladModule,
     JobsModule,
     AdminModule,
   ],

@@ -8,7 +8,6 @@ import type {
   DeliveryProvider,
   FiscalProvider,
   FiscalReceiptInput,
-  InventoryProvider,
   MessengerProvider,
   PaymentProvider,
   ShipmentInput,
@@ -162,21 +161,8 @@ export class FakeFiscalProvider implements FiscalProvider {
   }
 }
 
-export class FakeInventoryProvider implements InventoryProvider {
-  readonly key = 'moysklad' as const;
-  readonly pushed: { orderNumber: string; reserve: boolean }[] = [];
-
-  async pullAssortment() {
-    return [];
-  }
-
-  async pushOrder(input: { orderNumber: string; reserve: boolean }) {
-    this.pushed.push({ orderNumber: input.orderNumber, reserve: input.reserve });
-    return { externalId: `FAKE-MS-${input.orderNumber}` };
-  }
-
-  async updateOrderState(): Promise<void> {}
-}
+/** MoySklad's fake lives in `moysklad-fake.ts`. */
+export { FakeInventoryProvider } from './moysklad-fake';
 
 export class FakeAdSignalProvider implements AdSignalProvider {
   constructor(readonly key: AdSignalProvider['key']) {}

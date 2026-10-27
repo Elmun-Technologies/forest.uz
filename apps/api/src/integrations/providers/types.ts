@@ -155,26 +155,83 @@ export interface FiscalProvider {
 }
 
 // ── Inventory (MoySklad) ──
-export interface InventoryProduct {
+export type InventoryItemType = 'product' | 'variant' | 'bundle';
+
+/** One MoySklad assortment entry as the sync needs it (adapter: `moysklad.ts`). */
+export interface InventoryItem {
   externalId: string;
-  sku: string;
+  type: InventoryItemType;
+  /** Variant → its product's id; null otherwise. */
+  parentExternalId: string | null;
   name: string;
+  /** `article` (product/bundle) or `code` (variant); null when empty. */
+  sku: string | null;
+  /** Raw value of the configured IKPU attribute (variants inherit their product's). */
   ikpu: string | null;
-  priceTiyin: bigint;
-  stock: number;
-  isBundle: boolean;
+  /** Configured price type, tiyin; null when the item has no such price. */
+  priceTiyin: bigint | null;
+  archived: boolean;
+  /** A product with modifications is sold through its variants, never itself. */
+  hasVariants: boolean;
+  /** Variant characteristic values ("1 л, Oq"); null for products. */
+  label: string | null;
+  /** Bundle composition (assortment id + quantity per kit). */
+  components: { externalId: string; qty: number }[];
+}
+
+/** What the sync maps from settings (price type and IKPU attribute are per account). */
+export interface InventoryMapping {
+  priceType: string;
+  ikpuAttribute: string;
+}
+
+export interface InventoryOrderInput {
+  /** Our order number (`customerorder.name`) — also the idempotency lookup key. */
+  name: string;
+  counterpartyId: string;
+  organizationId: string | null;
+  storeId: string | null;
+  stateName: string | null;
+  reserve: boolean;
+  description: string;
+  attribute: { name: string; value: string } | null;
+  positions: {
+    externalId: string;
+    type: InventoryItemType;
+    qty: number;
+    priceTiyin: bigint;
+    discountPercent: number;
+  }[];
 }
 
 export interface InventoryProvider {
   readonly key: 'moysklad';
-  pullAssortment(): Promise<InventoryProduct[]>;
-  pushOrder(input: {
-    orderNumber: string;
+  test(mapping?: InventoryMapping): Promise<HealthResult>;
+  /** Every product, variant and bundle (archived ones included when the API returns them). */
+  listAssortment(mapping: InventoryMapping): Promise<InventoryItem[]>;
+  /** One entity; null when it no longer exists (deleted). Variants of a product come along. */
+  getItem(
+    type: InventoryItemType,
+    externalId: string,
+    mapping: InventoryMapping,
+  ): Promise<InventoryItem[] | null>;
+  /** Free stock (stock − reserve) per assortment id at a store (null = all stores). */
+  stockLevels(storeId: string | null): Promise<Map<string, number>>;
+  findCustomerOrder(name: string): Promise<string | null>;
+  findOrCreateCounterparty(input: {
     phone: string;
-    positions: { sku: string; qty: number; priceTiyin: bigint }[];
-    reserve: boolean;
-  }): Promise<{ externalId: string }>;
-  updateOrderState(externalId: string, state: string): Promise<void>;
+    name: string;
+  }): Promise<{ id: string; created: boolean }>;
+  createCustomerOrder(input: InventoryOrderInput): Promise<string>;
+  updateCustomerOrder(
+    externalId: string,
+    change: { stateName: string | null; clearReserve: boolean },
+  ): Promise<void>;
+  /** Registers our entity + stock webhooks (idempotent). */
+  registerWebhooks(
+    url: string,
+    opts: { byStore: boolean },
+  ): Promise<{ created: number; existing: number }>;
 }
 
 // ── Ads & AI ──

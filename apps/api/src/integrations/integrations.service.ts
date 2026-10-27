@@ -5,6 +5,8 @@ import type { Env } from '../config/env';
 import { redact } from '../common/redact';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.module';
+import { randomBytes } from 'node:crypto';
+import { parseMoyskladSettings } from '@forest/contracts';
 import { maskSecret, parseKey, SecretBox } from './crypto/secret-box';
 import {
   FakeAdSignalProvider,
@@ -18,6 +20,7 @@ import {
   FakeSmsProvider,
 } from './providers/fake';
 import { ClickPaymentProvider } from './providers/click';
+import { createMoyskladFetch, MoyskladInventoryProvider } from './providers/moysklad';
 import {
   EskizSmsProvider,
   EskizTokenCache,
@@ -167,7 +170,18 @@ export class IntegrationsService {
   async inventory(): Promise<InventoryProvider> {
     return this.fakeMode
       ? this.fakes.inventory
-      : this.real<InventoryProvider>('moysklad', () => null);
+      : this.real<InventoryProvider>('moysklad', (c) => this.moysklad(c));
+  }
+
+  /** Real MoySklad adapter: own fetch wrapper keeps its rate limits (≤ 2 parallel, 429 waits). */
+  private moysklad(c: Record<string, string>): MoyskladInventoryProvider | null {
+    if (!c.token) return null;
+    let http = this.httpClients.get('moysklad');
+    if (!http) {
+      http = new HttpClient('moysklad', { maxRetries: 2, fetchImpl: createMoyskladFetch() });
+      this.httpClients.set('moysklad', http);
+    }
+    return new MoyskladInventoryProvider(c, { http, baseUrl: this.env.MOYSKLAD_API_URL });
   }
 
   async ai(): Promise<AiProvider> {
@@ -248,6 +262,9 @@ export class IntegrationsService {
     if (missing.length) throw new DomainError('VALIDATION_FAILED', { missing }, missing[0]);
     // Eskiz callbacks are unsigned: the secret lives in the callback URL (CLAUDE.md §6).
     if (key === 'eskiz' && !merged.callbackToken) merged.callbackToken = newEskizCallbackToken();
+    // MoySklad webhooks are unsigned too: secret path token (CLAUDE.md §6).
+    if (key === 'moysklad' && !merged.webhookToken)
+      merged.webhookToken = randomBytes(24).toString('base64url');
 
     const health = await this.test(key, merged);
     await this.prisma.$transaction([
@@ -325,6 +342,15 @@ export class IntegrationsService {
     if (key === 'eskiz') {
       const eskiz = this.eskiz(creds);
       return eskiz ? eskiz.test() : { ok: false, message: 'email, password and from are required' };
+    }
+    if (key === 'moysklad') {
+      const ms = this.moysklad(creds);
+      if (!ms) return { ok: false, message: 'token is required' };
+      const row = await this.prisma.integration.findUnique({
+        where: { key },
+        select: { config: true },
+      });
+      return ms.test(parseMoyskladSettings(row?.config));
     }
     if (key === 'telegram')
       return telegramGetMe(this.httpClient('telegram'), creds.botToken ?? '', creds.botUsername);

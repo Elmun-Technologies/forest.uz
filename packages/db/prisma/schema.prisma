@@ -463,10 +463,30 @@ model Order {
   reservations    Reservation[]
   promoRedemption PromoRedemption?
   fiscalReceipts  FiscalReceipt[]
+  moyskladLink    MoyskladOrderLink?
 
   @@index([status, createdAt])
   @@index([customerId, createdAt])
   @@index([slaDueAt])
+}
+
+/// MoySklad `customerorder` mirror of an Order (apps/api/src/moysklad): created once, then its
+/// state follows ours. `holdHandedOver`: our stock hold moved to the MoySklad reserve on push.
+model MoyskladOrderLink {
+  orderId        String    @id
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  externalId     String?   @unique
+  counterpartyId String?
+  /// Our OrderStatus last mirrored to MoySklad.
+  pushedStatus   String?
+  holdHandedOver Boolean   @default(false)
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime? @db.Timestamptz(3)
+  lastError      String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([nextAttemptAt])
 }
 
 model OrderItem {

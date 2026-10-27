@@ -329,14 +329,13 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       'Ombor, narx, qoldiq va buyurtmalar ikki tomonlama.',
       'Склад, цены, остатки и заказы — двусторонне.',
     ),
-    fields: [
-      secret('token', 'API token', 'API-токен'),
-      text('priceType', 'Narx turi', 'Тип цены'),
-      text('store', 'Ombor', 'Склад'),
-    ],
+    // Only the token is a credential; price type, store, IKPU attribute, state mapping and flow
+    // toggles are settings on the MoySklad page (Integration.config, CLAUDE.md §6). The webhook
+    // path secret is generated on connect.
+    fields: [secret('token', 'API token', 'API-токен')],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
     webhookPath: '/v1/webhooks/moysklad',
     docsUrl: 'https://dev.moysklad.ru/doc/api/remap/1.2/',
   },
