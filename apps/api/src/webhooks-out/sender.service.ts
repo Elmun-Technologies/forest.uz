@@ -12,7 +12,8 @@ import type { Env } from '../config/env';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DELIVERY_HEADER, EVENT_HEADER, SIGNATURE_HEADER, signWebhook } from './signature';
-import { assertWebhookUrl } from './url-guard';
+import { postPinned } from './http-post';
+import { assertWebhookUrl, type Resolver } from './url-guard';
 import { WebhookSecrets } from './webhook-secrets';
 
 /** IntegrationLog key for outbound webhook attempts (not a registry card). */
@@ -42,8 +43,13 @@ export class WebhookSender {
     @Inject(ENV) private readonly env: Env,
   ) {}
 
+  /** DNS resolver for URL checks and the pinned connection (tests swap in a fake one). */
+  resolve: Resolver | undefined = undefined;
+  /** Production rules (https, 443/8443, public addresses); tests may switch them on. */
+  strictOverride: boolean | undefined = undefined;
+
   private get strictUrls(): boolean {
-    return this.env.NODE_ENV === 'production';
+    return this.strictOverride ?? this.env.NODE_ENV === 'production';
   }
 
   /** Claims due rows (lease) and attempts each once. */
@@ -87,7 +93,10 @@ export class WebhookSender {
   private async post(d: WebhookDelivery, endpoint: WebhookEndpoint): Promise<AttemptResult> {
     const started = Date.now();
     try {
-      const url = await assertWebhookUrl(endpoint.url, { strict: this.strictUrls });
+      const url = await assertWebhookUrl(endpoint.url, {
+        strict: this.strictUrls,
+        resolve: this.resolve,
+      });
       const envelope: WebhookEnvelope = {
         id: d.id,
         type: d.event as WebhookEvent | typeof WEBHOOK_TEST_EVENT,
@@ -96,9 +105,9 @@ export class WebhookSender {
       };
       const body = JSON.stringify(envelope);
       const secret = this.secrets.open(endpoint.id, endpoint.secret);
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
+      const status = await postPinned(
+        url,
+        {
           'Content-Type': 'application/json',
           'User-Agent': USER_AGENT,
           [EVENT_HEADER]: d.event,
@@ -106,23 +115,19 @@ export class WebhookSender {
           [SIGNATURE_HEADER]: signWebhook(secret, body),
         },
         body,
-        // A redirect could point at an internal host the URL check never saw.
-        redirect: 'manual',
-        signal: AbortSignal.timeout(WEBHOOK_POLICY.timeoutMs),
-      });
-      // The body is never read beyond what undici needs to free the socket.
-      await res.body?.cancel().catch(() => undefined);
-      const ok = res.status >= 200 && res.status < 300;
+        { strict: this.strictUrls, timeoutMs: WEBHOOK_POLICY.timeoutMs, resolve: this.resolve },
+      );
+      const ok = status >= 200 && status < 300;
       return {
         ok,
-        statusCode: res.status,
+        statusCode: status,
         durationMs: Date.now() - started,
-        error: ok ? null : `HTTP ${res.status}`,
+        error: ok ? null : `HTTP ${status}`,
       };
     } catch (e) {
       const error =
         e instanceof Error
-          ? e.name === 'TimeoutError'
+          ? e.message === 'timeout'
             ? 'timeout'
             : 'code' in e && e.code === 'WEBHOOK_URL_INVALID'
               ? 'url not allowed'

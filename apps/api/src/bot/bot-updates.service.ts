@@ -15,7 +15,7 @@ import { BotReviewsService } from './bot-reviews.service';
 import { type BotSession, redisSessionStorage } from './bot-session';
 import { type BotUser, BotSubscribersService } from './bot-subscribers.service';
 import { type BotMarkup, BotService } from './bot.service';
-import { publishReviewPhotos } from './review-photos';
+import { publishReviewPhotos, unpublishReviewPhotos } from './review-photos';
 import { StartLinksService } from './start-links.service';
 import { type BotConfig, TelegramGateway } from './telegram-gateway.service';
 
@@ -37,8 +37,8 @@ const DAY_NAMES: Record<Locale, readonly string[]> = {
 
 /**
  * Inbound side of the bot (docs/09 flows 1, 4, 5 + commands): one grammY `Bot` per token routes
- * webhook updates. Replies leave through `BotService` (logged as `Message` rows). Errors are
- * logged and swallowed — Telegram must always get 200 or it retries the update.
+ * webhook updates. Replies leave through `BotService` (logged as `Message` rows). A failing
+ * handler answers 500 so Telegram retries the update (its dedupe key is released).
  */
 @Injectable()
 export class BotUpdatesService {
@@ -58,15 +58,13 @@ export class BotUpdatesService {
     private readonly files: FilesService,
   ) {}
 
-  /** Handles one update once (Telegram redelivers on timeouts: `update_id` dedupe). */
+  /**
+   * Handles one update once (Telegram redelivers on timeouts: `update_id` dedupe). A handler
+   * error releases the dedupe key and propagates (HTTP 500), so Telegram's retry is processed.
+   */
   async handle(config: BotConfig, update: Update): Promise<void> {
-    const fresh = await this.redis.set(
-      `tg:upd:${config.token.split(':')[0]}:${update.update_id}`,
-      '1',
-      'EX',
-      DUPLICATE_TTL_SEC,
-      'NX',
-    );
+    const key = `tg:upd:${config.token.split(':')[0]}:${update.update_id}`;
+    const fresh = await this.redis.set(key, '1', 'EX', DUPLICATE_TTL_SEC, 'NX');
     if (fresh !== 'OK') return;
     try {
       await this.botFor(config).handleUpdate(update);
@@ -74,6 +72,8 @@ export class BotUpdatesService {
       this.logger.error(
         `update ${update.update_id} failed: ${e instanceof Error ? e.message : String(e)}`,
       );
+      await this.redis.del(key).catch(() => undefined);
+      throw e;
     }
   }
 
@@ -161,7 +161,7 @@ export class BotUpdatesService {
   private async start(ctx: Ctx, payload: string): Promise<void> {
     const { sub, locale } = ctx.forest;
     const ref = await this.starts.resolve(payload);
-    const { resubscribed } = await this.subscribers.start(sub, ref);
+    const { resubscribed } = await this.subscribers.start(sub, ref, payload.trim() === '');
     const customer = ctx.forest.customer;
     if (resubscribed) await this.say(ctx, html(copy(locale, 'resubscribed')));
     if (ref.orderToken) return this.orderSummary(ctx, ref.orderToken);
@@ -389,6 +389,7 @@ export class BotUpdatesService {
     await this.reviews.setConsent(reviewId, yes);
     // Consent after a moderator already approved: publish now (else on approval).
     if (yes) await publishReviewPhotos(this.prisma, this.files, reviewId, this.logger);
+    else await unpublishReviewPhotos(this.prisma, this.files, reviewId, this.logger);
     ctx.session.review = undefined;
     await this.say(ctx, html(copy(locale, yes ? 'reviewConsentYes' : 'reviewConsentNo')));
   }

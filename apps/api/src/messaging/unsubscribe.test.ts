@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto';
 import { signUnsubscribe, unsubscribeUrl, verifyUnsubscribe } from './unsubscribe';
 
 const secret = 'x'.repeat(64);
@@ -23,5 +24,14 @@ describe('unsubscribe tokens', () => {
     expect(verifyUnsubscribe(token, 'y'.repeat(64))).toBeNull();
     expect(verifyUnsubscribe('short', secret)).toBeNull();
     expect(verifyUnsubscribe(`x10482${token.slice(-16)}`, secret)).toBeNull();
+  });
+
+  it('MACs with a key derived from the secret and still accepts first-version tokens', () => {
+    const body = 's10482';
+    const legacy =
+      body + createHmac('sha256', secret).update(`unsub:${body}`).digest('base64url').slice(0, 16);
+    const token = signUnsubscribe('SMS', 'C-10482', secret);
+    expect(token).not.toBe(legacy);
+    expect(verifyUnsubscribe(legacy, secret)).toEqual({ channel: 'SMS', publicId: 'C-10482' });
   });
 });

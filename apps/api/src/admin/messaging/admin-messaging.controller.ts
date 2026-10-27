@@ -13,7 +13,8 @@ import {
   messagingSettingsInputSchema,
 } from '@forest/contracts';
 import { ZodPipe } from '../../common/http';
-import { Actor, AdminController, RequirePermissions } from '../admin-http';
+import type { AdminContext } from '../admin-access';
+import { Actor, Admin, AdminController, RequirePermissions } from '../admin-http';
 import type { AuditActor } from '../audit/audit.service';
 import { AdminMessagingService } from './admin-messaging.service';
 
@@ -75,8 +76,9 @@ export class AdminMessagingController {
   saveSettings(
     @Body(new ZodPipe(messagingSettingsInputSchema)) body: MessagingSettingsInput,
     @Actor() actor: AuditActor,
+    @Admin() admin: AdminContext,
   ): Promise<MessagingSettingsDto> {
-    return this.messaging.saveSettings(actor, body);
+    return this.messaging.saveSettings(actor, body, admin.permissions.includes('settings.store'));
   }
 }
 

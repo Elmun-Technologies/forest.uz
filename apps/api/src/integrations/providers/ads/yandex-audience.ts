@@ -1,6 +1,11 @@
 import type { HttpClient } from '../../http-client';
 import type { HealthResult } from '../types';
-import { AdPlatformError, type AudienceListProvider, platformError } from './types';
+import {
+  AdPlatformError,
+  type AudienceCreated,
+  type AudienceListProvider,
+  platformError,
+} from './types';
 
 /**
  * Yandex Audience management API (docs/runbooks/ads.md; official reference pages known only by
@@ -77,17 +82,21 @@ export class YandexAudienceProvider implements AudienceListProvider {
     }
   }
 
-  async create(name: string, hashes: string[]): Promise<string> {
+  /** Uploading the first file creates the (unconfirmed) segment; `confirm` finishes it. */
+  async create(_name: string, hashes: string[]): Promise<AudienceCreated> {
     const uploaded = await this.call('/segments/upload_csv_file', this.csv(hashes));
     const id = uploaded.segment?.id;
     if (id === undefined) throw new AdPlatformError('upload_csv_file: no segment id');
-    await this.call(`/segment/${encodeURIComponent(String(id))}/confirm`, {
+    return { id: String(id), seeded: true };
+  }
+
+  async confirm(id: string, name: string): Promise<void> {
+    await this.call(`/segment/${encodeURIComponent(id)}/confirm`, {
       body: JSON.stringify({
         segment: { id: Number(id), name: name.slice(0, 250), hashed: true, content_type: 'crm' },
       }),
       type: 'application/json',
     });
-    return String(id);
   }
 
   private async modify(id: string, type: 'addition' | 'subtraction', hashes: string[]) {

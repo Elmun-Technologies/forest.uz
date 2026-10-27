@@ -7,6 +7,9 @@ export interface SitemapEntry {
   lastmod: Date | null;
 }
 
+const URLSET_OPEN =
+  '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">';
+
 export type SitemapGroup = 'pages' | 'categories' | 'products';
 export const SITEMAP_GROUPS: readonly SitemapGroup[] = ['pages', 'categories', 'products'];
 
@@ -39,8 +42,12 @@ export function buildSitemaps(
   for (const l of LOCALES) {
     for (const group of SITEMAP_GROUPS) {
       const entries = groups[group].filter((e) => e.locales.includes(l));
-      if (entries.length === 0) continue;
       const name = `${l}-${group}.xml`;
+      if (entries.length === 0) {
+        // Stored too (a request for it must not trigger a rebuild); not listed in the index.
+        files.set(name, `${URLSET_OPEN}\n</urlset>\n`);
+        continue;
+      }
       const body = entries
         .map((e) => {
           const alternates = [
@@ -58,10 +65,7 @@ export function buildSitemaps(
           return `<url><loc>${esc(localized(site, l, e.path))}</loc>${lastmod}${alternates}</url>`;
         })
         .join('\n');
-      files.set(
-        name,
-        `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${body}\n</urlset>\n`,
-      );
+      files.set(name, `${URLSET_OPEN}\n${body}\n</urlset>\n`);
       counts.push({ name, urls: entries.length });
       const lastmod = entries.reduce<Date | null>(
         (m, e) => (e.lastmod && (!m || e.lastmod > m) ? e.lastmod : m),

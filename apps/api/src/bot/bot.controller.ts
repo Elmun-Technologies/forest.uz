@@ -12,11 +12,12 @@ import {
   Query,
   Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import type { Update } from 'grammy/types';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { assertDevEndpoints } from '../common/dev-endpoints';
+import { assertDevEndpoints, DevEndpointsGuard } from '../common/dev-endpoints';
 import { ZodPipe } from '../common/http';
 import { visitorId } from '../common/session';
 import { ENV } from '../config/config.module';
@@ -33,7 +34,8 @@ import { TelegramGateway } from './telegram-gateway.service';
  * `POST /v1/webhooks/telegram/:secret` — Bot API updates (CLAUDE.md §6, 5A). Path secret and the
  * `X-Telegram-Bot-Api-Secret-Token` header must both equal the connected integration's
  * `webhookSecret`, else 404. Updates are handled in-request so one chat's messages keep their
- * order (Telegram waits for the answer before sending that chat's next update).
+ * order (Telegram waits for the answer before sending that chat's next update); a failing handler
+ * answers 500 so Telegram retries (the update's dedupe key is released).
  */
 @Controller('webhooks/telegram')
 export class TelegramWebhookController {
@@ -123,6 +125,7 @@ const devUpdateSchema = z.object({
  * transport sent to a chat.
  */
 @Controller('dev/bot')
+@UseGuards(DevEndpointsGuard)
 export class DevBotController {
   constructor(
     private readonly links: CartLinkService,

@@ -10,6 +10,7 @@ import {
   Param,
   Post,
   Query,
+  type RawBodyRequest,
   Req,
   Res,
 } from '@nestjs/common';
@@ -33,6 +34,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
 import { SitemapService, siteBase } from '../../seo/sitemap.service';
 import { defaultRobots, normalizeRobots } from '../../seo/robots';
+import {
+  contextKey,
+  verifyWeb,
+  WEB_CONTEXTS,
+  WEB_SIGNATURE_HEADER,
+  webSharedSecret,
+} from '../../seo/web-signature';
 import { CustomerCommonModule } from '../common/customer-common.module';
 import { RateLimiter } from '../common/rate-limit';
 import { normalizePath, normalizeReferrer, redirectCandidates } from './seo-paths';
@@ -117,11 +125,18 @@ export class SeoService {
  */
 @Controller('seo')
 export class SeoController {
+  /** Key of the storefront server's signed 404 reports; null (production without secret) = refuse. */
+  private readonly notFoundKey: Buffer | null;
+
   constructor(
     private readonly seo: SeoService,
     private readonly sitemaps: SitemapService,
     private readonly limiter: RateLimiter,
-  ) {}
+    @Inject(ENV) env: Env,
+  ) {
+    const secret = webSharedSecret(env);
+    this.notFoundKey = secret ? contextKey(secret, WEB_CONTEXTS.notFound) : null;
+  }
 
   /** Not cacheable: every lookup counts a hit for the admin redirect manager. */
   @Get('redirect')
@@ -136,8 +151,13 @@ export class SeoController {
   @HttpCode(204)
   async notFound(
     @Body(new ZodPipe(notFoundReportSchema)) body: z.infer<typeof notFoundReportSchema>,
-    @Req() req: Request,
+    @Req() req: RawBodyRequest<Request>,
   ): Promise<void> {
+    // Only the storefront server reports 404s (signed): anyone else could plant fake "broken
+    // internal links" in the SEO health score.
+    const raw = req.rawBody?.toString('utf8') ?? '';
+    if (!verifyWeb(this.notFoundKey, req.headers[WEB_SIGNATURE_HEADER] as string | undefined, raw))
+      throw new DomainError('UNAUTHORIZED');
     // Generous: SSR reports come from the web server's IP, not the visitor's.
     await this.limiter.consume('seo:404', req.ip ?? 'unknown', 120, 60);
     await this.seo.notFound(body);

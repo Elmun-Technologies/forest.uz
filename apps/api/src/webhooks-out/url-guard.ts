@@ -1,11 +1,13 @@
-import { lookup } from 'node:dns/promises';
-import { BlockList, isIP } from 'node:net';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import { BlockList, isIP, type LookupFunction } from 'node:net';
 import { DomainError } from '@forest/contracts';
 
 /**
- * SSRF guard for admin-entered webhook URLs (CLAUDE.md §6). In production only https to hosts
- * that resolve to public addresses; elsewhere (dev/test) http and local receivers are allowed.
- * Checked when the URL is saved and again right before each send (DNS may change).
+ * SSRF guard for admin-entered webhook URLs (CLAUDE.md §6). Strict mode (production): https on
+ * ports 443/8443 only, to hosts that resolve to public addresses. The check runs when the URL is
+ * saved and again inside the connection itself (`pinnedLookup`), so a DNS answer that changes
+ * between the check and the request (rebinding) can't reach a private address.
+ * Non-strict (dev/test): http, any port and local receivers.
  */
 const blocked = new BlockList();
 for (const [net, prefix] of [
@@ -26,15 +28,23 @@ for (const [net, prefix] of [
 ] as const)
   blocked.addSubnet(net, prefix, 'ipv4');
 for (const [net, prefix] of [
-  ['::', 128],
+  // Unspecified, loopback and IPv4-compatible (::a.b.c.d) addresses.
+  ['::', 96],
   ['::1', 128],
+  // Discard-only, NAT64 (well-known + local-use), 6to4 (embeds any IPv4, private included).
+  ['100::', 64],
+  ['64:ff9b::', 96],
+  ['64:ff9b:1::', 48],
+  ['2002::', 16],
+  ['2001:db8::', 32],
   ['fc00::', 7],
   ['fe80::', 10],
   ['ff00::', 8],
-  ['2001:db8::', 32],
-  ['64:ff9b::', 96],
 ] as const)
   blocked.addSubnet(net, prefix, 'ipv6');
+
+/** Ports a strict-mode webhook may use (default https port included). */
+export const WEBHOOK_PORTS = ['', '443', '8443'] as const;
 
 export function isPrivateAddress(ip: string): boolean {
   const v = isIP(ip);
@@ -48,33 +58,67 @@ export function isPrivateAddress(ip: string): boolean {
 
 export type Resolver = (host: string) => Promise<string[]>;
 
-const dnsResolver: Resolver = async (host) =>
-  (await lookup(host, { all: true, verbatim: true })).map((a) => a.address);
+export const dnsResolver: Resolver = async (host) =>
+  (await dnsLookup(host, { all: true, verbatim: true })).map((a) => a.address);
+
+const invalid = () => new DomainError('WEBHOOK_URL_INVALID', undefined, 'url');
+
+/** All addresses of `host` (IP literal or name); strict mode refuses any private one. */
+export async function vettedAddresses(
+  host: string,
+  opts: { strict: boolean; resolve?: Resolver },
+): Promise<string[]> {
+  let addresses: string[];
+  try {
+    addresses = isIP(host) ? [host] : await (opts.resolve ?? dnsResolver)(host);
+  } catch {
+    throw invalid();
+  }
+  if (addresses.length === 0) throw invalid();
+  if (opts.strict && addresses.some(isPrivateAddress)) throw invalid();
+  return addresses;
+}
 
 /** Throws WEBHOOK_URL_INVALID unless `raw` may receive our webhooks. Returns the normalised URL. */
 export async function assertWebhookUrl(
   raw: string,
   opts: { strict: boolean; resolve?: Resolver },
 ): Promise<string> {
-  const fail = () => new DomainError('WEBHOOK_URL_INVALID', undefined, 'url');
   let url: URL;
   try {
     url = new URL(raw);
   } catch {
-    throw fail();
+    throw invalid();
   }
-  if (url.username || url.password) throw fail();
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && !opts.strict)) throw fail();
+  if (url.username || url.password) throw invalid();
+  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && !opts.strict)) throw invalid();
   if (!opts.strict) return url.toString();
+  if (!(WEBHOOK_PORTS as readonly string[]).includes(url.port)) throw invalid();
   const host = url.hostname.replace(/^\[|\]$/g, '');
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.internal'))
-    throw fail();
-  let addresses: string[];
-  try {
-    addresses = isIP(host) ? [host] : await (opts.resolve ?? dnsResolver)(host);
-  } catch {
-    throw fail();
-  }
-  if (addresses.length === 0 || addresses.some(isPrivateAddress)) throw fail();
+    throw invalid();
+  await vettedAddresses(host, opts);
   return url.toString();
+}
+
+/**
+ * `lookup` for the outgoing socket: resolves once, applies the same checks and hands the socket
+ * only the vetted address — the connection can't use a different DNS answer than the one checked.
+ * TLS SNI and the Host header still carry the URL's host name.
+ */
+export function pinnedLookup(opts: { strict: boolean; resolve?: Resolver }): LookupFunction {
+  return (hostname, options, callback) => {
+    vettedAddresses(hostname, opts).then(
+      (addresses) => {
+        const family = (a: string) => (isIP(a) === 6 ? 6 : 4);
+        if (options.all)
+          callback(
+            null,
+            addresses.map((address) => ({ address, family: family(address) })),
+          );
+        else callback(null, addresses[0]!, family(addresses[0]!));
+      },
+      (e: unknown) => callback(e as NodeJS.ErrnoException, '', 4),
+    );
+  };
 }

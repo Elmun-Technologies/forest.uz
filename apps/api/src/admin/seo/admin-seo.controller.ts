@@ -29,7 +29,8 @@ import {
 import type { Response } from 'express';
 import type { z } from 'zod';
 import { ZodPipe } from '../../common/http';
-import { Actor, AdminController, RequirePermissions } from '../admin-http';
+import type { AdminContext } from '../admin-access';
+import { Actor, Admin, AdminController, RequirePermissions } from '../admin-http';
 import type { AuditActor } from '../audit/audit.service';
 import { AdminSeoService } from './admin-seo.service';
 
@@ -59,8 +60,9 @@ export class AdminSeoController {
   saveMeta(
     @Body(new ZodPipe(seoMetaInputSchema)) body: SeoMetaInput,
     @Actor() actor: AuditActor,
+    @Admin() admin: AdminContext,
   ): Promise<AdminSeoPageDto> {
-    return this.seo.saveMeta(actor, body);
+    return this.seo.saveMeta(actor, body, admin.permissions.includes('seo.canonical_external'));
   }
 
   @Get('redirects')

@@ -103,6 +103,13 @@ export function TemplateEditor({ template }: { template: AdminMessageTemplateDto
       delayMin: d.delayMin ?? 0,
       smsFallback: d.smsFallback,
       smsApproved: d.smsApproved,
+      // A changed text keeps the approval only when staff re-ticked it for the new wording.
+      ...(template
+        ? {
+            smsReapproved:
+              d.smsApproved && (d.body.uz !== initial.body.uz || d.body.ru !== initial.body.ru),
+          }
+        : {}),
       active: d.active,
     };
     try {
@@ -163,12 +170,8 @@ export function TemplateEditor({ template }: { template: AdminMessageTemplateDto
 
   const buttonRows = d.buttons.map((b) => b.text[locale]).filter(Boolean);
   const showSms = channels.includes('SMS');
-  const smsText =
-    rendered === null
-      ? null
-      : kind === 'marketing'
-        ? `${rendered}\n${MARKETING_OPT_OUT.smsLine[locale].replace('{url}', 'forest.uz/…/obuna/…')}`
-        : rendered;
+  // Sent exactly as approved: the opt-out is the template's own {stop} slot.
+  const smsText = rendered;
 
   return (
     <Panel
@@ -258,6 +261,9 @@ export function TemplateEditor({ template }: { template: AdminMessageTemplateDto
             ))}
           </div>
           <span className="text-xs text-muted">{COPY.variablesHint}</span>
+          {meta?.vars.includes('stop') ? (
+            <span className="text-xs text-muted">{COPY.stopHint}</span>
+          ) : null}
         </div>
         {problems.length ? (
           <ul

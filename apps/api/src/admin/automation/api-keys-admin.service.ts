@@ -46,6 +46,8 @@ export class ApiKeysAdminService {
   async create(actor: AuditActor, input: ApiKeyCreateInput): Promise<ApiKeyCreatedDto> {
     const generated = newApiKey();
     const row = await this.prisma.$transaction(async (tx) => {
+      // Serialises concurrent creates so the active-key cap can't be overshot.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('api_key.create'))`;
       if ((await tx.apiKey.count({ where: { revokedAt: null } })) >= API_KEY_POLICY.maxActiveKeys)
         throw new DomainError('API_KEY_LIMIT');
       const k = await tx.apiKey.create({

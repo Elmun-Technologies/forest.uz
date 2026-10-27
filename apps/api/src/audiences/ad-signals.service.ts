@@ -90,9 +90,15 @@ export class AdSignalsService {
     const upper = new Date(now.getTime() - AD_SIGNAL_RULES.lagMs);
     const floor = new Date(now.getTime() - AD_SIGNAL_RULES.maxAgeMs);
     const cursor = await this.prisma.jobCursor.findUnique({ where: { key: AD_SIGNALS_CURSOR } });
-    // First run starts at "now": connecting a platform never replays history.
-    let afterTs = cursor ? (cursor.ts < floor ? floor : cursor.ts) : upper;
-    let afterId = cursor && cursor.ts >= floor ? cursor.ref : '';
+    // Start at the cursor, but never later than the re-scan window (late, back-dated events) and
+    // never earlier than the max age (first run: only the re-scan window, no older history).
+    const rescanFrom = new Date(upper.getTime() - AD_SIGNAL_RULES.rescanMs);
+    let afterTs = cursor && cursor.ts < rescanFrom ? cursor.ts : rescanFrom;
+    let afterId = cursor && cursor.ts < rescanFrom ? cursor.ref : '';
+    if (afterTs < floor) {
+      afterTs = floor;
+      afterId = '';
+    }
     const platforms = await this.connectedPlatforms();
     let events = 0;
     let queued = 0;
@@ -206,7 +212,7 @@ export class AdSignalsService {
   /** Sends due signals; returns counts per outcome. */
   async send(now = new Date()) {
     const rows = await this.claim(now);
-    const totals = { sent: 0, failed: 0, skipped: 0, dead: 0 };
+    const totals = { sent: 0, failed: 0, skipped: 0, dead: 0, deferred: 0 };
     if (!rows.length) return totals;
     const consent = await this.consenting([
       ...new Set(rows.map((r) => r.customerId).filter((x): x is string => !!x)),
@@ -218,9 +224,16 @@ export class AdSignalsService {
       const provider = await this.ads.conversions(platform);
       const skip: { row: SignalRow; reason: string }[] = [];
       const ready: SignalRow[] = [];
+      const tooOld = now.getTime() - AD_SIGNAL_RULES.maxAgeMs;
+      const defer: SignalRow[] = [];
       for (const r of mine) {
-        if (!provider) skip.push({ row: r, reason: 'integration not connected' });
-        else if (!r.customerId || !consent.has(r.customerId))
+        if (!provider) {
+          // A disconnected platform may come back (re-connect, credentials fix): wait, unless the
+          // event is already too old for the platform.
+          if (r.eventTs.getTime() < tooOld)
+            skip.push({ row: r, reason: 'integration not connected' });
+          else defer.push(r);
+        } else if (!r.customerId || !consent.has(r.customerId))
           skip.push({ row: r, reason: 'ads consent withdrawn' });
         else if (!conversions.has(r.eventId)) skip.push({ row: r, reason: 'event not found' });
         else ready.push(r);
@@ -229,6 +242,16 @@ export class AdSignalsService {
         skip.map((s) => ({ row: s.row, outcome: 'SKIPPED', reason: s.reason })),
         now,
       );
+      if (defer.length)
+        await this.prisma.adSignal.updateMany({
+          where: { id: { in: defer.map((r) => r.id) } },
+          data: {
+            status: 'PENDING',
+            lastError: 'integration not connected',
+            nextAttemptAt: new Date(now.getTime() + AD_SIGNAL_RULES.deferMs),
+          },
+        });
+      totals.deferred += defer.length;
       totals.skipped += skip.length;
       if (!provider || !ready.length) continue;
       let result;

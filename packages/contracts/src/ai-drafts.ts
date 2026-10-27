@@ -12,9 +12,14 @@ export const AI_DRAFT_POLICY = {
   /** Default model when the integration's `model` field is blank. */
   defaultModel: 'claude-opus-5-5',
   maxTokens: 4000,
-  /** Conversation messages a reply draft may see. */
-  replyContext: 10,
 } as const;
+
+/** `GET /admin/ai/status`: drafts can run; operator reply drafts switched on by the Owner. */
+export interface AiDraftStatusDto {
+  available: boolean;
+  /** Off by default: a reply draft sends the customer's latest message to Anthropic. */
+  replyDrafts: boolean;
+}
 
 export interface AiDraftMetaDto {
   model: string;

@@ -404,14 +404,25 @@ export function AudienceEditor({
                   value={s.channel}
                   onChange={(e) => set({ channel: e.target.value as 'telegram' | 'sms' })}
                 >
-                  <option value="telegram">Telegram</option>
-                  <option value="sms">SMS</option>
+                  {(tpl?.channels ?? ['telegram', 'sms']).map((c) => (
+                    <option key={c} value={c}>
+                      {c === 'sms' ? 'SMS' : 'Telegram'}
+                    </option>
+                  ))}
                 </select>
                 <select
                   aria-label="Shablon"
                   className="h-9 rounded-pill bg-canvas px-3"
                   value={s.templateKey}
-                  onChange={(e) => set({ templateKey: e.target.value })}
+                  onChange={(e) => {
+                    const next = list.templates.find((t) => t.key === e.target.value);
+                    set({
+                      templateKey: e.target.value,
+                      ...(next && !next.channels.includes(s.channel)
+                        ? { channel: next.channels[0] ?? s.channel }
+                        : {}),
+                    });
+                  }}
                 >
                   {list.templates.map((t) => (
                     <option key={t.key} value={t.key}>
@@ -451,7 +462,11 @@ export function AudienceEditor({
                   ...x.autoMessage,
                   steps: [
                     ...x.autoMessage.steps,
-                    { channel: 'telegram', delayMinutes: 120, templateKey: list.templates[0]!.key },
+                    {
+                      channel: list.templates[0]!.channels[0] ?? 'telegram',
+                      delayMinutes: 120,
+                      templateKey: list.templates[0]!.key,
+                    },
                   ],
                 },
               }))

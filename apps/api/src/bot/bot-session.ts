@@ -32,3 +32,8 @@ export function redisSessionStorage(redis: RedisService): StorageAdapter<BotSess
     },
   };
 }
+
+/** Every Redis key the bot keeps per chat (customer erasure removes them). */
+export function botChatRedisKeys(chatId: bigint | number | string): string[] {
+  return [`tg:sess:${chatId}`, `tg:visitor:${chatId}`, `tg:autoreply:${chatId}`];
+}

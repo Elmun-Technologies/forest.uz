@@ -2,6 +2,7 @@ import { localeFromAcceptLanguage } from '@forest/contracts/core';
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
+import { forwardToApi } from './lib/edge-proxy';
 
 const intl = createMiddleware(routing);
 
@@ -61,6 +62,7 @@ async function orderLocale(token: string): Promise<'uz' | 'ru' | null> {
 }
 
 export default async function middleware(req: NextRequest) {
+  if (req.nextUrl.pathname.startsWith('/api/')) return forwardToApi(req);
   // Telegram bot hand-offs are locale-less route handlers: `/c/<token>` (cart restore) and
   // `/tg?s=<src>` (bot start link) — no locale redirect (CLAUDE.md §6, 5A).
   if (req.nextUrl.pathname.startsWith('/c/') || req.nextUrl.pathname === '/tg')
@@ -83,6 +85,6 @@ export default async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Skip API, Next internals and static files.
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  // Pages (not Next internals or static files) + the `/api/*` proxy (edge header only).
+  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)', '/api/:path*'],
 };

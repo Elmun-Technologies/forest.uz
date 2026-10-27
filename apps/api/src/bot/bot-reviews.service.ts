@@ -73,7 +73,7 @@ export class BotReviewsService {
     }
     if (stars <= 3) {
       await this.inbox.reviewComplaint(chatId, customerId, `${stars} ★ · ${order.number}`, now);
-      this.alerts.reviewLow(reviewId, stars, order.number);
+      await this.alerts.reviewLow(reviewId, stars, order.number);
       return { kind: 'low', reviewId, orderNumber: order.number };
     }
     return { kind: 'high', reviewId, orderNumber: order.number };

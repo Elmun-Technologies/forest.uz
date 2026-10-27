@@ -14,10 +14,12 @@ import type { Prisma } from '@forest/db';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { revalidateKey, verifyRevalidate } from '../src/seo/revalidate-signature';
+import { verifyWeb, WEB_CONTEXTS } from '../src/seo/web-signature';
+import { NotFoundLogService } from '../src/seo/not-found-log.service';
 import { SearchQueriesService } from '../src/seo/search-queries.service';
 import { WebRevalidateService } from '../src/seo/web-revalidate.service';
 import { type AdminClient, createAdminTestApp, signedIn } from './admin-helpers';
+import { report404, webKey } from './web-signature';
 
 /** A stand-in for the storefront's `POST /api/revalidate`: records verified tag lists. */
 function webStub() {
@@ -26,8 +28,8 @@ function webStub() {
     let body = '';
     req.on('data', (c: Buffer) => (body += c.toString()));
     req.on('end', () => {
-      const key = revalidateKey(process.env.APP_ENCRYPTION_KEY!);
-      const verified = verifyRevalidate(key, req.headers['x-forest-signature'] as string, body);
+      const key = webKey(WEB_CONTEXTS.revalidate);
+      const verified = verifyWeb(key, req.headers['x-forest-signature'] as string, body);
       calls.push({ tags: (JSON.parse(body) as { tags: string[] }).tags, verified });
       res.writeHead(verified ? 200 : 401).end('{}');
     });
@@ -202,7 +204,7 @@ describe('admin SEO center A9 (integration)', () => {
       to: '/uz/t-seo-a',
     });
     expect((b.body as AdminRedirectDto).to).toBe('/uz/p/chalk-white');
-    expect((b.body as AdminRedirectDto).from).toBe('/uz/t-seo-b/');
+    expect((b.body as AdminRedirectDto).from).toBe('/uz/t-seo-b');
     // a → b would close a loop (b already ends at a's target… and a itself).
     const loop = await owner().post('/v1/admin/seo/redirects', {
       from: '/uz/p/chalk-white',
@@ -219,6 +221,23 @@ describe('admin SEO center A9 (integration)', () => {
       to: '/uz/t-seo-c',
     });
     expect(cycle.body.error.code).toBe('REDIRECT_LOOP');
+    // Trailing-slash variants are one path: /e/ → /f, then /f → /e would loop on the storefront.
+    const e = await owner().post('/v1/admin/seo/redirects', {
+      from: '/uz/t-seo-e/',
+      to: '/uz/t-seo-f',
+    });
+    expect((e.body as AdminRedirectDto).from).toBe('/uz/t-seo-e');
+    const slashLoop = await owner().post('/v1/admin/seo/redirects', {
+      from: '/uz/t-seo-f',
+      to: '/uz/t-seo-e/',
+    });
+    expect(slashLoop.body.error.code).toBe('REDIRECT_LOOP');
+    // A redirect into a slash variant of an existing source is collapsed to its final target.
+    const g = await owner().post('/v1/admin/seo/redirects', {
+      from: '/uz/t-seo-g',
+      to: '/uz/t-seo-e/',
+    });
+    expect((g.body as AdminRedirectDto).to).toBe('/uz/t-seo-f');
     // Retargeting a: redirects pointing at a follow it (no chain via a).
     const moved = await owner().send('patch', `/v1/admin/seo/redirects/${a.body.id}`, {
       from: '/uz/t-seo-a',
@@ -226,7 +245,7 @@ describe('admin SEO center A9 (integration)', () => {
       code: 301,
     });
     expect(moved.status).toBe(200);
-    expect(await prisma.redirect.findUnique({ where: { from: '/uz/t-seo-b/' } })).toMatchObject({
+    expect(await prisma.redirect.findUnique({ where: { from: '/uz/t-seo-b' } })).toMatchObject({
       to: '/uz/p/chalk-white',
     });
     expect((await lastAudit('seo.redirect_update'))?.entityId).toBe(a.body.id);
@@ -241,10 +260,10 @@ describe('admin SEO center A9 (integration)', () => {
     expect(list.items[0].lastHitAt).not.toBeNull();
 
     // 404 log → suggestion → create redirect clears the row.
-    await http()
-      .post('/v1/seo/not-found')
-      .send({ path: '/uz/p/chalk-whit', referrer: 'http://localhost:3000/uz/katalog?x=1' })
-      .expect(204);
+    await report404(http(), {
+      path: '/uz/p/chalk-whit',
+      referrer: 'http://localhost:3000/uz/katalog?x=1',
+    }).expect(204);
     const nf = (await owner().get('/v1/admin/seo/not-found?days=7')).body as AdminNotFoundDto[];
     expect(nf.find((n) => n.path === '/uz/p/chalk-whit')).toMatchObject({
       internal: true,
@@ -304,6 +323,54 @@ describe('admin SEO center A9 (integration)', () => {
       description: '',
     });
     await owner().post('/v1/admin/seo/sitemap/regenerate');
+  });
+
+  it('canonical: http refused, foreign host Owner/Manager only', async () => {
+    const meta = (c: AdminClient, canonical: string | null, title = '') =>
+      put(c, '/v1/admin/seo/meta', {
+        path: '/katalog',
+        locale: 'ru',
+        title,
+        description: '',
+        canonical,
+      });
+    const marketer = clients.get('MARKETER')!;
+    const manager = clients.get('MANAGER')!;
+    expect((await meta(marketer, 'http://example.com/x')).body.error.code).toBe(
+      'SEO_CANONICAL_INVALID',
+    );
+    expect((await meta(marketer, 'http://localhost:3000/ru/katalog')).body.error.code).toBe(
+      'SEO_CANONICAL_INVALID',
+    );
+    const foreign = await meta(marketer, 'https://partner.example.com/katalog');
+    expect(foreign.status).toBe(403);
+    expect(foreign.body.error.code).toBe('SEO_CANONICAL_EXTERNAL_FORBIDDEN');
+    expect((await meta(manager, 'https://partner.example.com/katalog')).status).toBe(200);
+    // A Marketer may keep the canonical a Manager set while editing other fields.
+    const kept = await meta(marketer, 'https://partner.example.com/katalog', 'Katalog sinov');
+    expect(kept.status).toBe(200);
+    expect((kept.body as AdminSeoPageDto).override?.canonical).toBe(
+      'https://partner.example.com/katalog',
+    );
+    await meta(owner(), null);
+  });
+
+  it('404 log is pruned: rare stale misses go, the rest stays', async () => {
+    const old = new Date(Date.now() - 100 * 86_400_000);
+    await prisma.notFoundLog.createMany({
+      data: [
+        { path: '/uz/t-seo-prune-rare', hits: 1, lastSeen: old },
+        { path: '/uz/t-seo-prune-busy', hits: 50, lastSeen: old },
+        { path: '/uz/t-seo-prune-new', hits: 1 },
+      ],
+    });
+    const removed = await app.get(NotFoundLogService).prune();
+    expect(removed).toBeGreaterThanOrEqual(1);
+    const left = await prisma.notFoundLog.findMany({
+      where: { path: { startsWith: '/uz/t-seo-prune' } },
+    });
+    expect(left.map((r) => r.path).sort()).toEqual(['/uz/t-seo-prune-busy', '/uz/t-seo-prune-new']);
+    await prisma.notFoundLog.deleteMany({ where: { path: { startsWith: '/uz/t-seo-prune' } } });
   });
 
   it('robots.txt is editable and resets to the generated default', async () => {

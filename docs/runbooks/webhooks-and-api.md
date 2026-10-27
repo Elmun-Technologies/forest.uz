@@ -74,8 +74,10 @@ deliveries in a row switch the endpoint off (audit `webhook.auto_disabled`); swi
 resets the counter, and its queued deliveries resume. Every attempt is one IntegrationLog row
 (`webhooks`, kind `webhook.<event>`, no payload).
 
-**URLs:** production accepts only `https://` hosts that resolve to public addresses (checked when
-saving and again before every send: no localhost, private, link-local or metadata addresses).
+**URLs:** production accepts only `https://` on port 443 or 8443, to hosts whose every address is
+public (no localhost, private, link-local, CGNAT, metadata, IPv4-compatible, 6to4 or NAT64
+addresses). Checked when saving and again inside the connection: the POST uses a DNS lookup that
+vets the answer and connects only to that address (no DNS-rebinding window).
 
 **Secret rotation:** "Kalitni yangilash" returns a new `whsec_…` once; the old one stops working
 immediately (rotate during a quiet minute or accept a few failed attempts — they are retried).
@@ -89,7 +91,7 @@ Header: `Authorization: Bearer fk_live_<prefix>_<secret>` (or `X-Api-Key`). Read
 |---|---|---|
 | `GET /partner/products?limit=50&cursor=` | `products:read` | ACTIVE products: name/short description uz+ru, categories, image URLs, variants (SKU, label, `priceUzs`, `compareAtUzs`, `available`, `active`), storefront URLs. `{items, nextCursor}` |
 | `GET /partner/products/:slug` | `products:read` | one product |
-| `GET /partner/stock?sku=A,B` or `?limit=&cursor=` | `stock:read` | `available` = stock − open reservations (0 when the variant is inactive), ≤ 100 SKUs per call |
+| `GET /partner/stock?sku=A,B` or `?limit=&cursor=` | `stock:read` | `available` = stock − open reservations (0 when the variant is inactive), ≤ 100 SKUs per call, matched case-insensitively |
 
 Errors: 401 `API_KEY_INVALID` (unknown, malformed or revoked key), 403 `API_KEY_SCOPE`,
 429 `RATE_LIMITED` with `Retry-After`. Every response has `X-RateLimit-Limit` /
@@ -113,12 +115,15 @@ updated at most once a minute. Revocation takes effect on the next request.
 - Endpoints (admin, POST, return drafts only — nothing is saved):
   `/admin/ai/product-description {productId, hint?}` (`products.edit`),
   `/admin/ai/seo {path}` (`seo.edit`; `/p/<slug>`, `/katalog/<slug>`, `/ilhom/<slug>`, `/`,
-  `/katalog`, `/ilhom`, `/brend`), `/admin/ai/reply {conversationId, locale?}` (`bot.inbox`).
+  `/katalog`, `/ilhom`, `/brend`), `/admin/ai/reply {conversationId, locale?}` (`bot.inbox`;
+  **off by default** — `PUT /admin/ai/settings {replyDrafts}` by the Owner, audited; `GET
+  /admin/ai/status` tells the UI).
 - Limits: 20 drafts/min per staff member, 300/day in total (`AI_DRAFT_LIMITED`). Each draft is
   audited `ai.draft` (kind, model, token counts) and logged in IntegrationLog `claude` (tokens).
-- Prompts contain catalog/content facts only; reply drafts get the last ≤ 10 messages with phone
-  numbers, emails, card-like digit runs, links and `F-`/`C-` ids replaced (`scrubPii`), never the
-  customer's name (open question 93).
+- Prompts contain catalog/content facts only; a reply draft (when switched on) sends only the
+  latest customer message with phone numbers, emails, card-like digit runs, links and `F-`/`C-` ids
+  replaced (`scrubPii`) plus shop facts — never the history or the customer's name (open question
+  93). The inbox shows operators a warning next to the button.
 - `PROVIDERS_MODE=fake`: a fake returns schema-shaped `[AI fake] …` strings (the admin says so).
 
 **Sources:** the claude-api skill bundled with Claude Code (model table cached 2026-10-06, TypeScript

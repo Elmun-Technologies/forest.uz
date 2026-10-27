@@ -45,6 +45,11 @@ export const AUTOMATION_ERROR_MESSAGES = {
     uz: "AI qoralama tayyorlay olmadi. Keyinroq urinib ko'ring yoki o'zingiz yozing.",
     ru: 'AI не смог подготовить черновик. Попробуйте позже или напишите сами.',
   },
+  AI_REPLY_DISABLED: {
+    http: 403,
+    uz: "Operator javobi uchun AI qoralama o'chirilgan. Uni faqat do'kon egasi yoqa oladi.",
+    ru: 'AI-черновики ответов оператора выключены. Включить их может только владелец.',
+  },
   AI_DRAFT_NO_SOURCE: {
     http: 400,
     uz: "Qoralama uchun ma'lumot yetarli emas: avval nom va qisqa tavsifni to'ldiring.",

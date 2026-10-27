@@ -27,6 +27,7 @@ export const COPY = {
   smsApprovedHint:
     "SMS matni Eskiz kabinetida tasdiqlangan bo'lishi shart. Matn o'zgarsa belgi olinadi — qayta tasdiqlatib, keyin belgilang. Tasdiqlanmagan matn SMS orqali yuborilmaydi.",
   active: 'Faol',
+  stopHint: '{stop} — mijozning obunani bekor qilish havolasi (Eskiz shu matnni tasdiqlaydi).',
   marketingNote:
     "Faqat roziligi bor mijozga yuboriladi. Har bir xabarda «Eslatmani o'chirish» tugmasi (SMS'da havola) avtomatik qo'shiladi.",
   save: 'Saqlash',
@@ -47,9 +48,11 @@ export const COPY = {
   settings: 'Sozlamalar',
   settingsSaved: 'Sozlamalar saqlandi',
   cap: 'Kuniga max reklama xabari (mijozga)',
-  capHint: 'Telegram + SMS birga. Xizmat xabarlari (buyurtma holati) hisoblanmaydi.',
+  capHint:
+    "Telegram + SMS birga. Xizmat xabarlari (buyurtma holati) hisoblanmaydi. 2 tadan ko'pini faqat Egasi yoqa oladi (max 5).",
   quiet: 'Tungi soatlar (yuborilmaydi)',
-  quietHint: 'Bu oraliqdagi xabarlar ertalab yuboriladi, bekor qilinmaydi.',
+  quietHint:
+    'Bu oraliqdagi xabarlar ertalab yuboriladi, bekor qilinmaydi. Kamida 8 soat; 21:00–09:00 ni faqat Egasi qisqartira oladi.',
   hours: 'Operator ish vaqti',
   days: 'Ish kunlari',
   operators: 'Operatorlar',
@@ -105,7 +108,9 @@ export function problemText(p: TemplateProblem): string {
     case 'unknown_variable':
       return `${where}: {${p.variable}} bu shablonda ishlatilmaydi`;
     case 'missing_variable':
-      return `${where}: {${p.variable}} bo'lishi shart`;
+      return p.variable === 'stop'
+        ? `${where}: {stop} — obunani bekor qilish havolasi — reklama SMS matnida bo'lishi shart`
+        : `${where}: {${p.variable}} bo'lishi shart`;
     case 'button_url':
       return `${where}: havola {link} yoki https://… bo'lsin`;
   }

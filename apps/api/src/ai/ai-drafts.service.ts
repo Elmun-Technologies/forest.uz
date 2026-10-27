@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   AI_DRAFT_POLICY,
   type AiDraftKind,
+  type AiDraftStatusDto,
   type AiProductDescriptionDraftDto,
   type AiReplyDraftDto,
   type AiSeoDraftDto,
@@ -137,21 +138,24 @@ export class AiDraftsService {
     conversationId: string,
     locale?: 'uz' | 'ru',
   ): Promise<AiReplyDraftDto> {
+    // Off unless the Owner switched it on: the customer's text leaves Uzbekistan (CLAUDE.md §6).
+    if (!(await this.status()).replyDrafts) throw new DomainError('AI_REPLY_DISABLED');
     const conv = await this.prisma.conversation.findUnique({
       where: { id: conversationId },
       include: {
         customer: { select: { locale: true } },
-        messages: { orderBy: { createdAt: 'desc' }, take: AI_DRAFT_POLICY.replyContext },
+        // Only the latest customer message is sent — never the history or operator replies.
+        messages: {
+          where: { fromCustomer: true, text: { not: null } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
     if (!conv) throw new DomainError('NOT_FOUND');
-    const messages = [...conv.messages].reverse().filter((m) => m.text?.trim());
-    if (!messages.length) throw new DomainError('AI_DRAFT_NO_SOURCE');
-    const lang =
-      locale ??
-      (/[а-яё]/i.test(messages.findLast((m) => m.fromCustomer)?.text ?? '')
-        ? 'ru'
-        : (conv.customer?.locale ?? 'uz'));
+    const last = conv.messages[0]?.text?.trim();
+    if (!last) throw new DomainError('AI_DRAFT_NO_SOURCE');
+    const lang = locale ?? (/[а-яё]/i.test(last) ? 'ru' : (conv.customer?.locale ?? 'uz'));
     const [store, zones] = await Promise.all([
       this.settings.get('store.info'),
       this.settings.get('delivery.zones'),
@@ -164,16 +168,57 @@ export class AiDraftsService {
         .map((z) => `${z.name[lang]}: ${z.etaLabel[lang]}`),
       payments: 'Payme, Click, cash or card on delivery',
     });
-    const transcript = messages
-      .map((m) => `${m.fromCustomer ? 'Customer' : 'Operator'}: ${scrubPii(clip(m.text, 1000))}`)
-      .join('\n');
     const { draft, completion, model } = await this.run(actor, 'reply', {
       system: REPLY_SYSTEM,
-      prompt: `Shop facts:\n${shopFacts}\n\nConversation (oldest first):\n${transcript}\n\nWrite the operator's next reply in ${lang === 'ru' ? 'Russian' : 'Uzbek (Latin)'}.`,
+      prompt: `Shop facts:\n${shopFacts}\n\nCustomer's message:\n${scrubPii(clip(last, 1000))}\n\nWrite the operator's reply in ${lang === 'ru' ? 'Russian' : 'Uzbek (Latin)'}.`,
       schema: REPLY_SCHEMA,
     });
     await this.done(actor, 'reply', 'Conversation', conversationId, completion);
     return { text: clip(draft.text, 1000), locale: lang, model, fake: completion.model === 'fake' };
+  }
+
+  /** Whether drafts can run and whether operator reply drafts are switched on (Owner setting). */
+  async status(): Promise<AiDraftStatusDto> {
+    const row = await this.prisma.integration.findUnique({
+      where: { key: 'claude' },
+      select: { status: true, config: true },
+    });
+    const config = isObj(row?.config) ? row.config : {};
+    return {
+      available: this.integrations.fakeMode || row?.status === 'CONNECTED',
+      replyDrafts: config.replyDrafts === true,
+    };
+  }
+
+  /** Owner: switch operator reply drafts on/off (sends customer chat text to Anthropic). */
+  async setReplyDrafts(actor: AuditActor, replyDrafts: boolean): Promise<AiDraftStatusDto> {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.integration.upsert({
+        where: { key: 'claude' },
+        update: {},
+        create: { key: 'claude' },
+      });
+      await tx.$queryRaw`SELECT "key" FROM "Integration" WHERE "key" = 'claude' FOR UPDATE`;
+      const row = await tx.integration.findUniqueOrThrow({ where: { key: 'claude' } });
+      const config = isObj(row.config) ? row.config : {};
+      const before = config.replyDrafts === true;
+      await tx.integration.update({
+        where: { key: 'claude' },
+        data: { config: { ...config, replyDrafts } },
+      });
+      await this.audit.record(
+        actor,
+        {
+          action: 'ai.settings.update',
+          entity: 'Integration',
+          entityId: 'claude',
+          before: { replyDrafts: before },
+          after: { replyDrafts },
+        },
+        tx,
+      );
+    });
+    return this.status();
   }
 
   /** Facts of a storefront page for SEO drafts (product, category, article, home/catalog). */

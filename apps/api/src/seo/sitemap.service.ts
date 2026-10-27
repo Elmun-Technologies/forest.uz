@@ -12,6 +12,9 @@ import { buildSitemaps, type SitemapEntry, type SitemapGroup } from './sitemap-x
 
 const KEY = (name: string) => `seo:sitemap:file:${name}`;
 const STATUS_KEY = 'seo:sitemap:status';
+const FILES_KEY = 'seo:sitemap:files';
+const LOCK_KEY = 'seo:sitemap:lock';
+const LOCK_TTL_S = 60;
 /** Files outlive the daily rebuild by a day; a miss is rebuilt on request. */
 const TTL_S = 2 * 86_400;
 
@@ -32,6 +35,8 @@ export const siteBase = (env: Env) => env.APP_URL.replace(/\/$/, '');
 @Injectable()
 export class SitemapService {
   private readonly logger = new Logger('Sitemap');
+  /** In-process single flight (on top of the Redis lock shared by all API processes). */
+  private building: Promise<SitemapStatus> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -41,7 +46,37 @@ export class SitemapService {
     @InjectQueue(SEO_QUEUE) private readonly queue: Queue,
   ) {}
 
-  async regenerate(reason: string, pages?: InventoryPage[]): Promise<SitemapStatus> {
+  /**
+   * Rebuilds every file. One build at a time across processes (Redis `SET NX` lock); a caller that
+   * finds a build running waits for its result instead of starting another.
+   */
+  regenerate(reason: string, pages?: InventoryPage[]): Promise<SitemapStatus> {
+    this.building ??= this.lockedBuild(reason, pages).finally(() => {
+      this.building = null;
+    });
+    return this.building;
+  }
+
+  private async lockedBuild(reason: string, pages?: InventoryPage[]): Promise<SitemapStatus> {
+    const token = `${process.pid}:${Date.now()}:${Math.random()}`;
+    if ((await this.redis.set(LOCK_KEY, token, 'EX', LOCK_TTL_S, 'NX')) !== 'OK') {
+      const before = (await this.status())?.generatedAt;
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 250));
+        const now = await this.status();
+        if (now && now.generatedAt !== before) return now;
+      }
+      throw new Error('sitemap build by another process did not finish in 10 s');
+    }
+    try {
+      return await this.build(reason, pages);
+    } finally {
+      // Release only our own lock (it may have expired and been taken by another build).
+      if ((await this.redis.get(LOCK_KEY)) === token) await this.redis.del(LOCK_KEY);
+    }
+  }
+
+  private async build(reason: string, pages?: InventoryPage[]): Promise<SitemapStatus> {
     const site = siteBase(this.env);
     const [all, excluded] = await Promise.all([
       pages ? Promise.resolve(pages) : this.inventory.pages(),
@@ -66,8 +101,12 @@ export class SitemapService {
       reason,
       files: built.counts,
     };
+    const stale = (await this.redis.smembers(FILES_KEY)).filter((n) => !built.files.has(n));
     const multi = this.redis.multi();
     for (const [name, xml] of built.files) multi.set(KEY(name), xml, 'EX', TTL_S);
+    if (stale.length) multi.del(...stale.map(KEY));
+    multi.del(FILES_KEY);
+    multi.sadd(FILES_KEY, ...built.files.keys());
     multi.set(STATUS_KEY, JSON.stringify(status));
     await multi.exec();
     this.logger.log(`sitemap rebuilt (${reason}): ${built.urls} URLs`);
@@ -79,11 +118,8 @@ export class SitemapService {
     if (!/^(sitemap|(uz|ru)-(pages|categories|products))\.xml$/.test(name)) return null;
     const cached = await this.redis.get(KEY(name));
     if (cached !== null) return cached;
-    const status = await this.status();
-    // Cache gone (TTL/flush) or never built → rebuild once; a child absent after a fresh build
-    // simply has no URLs.
-    if (!status || Date.now() - Date.parse(status.generatedAt) > 60_000)
-      await this.regenerate('on-demand');
+    // Cache gone (TTL/flush) or never built: one rebuild writes every file (empty ones too).
+    await this.regenerate('on-demand');
     return this.redis.get(KEY(name));
   }
 

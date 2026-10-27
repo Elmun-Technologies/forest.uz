@@ -15,10 +15,12 @@ import type {
 import { getQueueToken } from '@nestjs/bullmq';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Queue } from 'bullmq';
+import { Prisma } from '@forest/db';
 import request from 'supertest';
 import { ENV } from '../src/config/config.module';
 import type { Env } from '../src/config/env';
 import { FilesService } from '../src/files/files.service';
+import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { WebhookCollector } from '../src/webhooks-out/collector.service';
 import { WebhookSender } from '../src/webhooks-out/sender.service';
@@ -86,6 +88,7 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
   const apiKeyIds: string[] = [];
   const conversationIds: string[] = [];
   let brandBefore: unknown[] = [];
+  let claudeConfig: Prisma.InputJsonValue | null = null;
 
   beforeAll(async () => {
     app = await createAdminTestApp([], {}, (b) =>
@@ -103,6 +106,8 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
     operator = (await signedIn(app, 'OPERATOR')).client;
     hook = await receiver();
     brandBefore = await prisma.page.findMany({ where: { kind: 'PAGE', slug: 'brend' } });
+    claudeConfig =
+      (await prisma.integration.findUnique({ where: { key: 'claude' } }))?.config ?? null;
   });
 
   afterAll(async () => {
@@ -118,6 +123,10 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
     await prisma.page.deleteMany({ where: { kind: 'PAGE', slug: 'brend' } });
     for (const p of brandBefore as Parameters<typeof prisma.page.create>[0]['data'][])
       await prisma.page.create({ data: p });
+    await prisma.integration.updateMany({
+      where: { key: 'claude' },
+      data: { config: claudeConfig ?? Prisma.DbNull },
+    });
     await queue.resume();
     hook.server.close();
     await app.close();
@@ -309,6 +318,29 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
     expect((await manager.post(`/v1/admin/webhooks/${endpoint.id}/test`)).status).toBe(403);
   });
 
+  it('strict mode: a rebinding host is never connected to', async () => {
+    const { endpoint } = await createEndpoint(['customer.created']);
+    await prisma.webhookEndpoint.update({
+      where: { id: endpoint.id },
+      data: { url: 'https://hooks.example.test/x' },
+    });
+    hook.got.length = 0;
+    await newCustomer('ssrf');
+    await app.get(WebhookCollector).collect();
+    const sender = app.get(WebhookSender);
+    sender.strictOverride = true;
+    sender.resolve = async () => ['127.0.0.1'];
+    try {
+      await sender.sendDue();
+    } finally {
+      sender.strictOverride = undefined;
+      sender.resolve = undefined;
+    }
+    const d = await prisma.webhookDelivery.findFirstOrThrow({ where: { endpointId: endpoint.id } });
+    expect(d).toMatchObject({ status: 'PENDING', attempts: 1, lastError: 'url not allowed' });
+    expect(hook.got).toHaveLength(0);
+  });
+
   // ───────── API keys ─────────
 
   it('API keys: shown once, hashed, scoped, rate-limited and revocable', async () => {
@@ -369,7 +401,7 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
     apiKeyIds.push(created.key.id);
     const v = await prisma.variant.findFirstOrThrow({ where: { product: { status: 'ACTIVE' } } });
     const s = await request(app.getHttpServer())
-      .get(`/v1/partner/stock?sku=${v.sku}`)
+      .get(`/v1/partner/stock?sku=${v.sku.toLowerCase()}`)
       .set('Authorization', `Bearer ${created.secret}`);
     expect(s.status).toBe(200);
     expect(s.body.items).toEqual([
@@ -511,15 +543,51 @@ describe('phase 5C: webhooks, API keys, CMS, AI drafts (integration)', () => {
         customerId: customer.id,
         telegramChatId: 1n,
         topic: 'advice',
-        messages: { create: [{ fromCustomer: true, text: 'Divan uchun qaysi rang?' }] },
+        messages: {
+          create: [
+            {
+              fromCustomer: true,
+              text: 'Men Aziza, Chilonzor 9-kvartal 12-uy',
+              createdAt: new Date(Date.now() - 60_000),
+            },
+            {
+              fromCustomer: false,
+              text: 'Salom! Qanday yordam beray?',
+              createdAt: new Date(Date.now() - 30_000),
+            },
+            { fromCustomer: true, text: 'Divan uchun qaysi rang?' },
+          ],
+        },
       },
     });
     conversationIds.push(conv.id);
+    // Off by default (customer text would leave Uzbekistan): nobody gets a draft.
+    const off = await operator.post('/v1/admin/ai/reply', { conversationId: conv.id });
+    expect(off.status).toBe(403);
+    expect(off.body.error.code).toBe('AI_REPLY_DISABLED');
+    expect((await operator.get('/v1/admin/ai/status')).body).toMatchObject({ replyDrafts: false });
+    // Only the Owner switches it on (audited).
+    expect((await manager.send('put', '/v1/admin/ai/settings', { replyDrafts: true })).status).toBe(
+      403,
+    );
+    const on = await owner.send('put', '/v1/admin/ai/settings', { replyDrafts: true });
+    expect(on.body).toMatchObject({ replyDrafts: true, available: true });
+    expect(
+      await prisma.auditLog.count({ where: { action: 'ai.settings.update', entityId: 'claude' } }),
+    ).toBeGreaterThan(0);
+
     expect((await marketer.post('/v1/admin/ai/reply', { conversationId: conv.id })).status).toBe(
       403,
     );
+    const provider = await app.get(IntegrationsService).ai();
+    const spy = vi.spyOn(provider, 'complete');
     const reply = await operator.post('/v1/admin/ai/reply', { conversationId: conv.id });
     expect(reply.status).toBe(200);
+    // Only the latest customer message goes out — not the name/address said earlier.
+    const prompt = spy.mock.calls[0]![0].prompt;
+    expect(prompt).toContain('Divan uchun qaysi rang?');
+    expect(prompt).not.toMatch(/Aziza|Chilonzor|Qanday yordam/);
+    spy.mockRestore();
     expect((reply.body as AiReplyDraftDto).locale).toBe('uz');
   });
 });

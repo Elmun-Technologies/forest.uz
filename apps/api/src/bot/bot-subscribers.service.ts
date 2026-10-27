@@ -92,6 +92,8 @@ export class BotSubscribersService {
   async start(
     sub: BotSubscriber,
     ref: { source: string | null; anonymousId: string | null },
+    /** A plain `/start` typed by the user (no payload): the only way to undo the bot's `/stop`. */
+    explicit = false,
   ): Promise<{ resubscribed: boolean }> {
     let utm: Prisma.InputJsonValue | undefined;
     if (ref.anonymousId) {
@@ -114,14 +116,11 @@ export class BotSubscribersService {
       // Starting the bot = opting in to its reminders (docs/13 q.90), but never over an earlier
       // explicit opt-out from another place (SMS link, cabinet): only when no TELEGRAM row exists.
       const customer = await this.customer(sub.telegramId);
-      if (customer) {
-        const any = await this.prisma.consent.count({
-          where: { customerId: customer.id, channel: 'TELEGRAM' },
-        });
-        if (!any) await this.consents.record(this.prisma, customer.id, { telegram: true }, 'bot');
-      }
+      if (customer) await this.grantIfNeverAsked(customer.id);
       return { resubscribed: false };
     }
+    // Site buttons and deep links carry a payload: only a typed plain `/start` re-subscribes.
+    if (!explicit) return { resubscribed: false };
     await this.prisma.botSubscriber.update({
       where: { telegramId: sub.telegramId },
       data: { stoppedAt: null },
@@ -129,6 +128,12 @@ export class BotSubscribersService {
     const customer = await this.customer(sub.telegramId);
     if (customer) await this.consents.record(this.prisma, customer.id, { telegram: true }, 'bot');
     return { resubscribed: true };
+  }
+
+  /** TELEGRAM opt-in for a customer who never answered (no consent row on that channel). */
+  private async grantIfNeverAsked(customerId: string): Promise<void> {
+    const rows = await this.prisma.consent.count({ where: { customerId, channel: 'TELEGRAM' } });
+    if (!rows) await this.consents.record(this.prisma, customerId, { telegram: true }, 'bot');
   }
 
   /** The visitor of the start link waits for the phone (stitched on contact), 30 days. */
@@ -210,15 +215,45 @@ export class BotSubscribersService {
       const c = await tx.customer.findUniqueOrThrow({ where: { id: customerId } });
       if (!c.leadSource)
         await tx.customer.update({ where: { id: c.id }, data: { leadSource: 'bot', leadAt: now } });
-      await tx.botSubscriber.update({
+      const sub = await tx.botSubscriber.update({
         where: { telegramId: tgId },
-        data: { customerId, phoneSharedAt: now, stoppedAt: null },
+        data: { customerId, phoneSharedAt: now },
       });
-      await this.consents.record(tx, customerId, { telegram: true }, 'bot');
+      // The chat's history before the phone (inbox, bot replies) now belongs to the customer:
+      // the customer card shows it and an erasure finds it.
+      await tx.conversation.updateMany({
+        where: { telegramChatId: tgId, customerId: null },
+        data: { customerId },
+      });
+      await tx.message.updateMany({
+        where: {
+          customerId: null,
+          channel: 'TELEGRAM',
+          payload: { path: ['chatId'], equals: String(tgId) },
+        },
+        data: { customerId },
+      });
+      // Sharing a phone is not a new opt-in: an opt-out (here or elsewhere) stays in force.
+      const rows = await tx.consent.count({ where: { customerId, channel: 'TELEGRAM' } });
+      if (!rows && sub.stoppedAt)
+        // `/stop` came before the phone: carry the opt-out over to the customer.
+        await tx.consent.create({
+          data: { customerId, channel: 'TELEGRAM', granted: false, source: 'bot' },
+        });
+      else if (!rows) await this.consents.record(tx, customerId, { telegram: true }, 'bot');
     });
 
+    // Visitor of the start link: stitched only when it isn't someone else's already (a forwarded
+    // link must not move A's browsing to B).
     const anonymousId = opts.anonymousId ?? (await this.redis.getdel(visitorKey(tgId)));
-    if (anonymousId) await this.identity.link(anonymousId, customerId);
+    if (anonymousId) {
+      const v = await this.prisma.visitor.findUnique({
+        where: { anonymousId },
+        select: { customerId: true },
+      });
+      if (!v?.customerId || v.customerId === customerId)
+        await this.identity.link(anonymousId, customerId);
+    }
 
     if (opts.leadOn && (await this.limiter.once('lead:sms', phone, 86_400))) {
       await this.sms

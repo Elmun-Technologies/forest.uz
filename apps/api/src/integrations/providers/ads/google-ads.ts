@@ -3,6 +3,7 @@ import type { HealthResult } from '../types';
 import {
   type AdConversion,
   AdPlatformError,
+  type AudienceCreated,
   type AudienceListProvider,
   type ConversionProvider,
   type ConversionSendResult,
@@ -198,7 +199,8 @@ export class GoogleAdsProvider implements ConversionProvider, AudienceListProvid
     return result;
   }
 
-  async create(name: string, hashes: string[]): Promise<string> {
+  /** Creates an empty Customer Match list; members follow with `add` once the id is stored. */
+  async create(name: string): Promise<AudienceCreated> {
     const res = await this.call(`/customers/${this.cid}/userLists:mutate`, {
       operations: [
         {
@@ -214,8 +216,7 @@ export class GoogleAdsProvider implements ConversionProvider, AudienceListProvid
     const results = res.results as { resourceName?: string }[] | undefined;
     const id = results?.[0]?.resourceName;
     if (!id) throw new AdPlatformError('userLists:mutate: no resourceName');
-    await this.add(id, hashes);
-    return id;
+    return { id, seeded: false };
   }
 
   /** One OfflineUserDataJob per call: create → addOperations (≤ 10 000 each) → run. */

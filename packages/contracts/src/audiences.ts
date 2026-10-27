@@ -245,6 +245,14 @@ export const AD_SIGNAL_PLATFORM_EVENTS: Record<AdSignalPlatform, readonly AdSign
 export const AD_SIGNAL_RULES = {
   /** Events younger than this are not read yet (ingest batches land a few seconds late). */
   lagMs: 2 * 60_000,
+  /**
+   * Every run re-reads this window behind the newest event: ingest back-dates events by up to an
+   * hour (client clock offset, clamped), so a pure ts cursor would skip late arrivals. Unique
+   * (platform, event id) keeps the re-read idempotent.
+   */
+  rescanMs: 70 * 60_000,
+  /** A row of a briefly disconnected platform waits this long before the next try. */
+  deferMs: 15 * 60_000,
   /** Platforms reject old events (Meta: 7 days); older ones are never forwarded. */
   maxAgeMs: 7 * 86_400_000,
   maxAttempts: 8,
@@ -318,7 +326,8 @@ export interface AdminSegmentListDto {
     failed: number;
     pending: number;
   }[];
-  templates: { key: string; preview: string }[];
+  /** Marketing templates only (automations send marketing), with the channels each supports. */
+  templates: { key: string; preview: string; channels: ('telegram' | 'sms')[] }[];
   products: { id: string; name: string; slug: string }[];
   fakeMode: boolean;
 }

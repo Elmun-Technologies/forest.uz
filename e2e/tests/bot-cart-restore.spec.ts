@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { addToCart, API, quietOverlays } from './helpers';
+import { addToCart, API, devHeaders, quietOverlays } from './helpers';
 
 /**
  * Phase 5 acceptance "bot deep links restore cart" (CLAUDE.md §6, 5A): a cart restore link opened
@@ -7,6 +7,9 @@ import { addToCart, API, quietOverlays } from './helpers';
  * opens checkout; a broken link lands on the cart page.
  */
 test.describe('bot cart restore link', () => {
+  // Dev servers compile routes on first use.
+  test.describe.configure({ timeout: 120_000 });
+
   test('restores the cart with SAVAT5 in a fresh browser and opens checkout', async ({
     page,
     browser,
@@ -20,6 +23,7 @@ test.describe('bot cart restore link', () => {
 
     const minted = await page.request.post(`${API}/v1/dev/bot/cart-link`, {
       data: { cartId, promo: 'SAVAT5', locale: 'ru' },
+      headers: devHeaders(),
     });
     expect(minted.ok()).toBe(true);
     const link = new URL(((await minted.json()) as { url: string }).url);
@@ -39,13 +43,45 @@ test.describe('bot cart restore link', () => {
     expect(cart.lines.map((l) => l.qty)).toEqual([2]);
     expect(cart.promo?.code).toBe('SAVAT5');
 
-    // Opening the link again changes nothing (qty = max, not +2).
-    await phone.goto(link.pathname);
-    const again = (await (await phone.request.get('/api/cart')).json()) as {
+    // Opening the link again (another tap) changes nothing (qty = max, not +2).
+    const tap = await other.newPage();
+    await tap.goto(link.pathname);
+    await expect(tap).toHaveURL(/\/ru\/checkout/);
+    const again = (await (await tap.request.get('/api/cart')).json()) as {
       lines: { qty: number }[];
     };
     expect(again.lines.map((l) => l.qty)).toEqual([2]);
     await other.close();
+  });
+
+  test('a non-navigation request gets a confirm page and changes nothing', async ({
+    page,
+    playwright,
+    baseURL,
+  }) => {
+    await quietOverlays(page.context(), baseURL);
+    await page.goto('/uz');
+    await addToCart(page, 1);
+    const cartId = (await page.context().cookies()).find((c) => c.name === 'fr_cart')?.value;
+    const minted = await page.request.post(`${API}/v1/dev/bot/cart-link`, {
+      data: { cartId },
+      headers: devHeaders(),
+    });
+    const path = new URL(((await minted.json()) as { url: string }).url).pathname;
+
+    // Link-preview robots / cross-site <img>: no Fetch Metadata navigation → confirm page only.
+    const bot = await playwright.request.newContext({ baseURL });
+    const preview = await bot.get(path, { maxRedirects: 0 });
+    expect(preview.status()).toBe(200);
+    expect(await preview.text()).toContain('method="post"');
+    expect(preview.headers()['set-cookie'] ?? '').not.toContain('fr_cart');
+    // A cross-site form post is refused.
+    const forged = await bot.post(path, {
+      maxRedirects: 0,
+      headers: { Origin: 'https://evil.example', 'Sec-Fetch-Site': 'cross-site' },
+    });
+    expect(forged.status()).toBe(403);
+    await bot.dispose();
   });
 
   test('a broken link opens the cart page', async ({ page, baseURL }) => {

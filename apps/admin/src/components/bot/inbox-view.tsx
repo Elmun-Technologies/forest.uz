@@ -12,7 +12,7 @@ import { Badge, Button, cn, Input, Panel, Textarea } from '@forest/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { adminFetch, errorText } from '../../lib/client-api';
+import { adminFetch, ClientApiError, errorText } from '../../lib/client-api';
 import { formatWhen } from '../../lib/format';
 import { COPY, STATUS_LABEL, STATUS_TONE, TOPIC_LABEL } from './copy';
 import { AiReplyButton } from '../automation/ai-reply-button';
@@ -193,13 +193,32 @@ function Thread({
   }
 
   async function send() {
-    const ok = await act(`/admin/bot/conversations/${conv.id}/reply`, 'POST', {
-      text: text.trim(),
-      ...(product ? { product: { variantId: product.id, qty: 1 } } : {}),
-    });
-    if (ok) {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await adminFetch<AdminBotConversationDto>(
+        `/admin/bot/conversations/${conv.id}/reply`,
+        {
+          method: 'POST',
+          body: {
+            text: text.trim(),
+            ...(product ? { product: { variantId: product.id, qty: 1 } } : {}),
+          },
+        },
+      );
+      setConv(next);
       setText('');
       setProduct(null);
+      onChanged();
+    } catch (e) {
+      // The text went out, only the product card failed: a retry must send just the card.
+      if (e instanceof ClientApiError && e.details?.sent === 'text') {
+        setText('');
+        onChanged();
+      }
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
     }
   }
 

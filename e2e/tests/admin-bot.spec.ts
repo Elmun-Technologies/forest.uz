@@ -1,6 +1,6 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { ADMIN, ownerContext } from './admin-helpers';
-import { API } from './helpers';
+import { API, devHeaders } from './helpers';
 
 /**
  * A12 bot (desktop): the overview shows KPIs and the five scenarios; a customer's Telegram
@@ -39,6 +39,7 @@ test('inbox: a Telegram question is answered and closed', async ({}, testInfo) =
   for (const text of ['/start', question]) {
     const r = await page.request.post(`${API}/v1/dev/bot/update`, {
       data: { chatId, text, firstName: 'Dilnoza' },
+      headers: devHeaders(),
     });
     expect(r.ok()).toBe(true);
   }
@@ -47,12 +48,16 @@ test('inbox: a Telegram question is answered and closed', async ({}, testInfo) =
   await expect(row).toBeVisible();
   await row.click();
   await page.getByTestId('inbox-reply').fill('Zaytun rangi juda mos keladi.');
+  const replied = page.waitForResponse(
+    (r) => r.url().includes('/reply') && r.request().method() === 'POST',
+  );
   await page.getByTestId('inbox-send').click();
+  expect((await replied).status()).toBe(201);
   await expect(page.getByText('Zaytun rangi juda mos keladi.')).toBeVisible();
   await expect(page.locator('section').getByText('Javob berildi').first()).toBeVisible();
 
   const sent = (await (
-    await page.request.get(`${API}/v1/dev/bot/sent?chatId=${chatId}`)
+    await page.request.get(`${API}/v1/dev/bot/sent?chatId=${chatId}`, { headers: devHeaders() })
   ).json()) as { text: string }[];
   expect(sent.some((m) => m.text.includes('Zaytun rangi juda mos keladi.'))).toBe(true);
 

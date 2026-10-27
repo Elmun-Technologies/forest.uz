@@ -1,11 +1,10 @@
 -- Phase 5 (CLAUDE.md §6): outbound webhooks (endpoint + outbox) and partner API keys.
 
--- WebhookEndpoint was never written before Phase 5: the plain-text secret column becomes a sealed
--- SecretBox blob. No endpoint rows can exist yet; any stray row would hold an unusable secret.
-DELETE FROM "WebhookEndpoint";
-ALTER TABLE "WebhookEndpoint" DROP COLUMN "secret";
+-- WebhookEndpoint had no writer before Phase 5, but rows are kept if any exist: the old
+-- plain-text secret can't be sealed with the app's SecretBox in SQL, so it is dropped and such
+-- rows are switched off with an empty sealed secret until the Owner rotates it (admin refuses
+-- to re-enable an endpoint without a secret). Non-destructive for url/events.
 ALTER TABLE "WebhookEndpoint"
-  ADD COLUMN "secret" BYTEA NOT NULL,
   ADD COLUMN "name" TEXT NOT NULL DEFAULT '',
   ADD COLUMN "secretLast4" TEXT NOT NULL DEFAULT '',
   ADD COLUMN "disabledAt" TIMESTAMPTZ(3),
@@ -13,6 +12,13 @@ ALTER TABLE "WebhookEndpoint"
   ADD COLUMN "consecutiveFailures" INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN "createdById" TEXT,
   ADD COLUMN "updatedAt" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
+UPDATE "WebhookEndpoint"
+  SET "active" = false,
+      "disabledAt" = CURRENT_TIMESTAMP,
+      "disabledReason" = 'migration: rotate the signing secret before enabling';
+ALTER TABLE "WebhookEndpoint" DROP COLUMN "secret";
+ALTER TABLE "WebhookEndpoint" ADD COLUMN "secret" BYTEA NOT NULL DEFAULT '\x'::bytea;
+ALTER TABLE "WebhookEndpoint" ALTER COLUMN "secret" DROP DEFAULT;
 
 CREATE TABLE "WebhookDelivery" (
     "id" TEXT NOT NULL,

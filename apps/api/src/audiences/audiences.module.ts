@@ -43,7 +43,17 @@ export class AudienceJobs {
           select: { active: true },
         });
         if (!seg) return 'missing' as const;
-        const refresh = seg.active ? await this.audiences.refresh(segmentId) : null;
+        let refresh: Awaited<ReturnType<AudienceService['refresh']>> = null;
+        if (seg.active) {
+          try {
+            refresh = await this.audiences.refresh(segmentId);
+          } catch (e) {
+            // Membership is stale, but people who withdrew consent, were erased or changed
+            // phone must still leave the platforms; then report the failure.
+            await this.destinations.syncSegment(segmentId, { removalsOnly: true });
+            throw e;
+          }
+        }
         const sync = await this.destinations.syncSegment(segmentId);
         return { refresh, sync };
       },

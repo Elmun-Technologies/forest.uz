@@ -15,6 +15,7 @@ import {
   AUDIENCE_PRESET_KEYS,
   DomainError,
   maskUzPhone,
+  templateMeta,
   type SegmentCreateInput,
   type SegmentDestinationStateDto,
   type SegmentSyncStatus,
@@ -161,10 +162,17 @@ export class AdminAudiencesService {
     return {
       items,
       signals,
-      templates: templates.map((t) => {
-        const body = (t.body ?? {}) as { uz?: unknown };
-        return { key: t.key, preview: typeof body.uz === 'string' ? body.uz.slice(0, 160) : '' };
-      }),
+      templates: templates
+        .filter((t) => templateMeta(t.key)?.kind === 'marketing')
+        .map((t) => {
+          const body = (t.body ?? {}) as { uz?: unknown };
+          const channels = templateMeta(t.key)?.channels ?? [];
+          return {
+            key: t.key,
+            preview: typeof body.uz === 'string' ? body.uz.slice(0, 160) : '',
+            channels: channels.map((c) => (c === 'SMS' ? ('sms' as const) : ('telegram' as const))),
+          };
+        }),
       products: products.map((p) => {
         const name = (p.name ?? {}) as { uz?: unknown };
         return { id: p.id, slug: p.slug, name: typeof name.uz === 'string' ? name.uz : p.slug };
@@ -187,9 +195,22 @@ export class AdminAudiencesService {
     return this.audiences.preview(rules);
   }
 
+  /**
+   * A segment automation sends marketing: only marketing templates (cart reminders, review
+   * requests, admin `custom_*`) on a channel the template supports — never a service text such
+   * as `advice_received` or an OTP.
+   */
   private async assertTemplates(autoMessage: AudienceAutoMessage | null | undefined) {
-    const keys = [...new Set(autoMessage?.steps.map((s) => s.templateKey) ?? [])];
-    if (!keys.length) return;
+    const steps = autoMessage?.steps ?? [];
+    if (!steps.length) return;
+    for (const s of steps) {
+      const meta = templateMeta(s.templateKey);
+      if (!meta || meta.kind !== 'marketing')
+        throw new DomainError('AUDIENCE_TEMPLATE_NOT_MARKETING', { key: s.templateKey });
+      if (!meta.channels.includes(s.channel === 'sms' ? 'SMS' : 'TELEGRAM'))
+        throw new DomainError('AUDIENCE_TEMPLATE_NOT_MARKETING', { key: s.templateKey });
+    }
+    const keys = [...new Set(steps.map((s) => s.templateKey))];
     const found = await this.prisma.messageTemplate.count({ where: { key: { in: keys } } });
     if (found !== keys.length) throw new DomainError('AUDIENCE_TEMPLATE_NOT_FOUND');
   }

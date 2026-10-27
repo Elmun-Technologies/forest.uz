@@ -64,23 +64,18 @@ export const partnerListQuerySchema = z.object({
 export type PartnerListQuery = z.infer<typeof partnerListQuerySchema>;
 
 export const partnerStockQuerySchema = partnerListQuerySchema.extend({
-  /** Comma-separated SKUs (≤ 100); absent = all, paginated. */
+  /** Comma-separated SKUs (≤ 100), matched case-insensitively; absent = all, paginated. */
   sku: z
     .string()
     .trim()
     .max(4000)
     .optional()
-    .transform((v) =>
-      v
-        ? [
-            ...new Set(
-              v
-                .split(',')
-                .map((s) => s.trim().toUpperCase())
-                .filter(Boolean),
-            ),
-          ].slice(0, 100)
-        : undefined,
-    ),
+    .transform((v) => {
+      if (!v) return undefined;
+      const seen = new Map<string, string>();
+      for (const s of v.split(',').map((x) => x.trim()))
+        if (s && !seen.has(s.toLowerCase())) seen.set(s.toLowerCase(), s);
+      return [...seen.values()].slice(0, 100);
+    }),
 });
 export type PartnerStockQuery = z.infer<typeof partnerStockQuerySchema>;

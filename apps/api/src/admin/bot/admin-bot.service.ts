@@ -465,14 +465,18 @@ export class AdminBotService {
   }
 
   /**
-   * Operator reply: Telegram first (outside any transaction), then the message, status and audit
-   * in one transaction. A failed send writes nothing (`BOT_SEND_FAILED`).
+   * Operator reply: each part (text, product card) is one Telegram send followed by its own short
+   * transaction (message, status, audit) — never HTTP inside a transaction. When the text went
+   * out but the card failed, the text stays recorded and the error says so (`details.sent`), so a
+   * retry sends only the card. A reply to a CLOSED conversation lands in the chat's open one if
+   * there is one (one open conversation per chat), else reopens it.
    */
   async reply(actor: AuditActor, id: string, input: BotReplyInput, now = new Date()) {
-    const conv = await this.prisma.conversation.findUnique({ where: { id } });
-    if (!conv) throw new DomainError('BOT_CONVERSATION_NOT_FOUND');
-    if (conv.telegramChatId === 0n) throw new DomainError('BOT_SEND_FAILED');
+    const asked = await this.prisma.conversation.findUnique({ where: { id } });
+    if (!asked) throw new DomainError('BOT_CONVERSATION_NOT_FOUND');
+    if (asked.telegramChatId === 0n) throw new DomainError('BOT_SEND_FAILED');
     if (!(await this.gateway.config())) throw new DomainError('BOT_NOT_CONNECTED');
+    const conv = (asked.status === 'CLOSED' && (await this.openSibling(asked))) || asked;
     const locale = await this.chatLocale(conv.telegramChatId, conv.customerId);
     const staff = await this.prisma.staff.findUniqueOrThrow({
       where: { id: actor.staffId! },
@@ -481,82 +485,105 @@ export class AdminBotService {
     const operator = staff.name.split(/\s+/)[0] ?? staff.name;
     const product = input.product ? await this.productCard(input.product.variantId, locale) : null;
     if (input.product && !product) throw new DomainError('PRODUCT_NOT_FOUND');
-    try {
-      if (input.text)
+
+    const record = (part: 'text' | 'product', meta: Prisma.InputJsonValue) =>
+      this.prisma.$transaction(async (tx) => {
+        await tx.conversationMessage.create({
+          data: {
+            conversationId: conv.id,
+            fromCustomer: false,
+            staffId: actor.staffId,
+            text: part === 'text' ? input.text : null,
+            fileIds: [],
+            meta,
+            createdAt: new Date(),
+          },
+        });
+        await tx.conversation.update({
+          where: { id: conv.id },
+          data: {
+            // A complaint stays flagged until someone closes it.
+            status: conv.status === 'COMPLAINT' ? 'COMPLAINT' : 'ANSWERED',
+            lastMessageAt: now,
+            ...(conv.assigneeId ? {} : { assigneeId: actor.staffId }),
+          },
+        });
+        if (conv.customerId && part === 'text')
+          await tx.message.create({
+            data: {
+              customerId: conv.customerId,
+              channel: 'TELEGRAM',
+              body: input.text,
+              status: 'SENT',
+              sentAt: new Date(),
+              kind: 'service',
+              payload: { chatId: String(conv.telegramChatId) },
+            },
+          });
+        await this.audit.record(
+          actor,
+          {
+            action: 'bot.conversation.reply',
+            entity: 'Conversation',
+            entityId: conv.id,
+            after:
+              part === 'text'
+                ? { part, length: input.text.length }
+                : { part, product: product!.variantId },
+          },
+          tx,
+        );
+      });
+
+    let textSent = false;
+    if (input.text) {
+      try {
         await this.bot.send(conv.telegramChatId, {
           text: `<b>${html(`${operator} · ${copy(locale, 'specialist')}`)}</b>\n${html(input.text)}`,
         });
-      if (product) {
-        const button: BotButton = {
-          text: copy(locale, 'addToCart'),
-          url: this.links.addLinesUrl([{ variantId: product.variantId, qty: input.product!.qty }]),
-        };
+      } catch {
+        // Blocked bot, network, Telegram refusal: nothing is recorded, the operator retries.
+        throw new DomainError('BOT_SEND_FAILED');
+      }
+      await record('text', { operator });
+      textSent = true;
+    }
+    if (product) {
+      const button: BotButton = {
+        text: copy(locale, 'addToCart'),
+        url: this.links.addLinesUrl([{ variantId: product.variantId, qty: input.product!.qty }]),
+      };
+      try {
         await this.bot.send(conv.telegramChatId, {
           text: `<b>${html(product.name)}</b>${product.priceTiyin ? `\n${html(formatSoum(product.priceTiyin, locale))}` : ''}`,
           inline: [[button]],
           photoUrl: product.photoUrl,
         });
+      } catch {
+        throw new DomainError('BOT_SEND_FAILED', textSent ? { sent: 'text' } : undefined);
       }
-    } catch {
-      // Blocked bot, network, Telegram refusal: nothing is recorded, the operator retries.
-      throw new DomainError('BOT_SEND_FAILED');
-    }
-    await this.prisma.$transaction(async (tx) => {
-      const meta: Prisma.InputJsonValue = {
+      await record('product', {
         operator,
-        ...(product
-          ? {
-              product: {
-                variantId: product.variantId,
-                name: product.name,
-                priceSoum: product.priceTiyin ? tiyinToSoumInt(product.priceTiyin) : null,
-              },
-            }
-          : {}),
-      };
-      await tx.conversationMessage.create({
-        data: {
-          conversationId: id,
-          fromCustomer: false,
-          staffId: actor.staffId,
-          text: input.text || null,
-          fileIds: [],
-          meta,
-          createdAt: now,
+        product: {
+          variantId: product.variantId,
+          name: product.name,
+          priceSoum: product.priceTiyin ? tiyinToSoumInt(product.priceTiyin) : null,
         },
       });
-      await tx.conversation.update({
-        where: { id },
-        data: {
-          // A complaint stays flagged until someone closes it.
-          status: conv.status === 'COMPLAINT' ? 'COMPLAINT' : 'ANSWERED',
-          lastMessageAt: now,
-          ...(conv.assigneeId ? {} : { assigneeId: actor.staffId }),
-        },
-      });
-      if (conv.customerId && input.text)
-        await tx.message.create({
-          data: {
-            customerId: conv.customerId,
-            channel: 'TELEGRAM',
-            body: input.text,
-            status: 'SENT',
-            sentAt: now,
-            kind: 'service',
-          },
-        });
-      await this.audit.record(
-        actor,
-        {
-          action: 'bot.conversation.reply',
-          entity: 'Conversation',
-          entityId: id,
-          after: { length: input.text.length, product: product?.variantId ?? null },
-        },
-        tx,
-      );
+    }
+    return this.detail(conv.id);
+  }
+
+  /** Another not-closed conversation of the same chat (there is at most one). */
+  private async openSibling(conv: { id: string; telegramChatId: bigint }) {
+    return this.prisma.conversation.findFirst({
+      where: {
+        telegramChatId: conv.telegramChatId,
+        status: { not: 'CLOSED' },
+        id: { not: conv.id },
+      },
+      orderBy: { lastMessageAt: 'desc' },
     });
-    return this.detail(id);
   }
 
   private async chatLocale(chatId: bigint, customerId: string | null): Promise<Locale> {
@@ -624,9 +651,34 @@ export class AdminBotService {
   }
 
   async patch(actor: AuditActor, id: string, input: BotConversationPatchInput) {
+    let shownId = id;
     await this.prisma.$transaction(async (tx: Tx) => {
       const conv = await tx.conversation.findUnique({ where: { id } });
       if (!conv) throw new DomainError('BOT_CONVERSATION_NOT_FOUND');
+      // One open conversation per chat: reopening an old one while a newer is open shows that one.
+      if (input.status === 'OPEN' && conv.status === 'CLOSED') {
+        const open = await tx.conversation.findFirst({
+          where: {
+            telegramChatId: conv.telegramChatId,
+            status: { not: 'CLOSED' },
+            id: { not: id },
+          },
+        });
+        if (open && conv.telegramChatId !== 0n) {
+          shownId = open.id;
+          await this.audit.record(
+            actor,
+            {
+              action: 'bot.conversation.update',
+              entity: 'Conversation',
+              entityId: id,
+              after: { noop: true, openConversation: open.id },
+            },
+            tx,
+          );
+          return;
+        }
+      }
       if (input.assigneeId) {
         const s = await tx.staff.findUnique({ where: { id: input.assigneeId } });
         if (!s?.active || !hasPermission(s.role, 'bot.inbox'))
@@ -654,6 +706,6 @@ export class AdminBotService {
         tx,
       );
     });
-    return this.detail(id);
+    return this.detail(shownId);
   }
 }

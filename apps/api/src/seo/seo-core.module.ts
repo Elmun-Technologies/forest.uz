@@ -6,7 +6,14 @@ import { IndexNowService } from './indexnow.service';
 import { SearchQueriesService } from './search-queries.service';
 import { SeoEventsService } from './seo-events.service';
 import { SeoInventoryService } from './seo-inventory.service';
-import { INDEXNOW_FLUSH, QUERIES_SYNC, SEO_QUEUE, SITEMAP_REGENERATE } from './seo-queue';
+import { NotFoundLogService } from './not-found-log.service';
+import {
+  INDEXNOW_FLUSH,
+  NOT_FOUND_PRUNE,
+  QUERIES_SYNC,
+  SEO_QUEUE,
+  SITEMAP_REGENERATE,
+} from './seo-queue';
 import { SitemapService } from './sitemap.service';
 import { WebRevalidateService } from './web-revalidate.service';
 
@@ -17,6 +24,7 @@ export class SeoProcessor extends WorkerHost {
     private readonly sitemap: SitemapService,
     private readonly indexNow: IndexNowService,
     private readonly queries: SearchQueriesService,
+    private readonly notFound: NotFoundLogService,
   ) {
     super();
   }
@@ -29,6 +37,8 @@ export class SeoProcessor extends WorkerHost {
         return this.indexNow.flush();
       case QUERIES_SYNC:
         return this.queries.sync();
+      case NOT_FOUND_PRUNE:
+        return this.notFound.prune();
       default:
         return undefined;
     }
@@ -54,6 +64,11 @@ export class SeoScheduler implements OnApplicationBootstrap {
         { pattern: '40 5 * * *', tz: 'Asia/Tashkent' },
         { name: QUERIES_SYNC },
       );
+      await this.queue.upsertJobScheduler(
+        NOT_FOUND_PRUNE,
+        { pattern: '20 4 * * *', tz: 'Asia/Tashkent' },
+        { name: NOT_FOUND_PRUNE },
+      );
     } catch (e) {
       this.logger.warn(`schedule failed: ${String(e)}`);
     }
@@ -76,6 +91,7 @@ export class SeoScheduler implements OnApplicationBootstrap {
     SearchQueriesService,
     CwvService,
     SeoEventsService,
+    NotFoundLogService,
     SeoProcessor,
     SeoScheduler,
   ],

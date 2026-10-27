@@ -22,6 +22,9 @@ export interface DestinationSyncSummary {
   error?: string;
 }
 
+/** Prefix of a stored platform id whose two-step creation (Yandex confirm) is unfinished. */
+const UNCONFIRMED = 'unconfirmed:';
+
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 300);
 
 /**
@@ -48,7 +51,14 @@ export class DestinationsService {
         AND c."deletedAt" IS NULL AND c.phone IS NOT NULL AND ${consentGranted('ads')}`);
   }
 
-  async syncSegment(segmentId: string): Promise<DestinationSyncSummary[]> {
+  /**
+   * `removalsOnly`: used when the segment's refresh failed — membership is stale, but members who
+   * withdrew ads consent, were erased or changed phone must still leave the platforms.
+   */
+  async syncSegment(
+    segmentId: string,
+    opts: { removalsOnly?: boolean } = {},
+  ): Promise<DestinationSyncSummary[]> {
     const segment = await this.prisma.segment.findUnique({ where: { id: segmentId } });
     if (!segment) return [];
     const out: DestinationSyncSummary[] = [];
@@ -70,6 +80,7 @@ export class DestinationsService {
           externalId: state?.externalId ?? null,
           uploaded,
           desired: enabled ? (desired ?? []) : [],
+          removalsOnly: opts.removalsOnly ?? false,
         }),
       );
     }
@@ -85,6 +96,7 @@ export class DestinationsService {
       externalId: string | null;
       uploaded: { customerId: string; hash: string }[];
       desired: { customerId: string; phone: string }[];
+      removalsOnly: boolean;
     },
   ): Promise<DestinationSyncSummary> {
     const want = new Map<string, string>();
@@ -94,7 +106,6 @@ export class DestinationsService {
     }
     const have = new Map(input.uploaded.map((u) => [u.customerId, u.hash]));
     const add = [...want].filter(([id, h]) => have.get(id) !== h);
-    const remove = [...have].filter(([id, h]) => want.get(id) !== h);
 
     const save = (
       status: SegmentSyncStatus,
@@ -130,50 +141,70 @@ export class DestinationsService {
     const provider = await this.ads.audience(destination);
     if (!provider) {
       // Not connected: nothing can be sent or removed; keep the mirror as it is.
-      await save(input.enabled ? 'not_connected' : 'off', {});
+      if (!input.removalsOnly) await save(input.enabled ? 'not_connected' : 'off', {});
       return summary(input.enabled ? 'not_connected' : 'off');
     }
     let externalId = input.externalId;
+    let added = 0;
+    let removed = 0;
     try {
-      if (input.enabled && !externalId) {
+      if (input.enabled && !externalId && !input.removalsOnly) {
         if (want.size < AD_DESTINATION_MIN_CREATE[destination]) {
           await save('too_small', {});
           return summary('too_small');
         }
-        externalId = await provider.create(
+        const created = await provider.create(
           name,
           add.map(([, h]) => h),
         );
-        // Stored at once: a later failure must not create a second audience.
+        // Stored before any further call: a later failure continues on this audience next time
+        // instead of creating another one.
+        externalId = provider.confirm ? `${UNCONFIRMED}${created.id}` : created.id;
         await save('pending', { externalId });
-        await this.record(segmentId, destination, add, []);
-        for (const [id, h] of add) have.set(id, h);
-      } else if (externalId) {
-        if (remove.length) {
-          await provider.remove(externalId, [...new Set(remove.map(([, h]) => h))]);
-          await this.record(segmentId, destination, [], remove);
-          for (const [id] of remove) have.delete(id);
-        }
-        if (add.length) {
-          await provider.add(
-            externalId,
-            add.map(([, h]) => h),
-          );
+        if (created.seeded) {
           await this.record(segmentId, destination, add, []);
           for (const [id, h] of add) have.set(id, h);
+          added += add.length;
+        }
+      }
+      if (externalId?.startsWith(UNCONFIRMED) && provider.confirm) {
+        const id = externalId.slice(UNCONFIRMED.length);
+        await provider.confirm(id, name);
+        externalId = id;
+        await this.prisma.segmentDestination.update({
+          where: { segmentId_destination: { segmentId, destination } },
+          data: { externalId },
+        });
+      }
+      if (externalId && !externalId.startsWith(UNCONFIRMED)) {
+        const toRemove = [...have].filter(([id, h]) => want.get(id) !== h);
+        if (toRemove.length) {
+          await provider.remove(externalId, [...new Set(toRemove.map(([, h]) => h))]);
+          await this.record(segmentId, destination, [], toRemove);
+          for (const [id] of toRemove) have.delete(id);
+          removed += toRemove.length;
+        }
+        const toAdd = input.removalsOnly ? [] : [...want].filter(([id, h]) => have.get(id) !== h);
+        if (toAdd.length) {
+          await provider.add(
+            externalId,
+            toAdd.map(([, h]) => h),
+          );
+          await this.record(segmentId, destination, toAdd, []);
+          for (const [id, h] of toAdd) have.set(id, h);
+          added += toAdd.length;
         }
       }
       const status: SegmentSyncStatus = input.enabled ? 'ok' : 'off';
       await this.prisma.segmentDestination.update({
         where: { segmentId_destination: { segmentId, destination } },
-        data: { status, members: have.size, lastError: null, lastSyncAt: new Date() },
+        // A removal-only pass (refresh failed) keeps the status the last full sync set.
+        data: input.removalsOnly
+          ? { members: have.size }
+          : { status, members: have.size, lastError: null, lastSyncAt: new Date() },
       });
-      await this.log(destination, true, segmentId, add.length, remove.length);
-      return summary(status, {
-        added: add.length,
-        removed: input.externalId ? remove.length : 0,
-        members: have.size,
-      });
+      await this.log(destination, true, segmentId, added, removed);
+      return summary(status, { added, removed, members: have.size });
     } catch (e) {
       const error = errorText(e);
       this.logger.warn(`segment ${segmentId} → ${destination}: ${error}`);
@@ -189,7 +220,7 @@ export class DestinationsService {
         },
         update: { status: 'error', members: have.size, lastError: error },
       });
-      await this.log(destination, false, segmentId, add.length, remove.length, error);
+      await this.log(destination, false, segmentId, added, removed, error);
       return summary('error', { error, members: have.size });
     }
   }

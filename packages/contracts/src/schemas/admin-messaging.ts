@@ -31,7 +31,14 @@ const templateFields = {
   active: z.boolean(),
 };
 
-export const messageTemplateUpdateSchema = z.object(templateFields);
+/**
+ * Edits: with a changed body, `smsApproved` is stored only when `smsReapproved` is also true —
+ * staff explicitly attest that the NEW wording is approved in Eskiz (the UI sets it when the box
+ * is ticked after the text changed). Otherwise a changed text loses its approval.
+ */
+const updateFields = { ...templateFields, smsReapproved: z.boolean().default(false) };
+
+export const messageTemplateUpdateSchema = z.object(updateFields);
 export type MessageTemplateUpdateInput = z.infer<typeof messageTemplateUpdateSchema>;
 
 export const messageTemplateCreateSchema = z.object({

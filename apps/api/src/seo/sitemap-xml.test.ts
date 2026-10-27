@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { defaultRobots, normalizeRobots } from './robots';
 import { buildSitemaps } from './sitemap-xml';
 import {
+  contextKey,
   isRevalidateTag,
-  revalidateKey,
-  signRevalidate,
-  verifyRevalidate,
-} from './revalidate-signature';
+  signWeb,
+  verifyWeb,
+  WEB_CONTEXTS,
+  webSharedSecret,
+} from './web-signature';
 
 describe('buildSitemaps', () => {
   const at = new Date('2026-10-20T10:00:00Z');
@@ -32,6 +34,9 @@ describe('buildSitemaps', () => {
       '<loc>https://forest.uz/sitemaps/uz-products.xml</loc><lastmod>2026-10-20T10:00:00.000Z</lastmod>',
     );
     expect(index).not.toContain('categories');
+    // Empty files are still written (no rebuild per request), just not listed.
+    expect(built.files.get('uz-categories.xml')).toMatch(/<urlset [^>]*>\n<\/urlset>/);
+    expect(built.files.size).toBe(7);
   });
 
   it('lists hreflang alternates with x-default = uz', () => {
@@ -69,18 +74,29 @@ describe('robots', () => {
   });
 });
 
-describe('revalidate signature', () => {
-  const key = revalidateKey(Buffer.alloc(32, 7).toString('base64'));
+describe('web signatures (shared secret, one key per purpose)', () => {
+  const secret = webSharedSecret({
+    NODE_ENV: 'production',
+    WEB_REVALIDATE_SECRET: 's'.repeat(40),
+    APP_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
+  })!;
+  const key = contextKey(secret, WEB_CONTEXTS.revalidate);
   it('verifies its own signatures within the clock skew only', () => {
     const body = '{"tags":["product:x"]}';
-    const sig = signRevalidate(key, body, 1_000_000);
-    expect(verifyRevalidate(key, sig, body, 1_000_100)).toBe(true);
-    expect(verifyRevalidate(key, sig, body, 1_000_400)).toBe(false);
-    expect(verifyRevalidate(key, sig, '{"tags":["settings"]}', 1_000_000)).toBe(false);
-    expect(
-      verifyRevalidate(revalidateKey(Buffer.alloc(32, 8).toString('base64')), sig, body, 1_000_000),
-    ).toBe(false);
-    expect(verifyRevalidate(key, 'garbage', body, 1_000_000)).toBe(false);
+    const sig = signWeb(key, body, 1_000_000);
+    expect(verifyWeb(key, sig, body, 1_000_100)).toBe(true);
+    expect(verifyWeb(key, sig, body, 1_000_400)).toBe(false);
+    expect(verifyWeb(key, sig, '{"tags":["settings"]}', 1_000_000)).toBe(false);
+    expect(verifyWeb(contextKey(secret, WEB_CONTEXTS.notFound), sig, body, 1_000_000)).toBe(false);
+    expect(verifyWeb(key, 'garbage', body, 1_000_000)).toBe(false);
+    expect(verifyWeb(null, sig, body, 1_000_000)).toBe(false);
+  });
+  it('fails closed in production without the secret; dev/test derive one', () => {
+    const appKey = Buffer.alloc(32, 7).toString('base64');
+    expect(webSharedSecret({ NODE_ENV: 'production', APP_ENCRYPTION_KEY: appKey })).toBeNull();
+    const dev = webSharedSecret({ NODE_ENV: 'development', APP_ENCRYPTION_KEY: appKey });
+    expect(dev).toEqual(webSharedSecret({ NODE_ENV: 'test', APP_ENCRYPTION_KEY: appKey }));
+    expect(dev?.length).toBe(32);
   });
   it('accepts only storefront tag shapes', () => {
     expect(isRevalidateTag('product:chalk-white')).toBe(true);

@@ -33,6 +33,11 @@ export const MESSAGING_ERROR_MESSAGES = {
     uz: 'Bu shablon auditoriya avtomatik xabarida ishlatilmoqda. Avval auditoriyadan olib tashlang.',
     ru: 'Шаблон используется в автосообщении аудитории. Сначала уберите его оттуда.',
   },
+  MESSAGING_SETTINGS_UNSAFE: {
+    http: 400,
+    uz: "Tungi soatlar kamida 8 soat bo'lsin. Egasidan boshqa xodimlar faqat 21:00–09:00 oralig'ini kengaytira oladi va kuniga 2 tadan ortiq reklama xabarini yoqa olmaydi.",
+    ru: 'Тихие часы — не меньше 8 часов. Сотрудники (кроме владельца) могут только расширить окно 21:00–09:00 и не более 2 рекламных сообщений в день.',
+  },
   UNSUBSCRIBE_INVALID: {
     http: 400,
     uz: "Havola eskirgan yoki noto'g'ri. Kabinet → Bildirishnomalar bo'limida o'chirishingiz mumkin.",

@@ -1,6 +1,9 @@
-import { Body, HttpCode, Post } from '@nestjs/common';
+import { Body, Get, HttpCode, Post, Put } from '@nestjs/common';
 import {
+  type AiDraftStatusDto,
   type AiProductDescriptionDraftDto,
+  type AiSettingsInput,
+  aiSettingsSchema,
   type AiProductDraftInput,
   aiProductDraftSchema,
   type AiReplyDraftDto,
@@ -41,6 +44,23 @@ export class AdminAiController {
     @Actor() actor: AuditActor,
   ): Promise<AiSeoDraftDto> {
     return this.ai.seo(actor, body.path);
+  }
+
+  /** Any staff: whether the AI buttons can work (no secrets). */
+  @Get('status')
+  @RequirePermissions('dashboard.view')
+  status(): Promise<AiDraftStatusDto> {
+    return this.ai.status();
+  }
+
+  /** Owner (`integrations.keys`): operator reply drafts on/off — off by default (data leaves UZ). */
+  @Put('settings')
+  @RequirePermissions('integrations.view', 'integrations.keys')
+  settings(
+    @Body(new ZodPipe(aiSettingsSchema)) body: AiSettingsInput,
+    @Actor() actor: AuditActor,
+  ): Promise<AiDraftStatusDto> {
+    return this.ai.setReplyDrafts(actor, body.replyDrafts);
   }
 
   @Post('reply')

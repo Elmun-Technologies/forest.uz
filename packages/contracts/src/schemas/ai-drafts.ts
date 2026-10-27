@@ -24,3 +24,7 @@ export const aiReplyDraftSchema = z.object({
   locale: z.enum(['uz', 'ru']).optional(),
 });
 export type AiReplyDraftInput = z.infer<typeof aiReplyDraftSchema>;
+
+/** Owner setting for operator reply drafts (audited). */
+export const aiSettingsSchema = z.object({ replyDrafts: z.boolean() });
+export type AiSettingsInput = z.infer<typeof aiSettingsSchema>;

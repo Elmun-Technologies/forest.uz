@@ -103,11 +103,14 @@ export class PartnerService {
     const rows = await this.prisma.variant.findMany({
       where: {
         product: { status: 'ACTIVE' },
-        ...(q.sku ? { sku: { in: q.sku } } : {}),
+        // SKUs are matched case-insensitively (MoySklad codes may be mixed case).
+        ...(q.sku
+          ? { OR: q.sku.map((sku) => ({ sku: { equals: sku, mode: 'insensitive' as const } })) }
+          : {}),
         ...(after ? { id: { gt: after } } : {}),
       },
       orderBy: { id: 'asc' },
-      take: q.sku ? q.sku.length : q.limit + 1,
+      take: q.sku ? 200 : q.limit + 1,
       select: { id: true, sku: true, stock: true, reserved: true, active: true, updatedAt: true },
     });
     const page = q.sku ? rows : rows.slice(0, q.limit);

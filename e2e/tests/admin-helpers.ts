@@ -8,7 +8,7 @@ import {
   expect,
   type Page,
 } from '@playwright/test';
-import { API } from './helpers';
+import { API, devHeaders } from './helpers';
 
 /** Admin app origin (Next dev server or production build). */
 export const ADMIN = process.env.ADMIN_URL ?? 'http://localhost:3001';
@@ -57,7 +57,10 @@ export async function devTotp(request: APIRequestContext, email: string): Promis
   await expect
     .poll(
       async () => {
-        const res = await request.post(`${API}/v1/dev/admin-totp`, { data: { email } });
+        const res = await request.post(`${API}/v1/dev/admin-totp`, {
+          data: { email },
+          headers: devHeaders(),
+        });
         if (res.status() === 429) return '';
         expect(res.ok(), await res.text()).toBe(true);
         code = ((await res.json()) as { code: string }).code;

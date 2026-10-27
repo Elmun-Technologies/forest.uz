@@ -9,7 +9,8 @@ import {
   type TemplateButton,
   tashkentDayStart,
   templateMeta,
-  withSmsOptOut,
+  OPT_OUT_VARIABLE,
+  templateVariables,
 } from '@forest/contracts';
 import { Prisma, type Message, type MessageStatus } from '@forest/db';
 import { ENV } from '../config/config.module';
@@ -187,8 +188,22 @@ export class MessageDispatcher {
       break;
     }
 
-    let body = renderTemplate(t(template.body as { uz: string; ru: string }, locale), input.vars);
-    if (body === null) skip = { status: 'SKIPPED', reason: 'missing variable' };
+    const text = t(template.body as { uz: string; ru: string }, locale);
+    // Marketing: the opt-out link is the template's own `{stop}` slot (the approved SMS text).
+    const vars =
+      kind === 'marketing' && customer && channel
+        ? {
+            ...input.vars,
+            [OPT_OUT_VARIABLE]: unsubscribeUrl(
+              this.env.APP_URL,
+              locale,
+              this.unsubscribe.tokenFor(channel, customer.publicId),
+            ),
+          }
+        : input.vars;
+    const body = renderTemplate(text, vars);
+    // A missing variable matters only for a usable channel (else the channel's reason stands).
+    if (channel && body === null) skip = { status: 'SKIPPED', reason: 'missing variable' };
     const payload: MessagePayload = {
       locale,
       ...(input.orderId ? { orderId: input.orderId } : {}),
@@ -197,7 +212,17 @@ export class MessageDispatcher {
     };
     if (channel && body !== null) {
       skip = null;
-      if (channel === 'TELEGRAM') {
+      if (
+        channel === 'SMS' &&
+        kind === 'marketing' &&
+        !templateVariables(text).includes(OPT_OUT_VARIABLE)
+      ) {
+        this.warnOnce(
+          `nostop:${template.key}`,
+          `marketing SMS "${template.key}" has no {stop} opt-out slot: SMS skipped`,
+        );
+        skip = { status: 'SKIPPED', reason: 'no opt-out slot' };
+      } else if (channel === 'TELEGRAM') {
         const buttons = this.buttons(template.buttons, locale, input.vars);
         if (kind === 'marketing')
           buttons.push([
@@ -209,16 +234,6 @@ export class MessageDispatcher {
         if (buttons.length) payload.buttons = buttons;
         if (input.photoUrl) payload.photoUrl = input.photoUrl;
         if (input.flow) payload.flow = input.flow;
-      } else if (kind === 'marketing' && customer) {
-        body = withSmsOptOut(
-          body,
-          locale,
-          unsubscribeUrl(
-            this.env.APP_URL,
-            locale,
-            this.unsubscribe.tokenFor('SMS', customer.publicId),
-          ),
-        );
       }
     }
 

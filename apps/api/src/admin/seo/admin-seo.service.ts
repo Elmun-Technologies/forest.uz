@@ -280,11 +280,27 @@ export class AdminSeoService {
 
   // ───────── per-page meta ─────────
 
-  async saveMeta(actor: AuditActor, input: SeoMetaInput): Promise<AdminSeoPageDto> {
+  /**
+   * `canExternal` = the actor holds `seo.canonical_external` (Owner/Manager): a canonical to
+   * another host moves the page's ranking away, so Marketers may only keep an existing one.
+   */
+  async saveMeta(
+    actor: AuditActor,
+    input: SeoMetaInput,
+    canExternal: boolean,
+  ): Promise<AdminSeoPageDto> {
     const inventory = await this.inventory.pages();
     const page = inventory.find((p) => p.path === input.path && p.locales.includes(input.locale));
     if (!page) throw new DomainError('SEO_PAGE_UNKNOWN', undefined, 'path');
     const canonical = input.canonical ? this.canonical(input.canonical) : null;
+    if (canonical && !canonical.startsWith('/') && !canExternal) {
+      const current = await this.prisma.seoMeta.findUnique({
+        where: { path_locale: { path: input.path, locale: input.locale } },
+        select: { canonical: true },
+      });
+      if (current?.canonical !== canonical)
+        throw new DomainError('SEO_CANONICAL_EXTERNAL_FORBIDDEN', undefined, 'canonical');
+    }
     if (input.ogImageId) {
       const file = await this.prisma.file.findUnique({ where: { id: input.ogImageId } });
       if (!file?.isPublic || !/^image\//.test(file.mime))
@@ -327,20 +343,31 @@ export class AdminSeoService {
     return pages.find((p) => p.path === input.path && p.locale === input.locale)!;
   }
 
-  /** Same-site path (`/uz/…`) or an absolute https URL. */
+  /**
+   * Same-site path (`/uz/…`; an https URL on our own host is stored as its path) or an https URL
+   * on another host. `http://` is refused everywhere — a canonical must never downgrade.
+   */
   private canonical(input: string): string {
+    const invalid = () => new DomainError('SEO_CANONICAL_INVALID', undefined, 'canonical');
     if (input.startsWith('/')) {
       const path = normalizePath(input);
-      if (!path) throw new DomainError('SEO_CANONICAL_INVALID', undefined, 'canonical');
+      if (!path) throw invalid();
       return path;
     }
+    let u: URL;
     try {
-      const u = new URL(input);
-      if (u.protocol !== 'https:' && u.host !== this.siteHost) throw new Error('scheme');
-      return u.toString();
+      u = new URL(input);
     } catch {
-      throw new DomainError('SEO_CANONICAL_INVALID', undefined, 'canonical');
+      throw invalid();
     }
+    if (u.protocol !== 'https:' || !u.hostname.includes('.') || u.username || u.password)
+      throw invalid();
+    if (u.host === this.siteHost) {
+      const path = normalizePath(u.pathname);
+      if (!path) throw invalid();
+      return path;
+    }
+    return u.toString();
   }
 
   // ───────── redirects & 404 ─────────

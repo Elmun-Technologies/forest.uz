@@ -24,6 +24,7 @@ import type { Request, Response } from 'express';
 import { z, type ZodType } from 'zod';
 import { paymeParseErrorResponse } from '../integrations/providers/payme';
 import { maskPhonesInText } from './redact';
+import { reportServerError } from './error-reporting';
 
 export function requestLocale(req: Request): Locale {
   const q = req.query?.locale;
@@ -114,6 +115,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
       );
       body = { error: { code: 'INTERNAL', message: errorMessage('INTERNAL', locale) } };
     }
+    // Monitoring sees server faults only (4xx are expected client outcomes).
+    if (status >= 500) reportServerError(exception, req, status);
     res.status(status).json(body);
   }
 }

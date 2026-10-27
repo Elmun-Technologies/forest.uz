@@ -59,7 +59,9 @@ export class StartLinksService {
     if (signed?.kind === 'lead') return { ...none, source: signed.src };
     if (signed?.kind === 'order') return { ...none, source: 'order', orderToken: signed.token };
     if (signed?.kind === 'ref') {
-      const raw = await this.redis.get(`tg:ref:${signed.id}`).catch(() => null);
+      // Single use: the first chat that opens the link owns the visit; a forwarded or reopened
+      // link is a plain start from the site (no visitor to stitch).
+      const raw = await this.redis.getdel(`tg:ref:${signed.id}`).catch(() => null);
       if (!raw) return { ...none, source: 'site' };
       try {
         const v = JSON.parse(raw) as { src?: string; aid?: string };

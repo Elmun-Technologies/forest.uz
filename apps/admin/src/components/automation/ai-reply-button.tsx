@@ -1,13 +1,14 @@
 'use client';
 
-import type { AiReplyDraftDto } from '@forest/contracts/core';
+import type { AiDraftStatusDto, AiReplyDraftDto } from '@forest/contracts/core';
 import { Button } from '@forest/ui';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminFetch, errorText } from '../../lib/client-api';
 
 /**
  * Bot inbox: "AI qoralama" (CLAUDE.md §6) — asks for a reply draft and hands it to the reply box.
- * Nothing is sent: the operator reads, edits and presses "Yuborish".
+ * Nothing is sent: the operator reads, edits and presses "Yuborish". Shown only when the Owner
+ * switched reply drafts on, with a warning that the customer's message goes to Anthropic.
  */
 export function AiReplyButton({
   conversationId,
@@ -20,6 +21,17 @@ export function AiReplyButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    adminFetch<AiDraftStatusDto>('/admin/ai/status')
+      .then((s) => live && setEnabled(s.available && s.replyDrafts))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, []);
 
   async function draft() {
     setBusy(true);
@@ -40,6 +52,7 @@ export function AiReplyButton({
     }
   }
 
+  if (!enabled) return null;
   return (
     <>
       <Button
@@ -53,6 +66,9 @@ export function AiReplyButton({
       >
         ✦ AI qoralama
       </Button>
+      <span className="text-[12px] text-warn" data-testid="inbox-ai-warning">
+        Diqqat: mijozning oxirgi xabari qoralama uchun Anthropic (AQSh) serveriga yuboriladi.
+      </span>
       {note ? (
         <span role="status" className="text-[12px] text-muted">
           {note}

@@ -159,11 +159,13 @@ export class WebhooksAdminService {
 
   async create(actor: AuditActor, input: WebhookCreateInput): Promise<WebhookSecretDto> {
     const url = await this.url(input.url);
-    if ((await this.prisma.webhookEndpoint.count()) >= WEBHOOK_POLICY.maxEndpoints)
-      throw new DomainError('WEBHOOK_LIMIT');
     const id = `wh${randomBytes(12).toString('hex')}`;
     const secret = newWebhookSecret();
     await this.prisma.$transaction(async (tx) => {
+      // Serialises concurrent creates so the endpoint cap can't be overshot.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('webhook.create'))`;
+      if ((await tx.webhookEndpoint.count()) >= WEBHOOK_POLICY.maxEndpoints)
+        throw new DomainError('WEBHOOK_LIMIT');
       const row = await tx.webhookEndpoint.create({
         data: {
           id,
@@ -199,6 +201,9 @@ export class WebhooksAdminService {
       await tx.$queryRaw`SELECT "id" FROM "WebhookEndpoint" WHERE "id" = ${id} FOR UPDATE`;
       const before = await tx.webhookEndpoint.findUnique({ where: { id } });
       if (!before) throw new DomainError('NOT_FOUND');
+      // Rows migrated from the pre-Phase-5 shape have no sealed secret yet: rotate first.
+      if (input.active === true && !before.secretLast4)
+        throw new DomainError('VALIDATION_FAILED', { rotateSecret: true }, 'active');
       const data: Prisma.WebhookEndpointUpdateInput = {
         ...(input.name !== undefined ? { name: input.name } : {}),
         ...(url !== undefined ? { url } : {}),

@@ -3,6 +3,7 @@ import { isOperatorHours, type StaffRole } from '@forest/contracts';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Update } from 'grammy/types';
 import request from 'supertest';
+import { BotSubscribersService } from '../src/bot/bot-subscribers.service';
 import { BotService, BotUnreachableError } from '../src/bot/bot.service';
 import { CartLinkService } from '../src/bot/cart-link.service';
 import { fakeUpdates, type FakeTelegramTransport } from '../src/bot/fake-telegram';
@@ -175,13 +176,16 @@ describe('Telegram bot flows 1–5 with the fake transport (integration)', () =>
 
   afterAll(async () => {
     const ids = chats.map((c) => BigInt(c));
-    const convs = await prisma.conversation.findMany({ where: { telegramChatId: { in: ids } } });
+    const convWhere = {
+      OR: [{ telegramChatId: { in: ids } }, { customerId: { in: customerIds } }],
+    };
+    const convs = await prisma.conversation.findMany({ where: convWhere });
     const fileIds = (
       await prisma.conversationMessage.findMany({
         where: { conversationId: { in: convs.map((c) => c.id) } },
       })
     ).flatMap((m) => m.fileIds);
-    await prisma.conversation.deleteMany({ where: { telegramChatId: { in: ids } } });
+    await prisma.conversation.deleteMany({ where: convWhere });
     const reviews = await prisma.review.findMany({ where: { customerId: { in: customerIds } } });
     await prisma.review.deleteMany({ where: { customerId: { in: customerIds } } });
     await prisma.file.deleteMany({
@@ -286,7 +290,7 @@ describe('Telegram bot flows 1–5 with the fake transport (integration)', () =>
         await prisma.message.count({
           where: { customerId: customer.id, templateKey: 'lead_welcome' },
         }),
-      ).toBe(0); // welcome went before the phone (no customer yet) — recorded without one
+      ).toBe(1); // sent before the phone, attached to the customer when it was shared
     });
   });
 
@@ -668,6 +672,172 @@ describe('Telegram bot flows 1–5 with the fake transport (integration)', () =>
         (await mk.send('put', '/v1/admin/bot/rules', { complaintKeywords: ['x1'], version: 'old' }))
           .body.error.code,
       ).toBe('SETTINGS_CONFLICT');
+    });
+  });
+
+  describe('review fixes: consent, forwarded links, erasure, photos, replies, retries', () => {
+    let owner: AdminClient;
+    const latestTelegramConsent = (customerId: string) =>
+      prisma.consent.findFirst({
+        where: { customerId, channel: 'TELEGRAM' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      });
+
+    beforeAll(async () => {
+      owner = (await signedIn(app, 'OWNER')).client;
+    });
+
+    it('sharing a phone never re-subscribes an earlier opt-out', async () => {
+      // Opted out elsewhere (cabinet) before ever using the bot.
+      const phone = nextPhone();
+      const c = await prisma.customer.create({ data: { phone } });
+      customerIds.push(c.id);
+      await prisma.consent.create({
+        data: { customerId: c.id, channel: 'TELEGRAM', granted: false, source: 'cabinet' },
+      });
+      const a = chat();
+      await post(fakeUpdates.text(a, '/start')).expect(200);
+      await post(fakeUpdates.contact(a, phone.slice(1))).expect(200);
+      expect((await latestTelegramConsent(c.id))?.granted).toBe(false);
+
+      // `/stop` before the phone: the opt-out is carried over to the new customer.
+      const b = chat();
+      const phoneB = nextPhone();
+      await post(fakeUpdates.text(b, '/start')).expect(200);
+      await post(fakeUpdates.text(b, '/stop')).expect(200);
+      await post(fakeUpdates.contact(b, phoneB.slice(1))).expect(200);
+      const cb = await prisma.customer.findUniqueOrThrow({ where: { phone: phoneB } });
+      customerIds.push(cb.id);
+      expect(await latestTelegramConsent(cb.id)).toMatchObject({ granted: false, source: 'bot' });
+      expect(
+        (await prisma.botSubscriber.findUniqueOrThrow({ where: { telegramId: BigInt(b) } }))
+          .stoppedAt,
+      ).not.toBeNull();
+    });
+
+    it('/start with a payload after /stop does not re-subscribe; a plain /start does', async () => {
+      const { chatId, customerId } = await linkedCustomer();
+      await post(fakeUpdates.text(chatId, '/stop')).expect(200);
+      await post(fakeUpdates.text(chatId, '/start site')).expect(200);
+      expect((await latestTelegramConsent(customerId))?.granted).toBe(false);
+      await post(fakeUpdates.text(chatId, '/start')).expect(200);
+      expect((await latestTelegramConsent(customerId))?.granted).toBe(true);
+    });
+
+    it('a forwarded start link does not stitch the visitor to someone else', async () => {
+      const aid = randomBytes(18).toString('base64url');
+      const link = await http()
+        .post('/v1/bot/start-link')
+        .set('X-Forwarded-For', nextTestIp())
+        .set('Cookie', `fr_aid=${aid}`)
+        .send({ src: 'site' })
+        .expect(200);
+      const payload = new URL(link.body.url as string).searchParams.get('start')!;
+      const first = chat();
+      await post(fakeUpdates.text(first, `/start ${payload}`)).expect(200);
+      // The same link opened by another person (forwarded): single use, no visitor.
+      const second = chat();
+      const phone = nextPhone();
+      await post(fakeUpdates.text(second, `/start ${payload}`)).expect(200);
+      await post(fakeUpdates.contact(second, phone.slice(1))).expect(200);
+      const c = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+      customerIds.push(c.id);
+      expect(
+        (await prisma.visitor.findUnique({ where: { anonymousId: aid } }))?.customerId ?? null,
+      ).toBeNull();
+    });
+
+    it('erasure removes the chat history from before the phone, subscriber rows and state', async () => {
+      const chatId = chat();
+      fake.addFile(`er-${chatId}`, jpeg());
+      await post(fakeUpdates.text(chatId, '/start')).expect(200);
+      await post(fakeUpdates.photo(chatId, `er-${chatId}`, 'Mening divanim')).expect(200);
+      const phone = nextPhone();
+      await post(fakeUpdates.contact(chatId, phone.slice(1))).expect(200);
+      const c = await prisma.customer.findUniqueOrThrow({ where: { phone } });
+      customerIds.push(c.id);
+      // Conversation and bot replies from before the phone joined the customer.
+      const conv = await prisma.conversation.findFirstOrThrow({
+        where: { telegramChatId: BigInt(chatId) },
+        include: { messages: true },
+      });
+      expect(conv.customerId).toBe(c.id);
+      expect(
+        await prisma.message.count({ where: { customerId: c.id, templateKey: 'lead_welcome' } }),
+      ).toBe(1);
+      const photoId = conv.messages[0]!.fileIds[0]!;
+
+      const res = await owner.post(`/v1/admin/customers/${c.id}/erase`, { confirm: c.publicId });
+      expect(res.status).toBe(200);
+      const after = await prisma.conversation.findUniqueOrThrow({
+        where: { id: conv.id },
+        include: { messages: true },
+      });
+      expect(after.telegramChatId).toBe(0n);
+      expect(after.messages.every((m) => m.text === null && m.fileIds.length === 0)).toBe(true);
+      expect(await prisma.file.findUnique({ where: { id: photoId } })).toBeNull();
+      expect(
+        await prisma.botSubscriber.findUnique({ where: { telegramId: BigInt(chatId) } }),
+      ).toBeNull();
+      expect(await prisma.message.count({ where: { customerId: c.id, NOT: { body: '' } } })).toBe(
+        0,
+      );
+    });
+
+    it('rejecting (or withdrawing consent) makes published bot photos private again', async () => {
+      const { chatId, customerId, phone } = await linkedCustomer();
+      const order = await deliveredOrder(customerId, phone);
+      await post(fakeUpdates.callback(chatId, `rv:${order.id}:5`)).expect(200);
+      fake.addFile(`pub-${chatId}`, jpeg());
+      await post(fakeUpdates.photo(chatId, `pub-${chatId}`)).expect(200);
+      const review = await prisma.review.findFirstOrThrow({ where: { orderId: order.id } });
+      await post(fakeUpdates.callback(chatId, `rc:${review.id}:1`)).expect(200);
+      await owner.send('patch', `/v1/admin/reviews/${review.id}/status`, { status: 'APPROVED' });
+      const withPhoto = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
+      const file = await prisma.file.findUniqueOrThrow({
+        where: { id: withPhoto.photoFileIds[0]! },
+      });
+      expect(file.isPublic).toBe(true);
+      expect(files.objects.has(`pub:${file.key}`)).toBe(true);
+      await owner.send('patch', `/v1/admin/reviews/${review.id}/status`, { status: 'REJECTED' });
+      const back = await prisma.file.findUniqueOrThrow({ where: { id: file.id } });
+      expect(back.isPublic).toBe(false);
+      expect(files.objects.has(`pub:${file.key}`)).toBe(false);
+      expect(files.objects.has(`priv:${file.key}`)).toBe(true);
+    });
+
+    it('a reply to a closed conversation lands in the open one; reopening shows it', async () => {
+      const { chatId } = await linkedCustomer();
+      await post(fakeUpdates.text(chatId, 'Birinchi savol')).expect(200);
+      const first = await prisma.conversation.findFirstOrThrow({
+        where: { telegramChatId: BigInt(chatId) },
+      });
+      await owner.send('patch', `/v1/admin/bot/conversations/${first.id}`, { status: 'CLOSED' });
+      await post(fakeUpdates.text(chatId, 'Ikkinchi savol')).expect(200);
+      const reply = await owner.post(`/v1/admin/bot/conversations/${first.id}/reply`, {
+        text: 'Javob',
+      });
+      expect(reply.status).toBe(201);
+      expect(reply.body.id).not.toBe(first.id);
+      expect(reply.body.status).toBe('ANSWERED');
+      const reopen = await owner.send('patch', `/v1/admin/bot/conversations/${first.id}`, {
+        status: 'OPEN',
+      });
+      expect(reopen.body.id).toBe(reply.body.id);
+      expect(
+        (await prisma.conversation.findUniqueOrThrow({ where: { id: first.id } })).status,
+      ).toBe('CLOSED');
+    });
+
+    it('a failing handler answers 500 and the retried update is processed', async () => {
+      const chatId = chat();
+      const subs = app.get(BotSubscribersService);
+      const spy = vi.spyOn(subs, 'touch').mockRejectedValueOnce(new Error('db hiccup'));
+      const update = fakeUpdates.text(chatId, '/yordam');
+      await post(update).expect(500);
+      spy.mockRestore();
+      await post(update).expect(200);
+      expect(fake.sent(chatId)).toHaveLength(1);
     });
   });
 });

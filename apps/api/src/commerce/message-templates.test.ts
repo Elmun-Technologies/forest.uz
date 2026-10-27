@@ -6,6 +6,11 @@ const MIGRATIONS = path.resolve(__dirname, '../../../../packages/db/prisma/migra
 const MIGRATION = path.join(MIGRATIONS, '20261027120000_message_templates_backfill/migration.sql');
 /** Phase 5B: automation/bot templates, with the `active` and `smsApproved` columns. */
 const MIGRATION_5B = path.join(MIGRATIONS, '20261027161000_messaging_automation/migration.sql');
+/** Follow-up: `{stop}` opt-out slot written into the marketing SMS texts (UPDATE … WHERE body = old). */
+const MIGRATION_5B_STOP = path.join(
+  MIGRATIONS,
+  '20261027161001_messaging_optout_slot/migration.sql',
+);
 
 interface Row {
   key: string;
@@ -44,15 +49,31 @@ function migration5bRows(): Row[] {
     'g',
   );
   const un = (s: string) => s.replace(/''/g, "'");
-  return [...sql.matchAll(row)].map((m) => ({
-    key: un(m[2]!),
-    body: JSON.parse(un(m[3]!)),
-    buttons: m[4] === undefined ? null : JSON.parse(un(m[4])),
-    delayMin: Number(m[5]),
-    smsFallback: m[6] === 'true',
-    active: m[7] === 'true',
-    smsApproved: m[8] === 'true',
-  }));
+  // Rows as a fresh database holds them: inserted by 161000, then rewritten by 161001.
+  const updates = new Map<string, { body: unknown; old: unknown }>();
+  for (const m of readFileSync(MIGRATION_5B_STOP, 'utf8').matchAll(
+    new RegExp(
+      `SET "body" = ${lit}::jsonb, "smsApproved" = false, "updatedAt" = CURRENT_TIMESTAMP\\s+WHERE "key" = ${lit} AND "body" = ${lit}::jsonb;`,
+      'g',
+    ),
+  ))
+    updates.set(un(m[2]!), { body: JSON.parse(un(m[1]!)), old: JSON.parse(un(m[3]!)) });
+  expect(updates.size).toBe(2);
+  return [...sql.matchAll(row)].map((m) => {
+    const key = un(m[2]!);
+    const body: unknown = JSON.parse(un(m[3]!));
+    const upd = updates.get(key);
+    if (upd) expect(upd.old, `161001 rewrites the 161000 text of ${key}`).toEqual(body);
+    return {
+      key,
+      body: upd ? upd.body : body,
+      buttons: m[4] === undefined ? null : JSON.parse(un(m[4])),
+      delayMin: Number(m[5]),
+      smsFallback: m[6] === 'true',
+      active: m[7] === 'true',
+      smsApproved: upd ? false : m[8] === 'true',
+    };
+  });
 }
 
 /** Template keys the API code sends (string literals next to the send APIs). */

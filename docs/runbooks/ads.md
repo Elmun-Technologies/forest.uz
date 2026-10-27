@@ -48,6 +48,9 @@ or user agents (we store neither IP nor UA). `adPhone()` (contracts) + `hashPhon
   (Redis lease `forest:audiences:segment:<id>`).
 - A destination uploads only when its integration is **CONNECTED** (A10). In `PROVIDERS_MODE=fake`
   connecting stores the credentials and the in-memory fake receives the hashes.
+- Creation is two-phase: the platform audience id is stored as soon as it exists (Yandex: as
+  `unconfirmed:<id>` until `confirm` succeeds), then members are added — a failure never leads to a
+  second audience. A failed refresh still runs a removal-only sync.
 - Status per segment × destination (A8): `ok`, `error` (last error shown; next refresh retries
   the same diff), `not_connected`, `too_small` (TikTok < 1 000, Yandex < 100 consenting members —
   nothing is sent until the list grows), `off`. Details in A10 logs (`audience.sync`).
@@ -68,13 +71,17 @@ or user agents (we store neither IP nor UA). `adPhone()` (contracts) + `hashPhon
 
 ## Ad signals: operations
 - `ads.signals.collect` (every minute) reads lead / add_to_cart / begin_checkout / purchase events
-  older than 2 min after the cursor `JobCursor('ads.signals')` (first run starts at "now": connecting
-  a platform never replays history; events > 7 days old are never sent). A row per platform + event
+  older than 2 min after the cursor `JobCursor('ads.signals')` and always re-reads the last 70 min
+  (ingest back-dates events by up to an hour; the unique platform + event id keeps it idempotent).
+  Connecting a platform therefore forwards at most the last 70 min; events > 7 days old are never sent. A row per platform + event
   id is created only for customers whose latest ADS_MATCHING consent is granted.
 - `ads.signals.send` (every minute) claims due rows (`FOR UPDATE SKIP LOCKED`, 5 min lease),
   re-checks consent (withdrawn → `SKIPPED`), sends, and marks `SENT` / `FAILED` (backoff 1 min, 5 min,
   15 min, 1 h, 3 h, 6 h…) / `DEAD` after 8 attempts / `SKIPPED` (no identifiers, no conversion action,
-  integration disconnected). One `signals.send` IntegrationLog row per batch.
+  integration disconnected for longer than the 7-day age). A row whose platform is disconnected at send
+  time stays `PENDING` and retries every 15 min. One `signals.send` IntegrationLog row per batch.
+- Meta events use `action_source: 'other'`: website events require `client_user_agent`, which we do
+  not store (no UA/IP on Session). Open question 103.
 - Dedup with browser pixels: `event_id` = our Event row id (Meta, TikTok). The storefront pixel (not
   built yet) must send the same id; purchase ids are deterministic (`purchaseEventId(orderId)`).
 - Re-sending a period (e.g. after fixing credentials): set rows back to `PENDING` with

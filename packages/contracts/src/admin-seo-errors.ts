@@ -25,6 +25,11 @@ export const ADMIN_SEO_ERROR_MESSAGES = {
     uz: "Canonical — sayt ichidagi yo'l (/uz/…) yoki https manzil bo'lishi kerak.",
     ru: 'Canonical — путь на сайте (/uz/…) или https-адрес.',
   },
+  SEO_CANONICAL_EXTERNAL_FORBIDDEN: {
+    http: 403,
+    uz: "Boshqa saytga canonical faqat do'kon egasi yoki menejer qo'ya oladi.",
+    ru: 'Canonical на другой сайт может задать только владелец или менеджер.',
+  },
   SEO_OG_IMAGE_INVALID: {
     http: 400,
     uz: 'OG rasm topilmadi yoki ochiq emas. Mahsulot rasmlaridan birini tanlang.',

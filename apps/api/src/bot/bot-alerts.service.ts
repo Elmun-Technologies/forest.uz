@@ -91,8 +91,9 @@ export class BotAlertsService {
     });
   }
 
-  reviewLow(reviewId: string, rating: number, orderNumber: string): void {
-    void this.alert(
+  /** Never rejects; the bot awaits it so the alert is out before the webhook answers. */
+  async reviewLow(reviewId: string, rating: number, orderNumber: string): Promise<void> {
+    await this.alert(
       'review_low',
       reviewId,
       [`<b>Past baho: ${rating}★</b> · buyurtma ${html(orderNumber)}`, this.admin('/reviews')].join(
@@ -101,8 +102,8 @@ export class BotAlertsService {
     );
   }
 
-  complaint(conversationId: string, preview: string): void {
-    void this.alert(
+  async complaint(conversationId: string, preview: string): Promise<void> {
+    await this.alert(
       'complaint',
       // One alert per conversation episode (a later complaint after closing alerts again).
       conversationId,

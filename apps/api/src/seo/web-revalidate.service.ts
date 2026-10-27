@@ -2,11 +2,13 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import {
+  contextKey,
   isRevalidateTag,
-  REVALIDATE_HEADER,
-  revalidateKey,
-  signRevalidate,
-} from './revalidate-signature';
+  signWeb,
+  WEB_CONTEXTS,
+  WEB_SIGNATURE_HEADER,
+  webSharedSecret,
+} from './web-signature';
 
 /**
  * On-demand storefront revalidation (CLAUDE.md §6): after a committed admin save the API asks the
@@ -16,12 +18,17 @@ import {
 @Injectable()
 export class WebRevalidateService {
   private readonly logger = new Logger('WebRevalidate');
-  private readonly key: Buffer;
+  private readonly key: Buffer | null;
   private readonly target: string | null;
   private readonly inflight = new Set<Promise<void>>();
 
   constructor(@Inject(ENV) env: Env) {
-    this.key = revalidateKey(env.APP_ENCRYPTION_KEY);
+    const secret = webSharedSecret(env);
+    this.key = secret ? contextKey(secret, WEB_CONTEXTS.revalidate) : null;
+    if (!secret)
+      this.logger.error(
+        'WEB_REVALIDATE_SECRET is not set: on-demand storefront revalidation is off (pages refresh by ISR only)',
+      );
     // Tests reach a web server only when they stub one (never the developer's running storefront).
     const base = env.WEB_INTERNAL_URL ?? (env.NODE_ENV === 'test' ? null : env.APP_URL);
     this.target = base ? `${base.replace(/\/$/, '')}/api/revalidate` : null;
@@ -30,7 +37,7 @@ export class WebRevalidateService {
   /** Queue a revalidation of `tags`; returns at once. */
   revalidate(tags: readonly string[], reason: string): void {
     const unique = [...new Set(tags)].filter(isRevalidateTag);
-    if (!this.target || unique.length === 0) return;
+    if (!this.target || !this.key || unique.length === 0) return;
     const p = this.send(unique, reason).finally(() => this.inflight.delete(p));
     this.inflight.add(p);
   }
@@ -53,7 +60,7 @@ export class WebRevalidateService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          [REVALIDATE_HEADER]: signRevalidate(this.key, body),
+          [WEB_SIGNATURE_HEADER]: signWeb(this.key!, body),
         },
         body,
         signal: AbortSignal.timeout(5_000),

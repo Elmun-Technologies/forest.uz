@@ -45,9 +45,9 @@ describe('automation inputs', () => {
     ).toBe(false);
   });
 
-  it('partner stock query: SKUs normalised, capped at 100', () => {
-    const q = partnerStockQuerySchema.parse({ sku: 'fr-cw-1, FR-CW-1,,fr-fs' });
-    expect(q.sku).toEqual(['FR-CW-1', 'FR-FS']);
+  it('partner stock query: SKUs kept as typed, case-insensitive duplicates dropped, ≤ 100', () => {
+    const q = partnerStockQuerySchema.parse({ sku: 'fr-cw-1, FR-CW-1,,Fr-Fs' });
+    expect(q.sku).toEqual(['fr-cw-1', 'Fr-Fs']);
     const many = Array.from({ length: 150 }, (_, i) => `S${i}`).join(',');
     expect(partnerStockQuerySchema.parse({ sku: many }).sku).toHaveLength(100);
   });

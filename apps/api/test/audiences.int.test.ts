@@ -394,7 +394,7 @@ describe('audiences A8 + ad signals (integration)', () => {
       destinations: ['meta', 'tiktok', 'sms'],
       autoMessage: {
         enabled: true,
-        steps: [{ channel: 'sms', delayMinutes: 120, templateKey: 'otp' }],
+        steps: [{ channel: 'sms', delayMinutes: 120, templateKey: 'cart_abandoned_24h_sms' }],
       },
     });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
@@ -405,9 +405,19 @@ describe('audiences A8 + ad signals (integration)', () => {
     ).toBe(1);
 
     const jobs = app.get(AudienceJobs);
+    // The first upload fails after the platform audience was created: its id is kept, so the
+    // next run continues on the same audience (no second audience per hourly retry).
+    fakes.failOps.add('add');
     await jobs.segment(seg.id);
     let row = await prisma.segment.findUniqueOrThrow({ where: { id: seg.id } });
     expect(row.size).toBe(3);
+    const failed = await prisma.segmentDestination.findUniqueOrThrow({
+      where: { segmentId_destination: { segmentId: seg.id, destination: 'meta' } },
+    });
+    expect(failed).toMatchObject({ status: 'error', members: 0 });
+    expect(failed.externalId).toMatch(/^fake-meta-/);
+    expect(fakes.audiences.get('meta')?.size).toBe(1);
+    fakes.failOps.clear();
 
     // B leaves, D joins.
     await prisma.customer.update({ where: { id: ids.B! }, data: { tags: [] } });
@@ -439,13 +449,42 @@ describe('audiences A8 + ad signals (integration)', () => {
     expect(state('google')).toMatchObject({ enabled: false, status: 'off', connected: false });
     expect(detail.autoMessage).toEqual({
       enabled: true,
-      steps: [{ channel: 'sms', delayMinutes: 120, templateKey: 'otp' }],
+      steps: [{ channel: 'sms', delayMinutes: 120, templateKey: 'cart_abandoned_24h_sms' }],
     });
+    // Automations send marketing: service templates and unsupported channels are refused.
+    for (const step of [
+      { channel: 'telegram', delayMinutes: 0, templateKey: 'advice_received' },
+      { channel: 'sms', delayMinutes: 0, templateKey: 'otp' },
+      { channel: 'sms', delayMinutes: 0, templateKey: 'cart_abandoned_2h' },
+    ]) {
+      const bad = await owner.send('patch', `/v1/admin/audiences/${seg.id}`, {
+        autoMessage: { enabled: true, steps: [step] },
+      });
+      expect(bad.status, step.templateKey).toBe(400);
+      expect(bad.body.error.code).toBe('AUDIENCE_TEMPLATE_NOT_MARKETING');
+    }
 
     // Consent withdrawal removes A from the platform on the next sync.
     await consent(ids.A!, false);
     await jobs.segment(seg.id);
     expect([...meta[0]!]).toEqual([hashPhone(phones.D!, 'meta')]);
+
+    // A refresh that fails still removes members who withdrew consent (removal-only pass).
+    await prisma.segment.update({ where: { id: seg.id }, data: { rules: { groups: [] } } });
+    await consent(ids.D!, false);
+    await expect(jobs.segment(seg.id)).rejects.toThrow();
+    expect(meta[0]!.size).toBe(0);
+    expect(
+      (await prisma.segment.findUniqueOrThrow({ where: { id: seg.id } })).refreshError,
+    ).toContain('invalid');
+    await prisma.segment.update({
+      where: { id: seg.id },
+      data: { rules: { groups: [{ conditions: [{ type: 'tag', tag, has: true }] }] } },
+    });
+    await consent(ids.D!, true);
+    await jobs.segment(seg.id);
+    expect([...meta[0]!]).toEqual([hashPhone(phones.D!, 'meta')]);
+    expect(fakes.audiences.get('meta')?.size).toBe(1);
 
     // Members are listed masked only.
     const members = (await owner.get(`/v1/admin/audiences/${seg.id}/members`))
@@ -556,5 +595,36 @@ describe('audiences A8 + ad signals (integration)', () => {
     });
     expect(d2).toMatchObject({ status: 'SKIPPED', lastError: 'ads consent withdrawn' });
     expect(fakes.events.get('meta')!.has(eD2)).toBe(false);
+
+    // A late batch back-dated behind the cursor is still read (re-scan window).
+    const eLate = await event('add_to_cart', new Date(now - 40 * 60_000), { customerId: ids.A! });
+    await signals.collect();
+    expect(await prisma.adSignal.count({ where: { eventId: eLate } })).toBe(2);
+
+    // A briefly disconnected platform defers the row instead of dropping it.
+    const eDefer = await event('add_to_cart', at, { customerId: ids.A! });
+    await prisma.adSignal.create({
+      data: {
+        platform: 'meta',
+        eventId: eDefer,
+        eventName: 'add_to_cart',
+        eventTs: at,
+        customerId: ids.A!,
+      },
+    });
+    await prisma.integration.update({
+      where: { key: 'meta_capi' },
+      data: { status: 'DISCONNECTED' },
+    });
+    await signals.send();
+    const deferred = await prisma.adSignal.findFirstOrThrow({
+      where: { eventId: eDefer, platform: 'meta' },
+    });
+    expect(deferred).toMatchObject({
+      status: 'PENDING',
+      attempts: 0,
+      lastError: 'integration not connected',
+    });
+    expect(deferred.nextAttemptAt.getTime()).toBeGreaterThan(Date.now());
   });
 });

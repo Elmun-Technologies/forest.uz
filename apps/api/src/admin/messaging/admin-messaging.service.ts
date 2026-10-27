@@ -25,6 +25,7 @@ import { IntegrationsService } from '../../integrations/integrations.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
+import { messagingSettingsProblems } from './settings-guard';
 
 type Tx = Prisma.TransactionClient;
 const DAY_MS = 86_400_000;
@@ -33,6 +34,15 @@ const DELAY_SETTINGS: Record<string, 'abandonedCartMinutes' | 'reviewRequestDays
   cart_abandoned_2h: 'abandonedCartMinutes',
   review_request: 'reviewRequestDays',
 };
+
+/** JSON with sorted keys: jsonb reorders object keys, so plain stringify can't compare. */
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_k, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  );
+}
 
 const isUniqueViolation = (e: unknown) =>
   e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
@@ -102,7 +112,10 @@ export class AdminMessagingService {
     };
   }
 
-  private assertValid(key: string, input: MessageTemplateUpdateInput): void {
+  private assertValid(
+    key: string,
+    input: Pick<MessageTemplateUpdateInput, 'body' | 'buttons' | 'delayMin'>,
+  ): void {
     if (!templateMeta(key)) throw new DomainError('NOT_FOUND');
     const problems = templateProblems({ key, body: input.body, buttons: input.buttons });
     if (DELAY_SETTINGS[key] && input.delayMin < 1)
@@ -121,12 +134,16 @@ export class AdminMessagingService {
       await tx.$queryRaw`SELECT "id" FROM "MessageTemplate" WHERE "key" = ${key} FOR UPDATE`;
       const before = await tx.messageTemplate.findUnique({ where: { key } });
       if (!before) throw new DomainError('NOT_FOUND');
+      // Eskiz approves an exact text: a changed body keeps the approval only when this request
+      // explicitly attests the new wording is approved (`smsReapproved`).
+      const prevBody = before.body as { uz?: string; ru?: string };
+      const bodyChanged = prevBody.uz !== input.body.uz || prevBody.ru !== input.body.ru;
       const next = {
         body: input.body,
         buttons: input.buttons.length ? input.buttons : null,
         delayMin: input.delayMin,
         smsFallback: input.smsFallback,
-        smsApproved: input.smsApproved,
+        smsApproved: bodyChanged ? input.smsApproved && input.smsReapproved : input.smsApproved,
         active: input.active,
       };
       await tx.messageTemplate.update({
@@ -142,7 +159,7 @@ export class AdminMessagingService {
         active: before.active,
       };
       const changed = (Object.keys(next) as (keyof typeof next)[]).filter(
-        (k) => JSON.stringify(prev[k]) !== JSON.stringify(next[k]),
+        (k) => canonical(prev[k]) !== canonical(next[k]),
       );
       const setting = DELAY_SETTINGS[key];
       if (setting && changed.includes('delayMin'))
@@ -249,7 +266,8 @@ export class AdminMessagingService {
   }
 
   /**
-   * "O'zimga test": the saved template with example values, by SMS to the staff member's own
+   * "O'zimga test": the saved template rendered with example values — exactly the approved text,
+   * no prefix or extra lines (Eskiz rejects anything else) — by SMS to the staff member's own
    * phone (only an Eskiz-approved text). Not a customer message → no `Message` row; audited.
    */
   async test(
@@ -276,17 +294,11 @@ export class AdminMessagingService {
     const body = template.body as { uz: string; ru: string };
     const text = renderTemplate(body[input.locale] ?? '', vars);
     if (text === null) throw new DomainError('MESSAGE_TEMPLATE_INVALID');
-    const buttons = Array.isArray(template.buttons)
-      ? (template.buttons as unknown as TemplateButton[])
-      : [];
-    const lines = buttons.map(
-      (b) => `${b.text[input.locale]}: ${b.url === '{link}' ? vars.link : b.url}`,
-    );
     try {
       const sms = await this.integrations.sms();
       await sms.send({
         phone: staff.phone,
-        text: ['[TEST]', text, ...lines].join('\n'),
+        text,
         templateKey: key,
       });
     } catch (e) {
@@ -355,11 +367,16 @@ export class AdminMessagingService {
     };
   }
 
+  /** `ownerLevel` = the actor holds `settings.store` (Owner): wider cap / quiet-window bounds. */
   async saveSettings(
     actor: AuditActor,
     input: MessagingSettingsInput,
+    ownerLevel: boolean,
   ): Promise<MessagingSettingsDto> {
     const { version, ...fields } = input;
+    const unsafe = messagingSettingsProblems(fields, ownerLevel);
+    if (unsafe.length)
+      throw new DomainError('MESSAGING_SETTINGS_UNSAFE', { problems: unsafe }, unsafe[0]!.field);
     if (fields.operatorIds.length) {
       const ok = await this.prisma.staff.findMany({
         where: { id: { in: fields.operatorIds }, active: true },

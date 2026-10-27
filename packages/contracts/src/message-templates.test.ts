@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   MESSAGE_TEMPLATES,
+  OPT_OUT_VARIABLE,
   renderTemplate,
   TEMPLATE_VARIABLES,
   templateMeta,
   templateProblems,
   templateVariables,
-  withSmsOptOut,
 } from './message-templates';
 
 describe('renderTemplate', () => {
@@ -32,12 +32,6 @@ describe('renderTemplate', () => {
   it('refuses to render with any other variable missing (no holes in sent texts)', () => {
     expect(renderTemplate('Kod: {kod}', {})).toBeNull();
     expect(renderTemplate('Kod: {kod}', { kod: '' })).toBeNull();
-  });
-
-  it('adds the SMS opt-out line', () => {
-    expect(withSmsOptOut('Matn', 'ru', 'https://f.uz/ru/obuna/s1x')).toBe(
-      'Matn\nОтписаться: https://f.uz/ru/obuna/s1x',
-    );
   });
 });
 
@@ -89,21 +83,43 @@ describe('templateProblems', () => {
     ).toEqual([]);
   });
 
-  it('custom audience templates allow {ism} and {link} only', () => {
-    expect(templateMeta('custom_vip')).toMatchObject({ kind: 'marketing', vars: ['ism', 'link'] });
+  it('marketing SMS templates must carry the {stop} opt-out slot', () => {
+    expect(
+      templateProblems({
+        key: 'cart_abandoned_24h_sms',
+        body: { uz: 'Forest: {kod} {link}', ru: 'Forest: {kod} {link} Отписка: {stop}' },
+        buttons: [],
+      }),
+    ).toEqual([{ field: 'body.uz', code: 'missing_variable', variable: 'stop' }]);
+  });
+
+  it('custom audience templates allow {ism} {link} {stop} and need {stop}', () => {
+    expect(templateMeta('custom_vip')).toMatchObject({
+      kind: 'marketing',
+      vars: ['ism', 'link', 'stop'],
+    });
     expect(
       templateProblems({
         key: 'custom_vip',
-        body: { uz: '{ism} {kod}', ru: '{ism}' },
+        body: { uz: '{ism} {kod} {stop}', ru: '{ism}' },
         buttons: [],
       }),
-    ).toEqual([{ field: 'body.uz', code: 'unknown_variable', variable: 'kod' }]);
+    ).toEqual([
+      { field: 'body.uz', code: 'unknown_variable', variable: 'kod' },
+      { field: 'body.ru', code: 'missing_variable', variable: 'stop' },
+    ]);
   });
 });
 
 describe('catalog', () => {
-  it('uses the A12 variables plus the BTS slots only', () => {
-    const allowed = new Set<string>([...TEMPLATE_VARIABLES, 'trek', 'filial']);
+  it('every marketing template that can go by SMS requires the opt-out slot', () => {
+    for (const [key, meta] of Object.entries(MESSAGE_TEMPLATES))
+      if (meta.kind === 'marketing' && meta.channels.includes('SMS'))
+        expect(meta.required, key).toContain(OPT_OUT_VARIABLE);
+  });
+
+  it('uses the A12 variables plus the BTS and opt-out slots only', () => {
+    const allowed = new Set<string>([...TEMPLATE_VARIABLES, 'trek', 'filial', OPT_OUT_VARIABLE]);
     for (const [key, meta] of Object.entries(MESSAGE_TEMPLATES))
       for (const v of meta.vars) expect(allowed.has(v), `${key}:${v}`).toBe(true);
   });

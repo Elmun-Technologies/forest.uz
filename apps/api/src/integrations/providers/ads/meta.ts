@@ -3,6 +3,7 @@ import type { HealthResult } from '../types';
 import {
   type AdConversion,
   AdPlatformError,
+  type AudienceCreated,
   type AudienceListProvider,
   type ConversionProvider,
   type ConversionSendResult,
@@ -72,7 +73,10 @@ export function metaServerEvent(e: AdConversion): Record<string, unknown> | null
     event_name: EVENT_NAME[e.name],
     event_time: Math.floor(e.at.getTime() / 1000),
     event_id: e.eventId,
-    action_source: 'website',
+    // Not 'website': Meta requires client_user_agent (and wants the IP) for website events, and we
+    // store neither (CLAUDE.md §6). 'other' is a documented action source without that
+    // requirement; the page URL still travels in event_source_url (docs/13 q.103).
+    action_source: 'other',
     ...(e.url ? { event_source_url: e.url } : {}),
     user_data: userData,
     custom_data: customData,
@@ -164,7 +168,8 @@ export class MetaAdsProvider implements ConversionProvider, AudienceListProvider
     return result;
   }
 
-  async create(name: string, hashes: string[]): Promise<string> {
+  /** Creates an empty audience; members follow with `add` once the id is stored. */
+  async create(name: string): Promise<AudienceCreated> {
     if (!this.c.adAccountId) throw new AdPlatformError('adAccountId is required for audiences');
     const res = await this.call(
       'POST',
@@ -178,8 +183,7 @@ export class MetaAdsProvider implements ConversionProvider, AudienceListProvider
     );
     const id = typeof res.id === 'string' ? res.id : null;
     if (!id) throw new AdPlatformError('customaudiences: no id in response');
-    await this.add(id, hashes);
-    return id;
+    return { id, seeded: false };
   }
 
   private async users(method: 'POST' | 'DELETE', audienceId: string, hashes: string[]) {

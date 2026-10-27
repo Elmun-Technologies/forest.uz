@@ -64,6 +64,9 @@ export class CartRestoreService {
       await this.fill(created.id, [], sellable, lines, payload.promo ?? null, null);
       return { restored: sellable.length, ...result };
     }
+    // The link's own cart is already this browser's (its owner is signed in): nothing to copy,
+    // and touching it would restart the abandoned-cart episode (keyed by `updatedAt`).
+    if (target.id === payload.cartId) return { restored: target.items.length, ...result };
     const restored = await this.fill(
       target.id,
       target.items.map((i) => ({ variantId: i.variantId, qty: i.qty })),
@@ -85,25 +88,30 @@ export class CartRestoreService {
   ): Promise<number> {
     const have = new Map(existing.map((i) => [i.variantId, i.qty]));
     let count = 0;
+    let changed = false;
     await this.prisma.$transaction(async (tx) => {
       for (const v of sellable) {
         const qty = lines.get(v.id) ?? 0;
         if (qty <= 0) continue;
         if (!have.has(v.id) && have.size >= MAX_LINES) continue;
         const next = Math.min(99, Math.max(have.get(v.id) ?? 0, qty));
+        count++;
+        if (next === have.get(v.id)) continue;
+        changed = true;
         await tx.cartItem.upsert({
           where: { cartId_variantId: { cartId, variantId: v.id } },
           update: { qty: next },
           create: { cartId, variantId: v.id, qty: next },
         });
         have.set(v.id, next);
-        count++;
       }
       // The promo is re-validated whenever the cart is priced (an ineligible code shows its reason).
-      await tx.cart.update({
-        where: { id: cartId },
-        data: { updatedAt: new Date(), ...(promo && !currentPromo ? { promoCode: promo } : {}) },
-      });
+      const setPromo = !!promo && !currentPromo;
+      if (changed || setPromo)
+        await tx.cart.update({
+          where: { id: cartId },
+          data: { updatedAt: new Date(), ...(setPromo ? { promoCode: promo } : {}) },
+        });
     });
     return count;
   }

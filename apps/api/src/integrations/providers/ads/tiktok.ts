@@ -4,6 +4,7 @@ import type { HealthResult } from '../types';
 import {
   type AdConversion,
   AdPlatformError,
+  type AudienceCreated,
   type AudienceListProvider,
   type ConversionProvider,
   type ConversionSendResult,
@@ -181,7 +182,8 @@ export class TiktokAdsProvider implements ConversionProvider, AudienceListProvid
     return path;
   }
 
-  async create(name: string, hashes: string[]): Promise<string> {
+  /** The audience is created from its first file in one call (nothing to lose in between). */
+  async create(name: string, hashes: string[]): Promise<AudienceCreated> {
     const filePath = await this.upload(hashes);
     const data = await this.json('/dmp/custom_audience/create/', {
       advertiser_id: this.c.advertiserId,
@@ -192,7 +194,7 @@ export class TiktokAdsProvider implements ConversionProvider, AudienceListProvid
     const id = data.custom_audience_id;
     if (typeof id !== 'string' && typeof id !== 'number')
       throw new AdPlatformError('custom_audience/create: no id');
-    return String(id);
+    return { id: String(id), seeded: true };
   }
 
   private async update(id: string, action: 'APPEND' | 'REMOVE', hashes: string[]) {

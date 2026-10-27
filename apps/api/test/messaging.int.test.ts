@@ -146,7 +146,10 @@ describe('messaging engine: policy, automations, opt-out (integration)', () => {
   }
 
   const messages = (customerId: string) =>
-    prisma.message.findMany({ where: { customerId }, orderBy: { createdAt: 'asc' } });
+    prisma.message.findMany({
+      where: { customerId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
 
   beforeAll(async () => {
     app = await createAdminTestApp([], {}, (b) =>
@@ -573,7 +576,10 @@ describe('messaging engine: policy, automations, opt-out (integration)', () => {
       expect(res.body.channel).toBe('SMS');
       const sms = integrations.outbox.list(own);
       expect(sms).toHaveLength(1);
-      expect(sms[0]!.text).toMatch(/^\[TEST\]\nForest: buyurtma F-10001 qabul qilindi/);
+      // Exactly the approved text with example values: no prefix, no extra lines (Eskiz).
+      expect(sms[0]!.text).toBe(
+        'Forest: buyurtma F-10001 qabul qilindi. Kuzatish: https://forest.uz',
+      );
       const unapproved = await marketer.post(
         '/v1/admin/messaging/templates/cart_abandoned_2h/test',
         {
@@ -590,20 +596,29 @@ describe('messaging engine: policy, automations, opt-out (integration)', () => {
       const key = `custom_t${run}_adm`;
       const tpl = {
         key,
-        body: { uz: '{ism}, yangi kolleksiya: {link}', ru: '{ism}, новая коллекция: {link}' },
+        body: {
+          uz: '{ism}, yangi kolleksiya: {link} Rad etish: {stop}',
+          ru: '{ism}, новая коллекция: {link} Отписаться: {stop}',
+        },
         buttons: [],
         delayMin: 0,
         smsFallback: true,
         smsApproved: false,
         active: true,
       };
+      const noStop = await marketer.post('/v1/admin/messaging/templates', {
+        ...tpl,
+        body: { uz: '{ism}: {link}', ru: '{ism}: {link} {stop}' },
+      });
+      expect(noStop.body.error.code).toBe('MESSAGE_TEMPLATE_INVALID');
+      expect(noStop.body.error.field).toBe('body.uz');
       const created = await marketer.post('/v1/admin/messaging/templates', tpl);
       expect(created.status).toBe(201);
       expect(created.body).toMatchObject({
         key,
         kind: 'marketing',
         custom: true,
-        vars: ['ism', 'link'],
+        vars: ['ism', 'link', 'stop'],
       });
       expect((await marketer.post('/v1/admin/messaging/templates', tpl)).body.error.code).toBe(
         'MESSAGE_TEMPLATE_EXISTS',
@@ -630,6 +645,92 @@ describe('messaging engine: policy, automations, opt-out (integration)', () => {
       expect(
         (await marketer.send('delete', '/v1/admin/messaging/templates/order_created')).status,
       ).toBe(404);
+    });
+
+    it('a changed SMS text loses its Eskiz approval unless the request re-approves it', async () => {
+      const key = `custom_t${run}_appr`;
+      const body = {
+        uz: 'Yangi: {link} Rad etish: {stop}',
+        ru: 'Новое: {link} Отписаться: {stop}',
+      };
+      const base = { buttons: [], delayMin: 0, smsFallback: true, active: true };
+      expect(
+        (
+          await marketer.post('/v1/admin/messaging/templates', {
+            key,
+            body,
+            ...base,
+            smsApproved: true,
+          })
+        ).body.smsApproved,
+      ).toBe(true);
+      const path = `/v1/admin/messaging/templates/${key}`;
+      const edited = { uz: `${body.uz} !`, ru: body.ru };
+      // Ticked approval sent along with a new text, but no explicit re-approval → stored false.
+      const lost = await marketer.send('patch', path, { body: edited, ...base, smsApproved: true });
+      expect(lost.body.smsApproved).toBe(false);
+      // Same text: the flag is stored as sent.
+      const kept = await marketer.send('patch', path, { body: edited, ...base, smsApproved: true });
+      expect(kept.body.smsApproved).toBe(true);
+      const again = { uz: `${body.uz} !!`, ru: body.ru };
+      const reapproved = await marketer.send('patch', path, {
+        body: again,
+        ...base,
+        smsApproved: true,
+        smsReapproved: true,
+      });
+      expect(reapproved.body.smsApproved).toBe(true);
+      expect((await marketer.send('delete', path)).status).toBe(204);
+    });
+
+    it('a marketing SMS without the {stop} slot is never sent', async () => {
+      const key = `custom_t${run}_nostop`;
+      await prisma.messageTemplate.create({
+        data: { key, body: { uz: 'Aksiya: {link}', ru: 'Акция: {link}' }, smsApproved: true },
+      });
+      const c = await customer({ sms: true });
+      await dispatcher.enqueue({
+        templateKey: key,
+        kind: 'marketing',
+        customerId: c.id,
+        channels: ['SMS'],
+        vars: { link: 'https://forest.test' },
+        now: base,
+      });
+      expect((await messages(c.id))[0]).toMatchObject({
+        status: 'SKIPPED',
+        error: 'no opt-out slot',
+      });
+      expect(integrations.outbox.list(c.phone!)).toHaveLength(0);
+    });
+
+    it('settings bounds: quiet hours stay ≥ 8 h over the night; cap > 2 is owner-only', async () => {
+      const got = await marketer.get('/v1/admin/messaging/settings');
+      const { abandonedCartMinutes: _a, reviewRequestDays: _r, ...value } = got.body.value;
+      const put = (client: AdminClient, patch: object) =>
+        client.send('put', '/v1/admin/messaging/settings', {
+          ...value,
+          version: got.body.version,
+          ...patch,
+        });
+      for (const patch of [
+        { quietStart: '09:00', quietEnd: '09:00' },
+        { quietStart: '23:00', quietEnd: '06:00' },
+        { quietStart: '22:00', quietEnd: '10:00' },
+        { marketingPerDay: 3 },
+      ]) {
+        const res = await put(marketer, patch);
+        expect(res.body.error?.code, JSON.stringify(patch)).toBe('MESSAGING_SETTINGS_UNSAFE');
+      }
+      const owner = (await signedIn(app, 'OWNER')).client;
+      expect((await put(owner, { marketingPerDay: 6 })).status).toBe(400);
+      const ok = await put(owner, { marketingPerDay: 4, quietStart: '22:00', quietEnd: '08:00' });
+      expect(ok.status).toBe(200);
+      expect(ok.body.value).toMatchObject({ marketingPerDay: 4, quietStart: '22:00' });
+      await prisma.setting.update({
+        where: { key: 'messaging.rules' },
+        data: { value: savedRules as object },
+      });
     });
 
     it('settings: version check, cap and scenario switches; operators must hold bot.inbox', async () => {

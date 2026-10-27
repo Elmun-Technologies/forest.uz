@@ -8,6 +8,11 @@ export const ADMIN_AUDIENCES_ERROR_MESSAGES = {
     uz: "Qoidadagi mahsulot topilmadi. Mahsulotni ro'yxatdan qayta tanlang.",
     ru: 'Товар из правила не найден. Выберите товар из списка заново.',
   },
+  AUDIENCE_TEMPLATE_NOT_MARKETING: {
+    http: 400,
+    uz: "Avtomatik xabar uchun faqat marketing shablonlari (savat eslatmasi, sharh so'rovi yoki o'zingiz yaratgan) va ular qo'llaydigan kanal tanlanadi.",
+    ru: 'Для автосообщения подходят только маркетинговые шаблоны (напоминание о корзине, просьба об отзыве или свои) и поддерживаемый ими канал.',
+  },
   AUDIENCE_TEMPLATE_NOT_FOUND: {
     http: 400,
     uz: 'Avtomatik xabar shabloni topilmadi.',

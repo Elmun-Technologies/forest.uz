@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { acceptInvite, ADMIN, ownerContext, spreadAdminIp } from './admin-helpers';
-import { API, uniquePhone } from './helpers';
+import { API, devHeaders, uniquePhone } from './helpers';
 
 /**
  * A12 messages (desktop): the template editor validates variables live and previews the bubble;
@@ -75,9 +75,16 @@ test('owner creates a custom audience template (marketing: opt-out shown)', asyn
   await page.goto('/bot/messages?key=new');
   const editor = page.getByTestId('template-editor');
   await editor.getByTestId('template-key').fill(key);
+  // Marketing SMS must carry the {stop} opt-out slot: refused until it is there.
   await editor.getByTestId('template-body-uz').fill('{ism}, yangi to‘plamlar keldi: {link}');
+  await expect(editor.getByTestId('template-problems')).toContainText('{stop}');
+  await editor
+    .getByTestId('template-body-uz')
+    .fill('{ism}, yangi to‘plamlar keldi: {link} Rad etish: {stop}');
   await editor.getByRole('button', { name: 'RU', exact: true }).click();
-  await editor.getByTestId('template-body-ru').fill('{ism}, новые наборы: {link}');
+  await editor
+    .getByTestId('template-body-ru')
+    .fill('{ism}, новые наборы: {link} Отписаться: {stop}');
   await expect(editor.getByTestId('template-preview')).toContainText(
     'Имя, новые наборы: https://forest.uz',
   );
@@ -88,7 +95,7 @@ test('owner creates a custom audience template (marketing: opt-out shown)', asyn
   await page.reload();
   await expect(page.getByTestId('template-editor')).toContainText(key);
   await expect(page.getByTestId('template-body-uz')).toHaveValue(
-    '{ism}, yangi to‘plamlar keldi: {link}',
+    '{ism}, yangi to‘plamlar keldi: {link} Rad etish: {stop}',
   );
   await expect(page.getByTestId('template-row').filter({ hasText: key })).toContainText('Eskiz ✓');
 
@@ -122,9 +129,14 @@ test('marketer sends the saved template to their own phone', async ({ page, requ
 
   await expect
     .poll(async () => {
-      const out = await request.get(`${API}/v1/dev/outbox?to=${encodeURIComponent(marketerPhone)}`);
+      const out = await request.get(
+        `${API}/v1/dev/outbox?to=${encodeURIComponent(marketerPhone)}`,
+        { headers: devHeaders() },
+      );
       const list = (await out.json()) as { text: string }[];
       return list[0]?.text ?? '';
     })
-    .toMatch(/^\[TEST\]\nE2E, yangi to‘plamlar keldi: https:\/\/forest\.uz$/);
+    .toBe(
+      'E2E, yangi to‘plamlar keldi: https://forest.uz Rad etish: https://forest.uz/uz/obuna/s10001',
+    );
 });

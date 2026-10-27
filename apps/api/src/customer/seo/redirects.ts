@@ -26,7 +26,12 @@ export async function resolveTarget(
   throw new DomainError('REDIRECT_LOOP', undefined, 'to');
 }
 
-/** Same-site path from a path or an absolute URL on `siteHost`; null when it isn't one. */
+/**
+ * Same-site path from a path or an absolute URL on `siteHost`, in the canonical form redirects are
+ * stored in: no trailing slash (except "/"). Lookups match both slash variants
+ * (`redirectCandidates`), so storing one form is what keeps loop/chain checks exact. null when it
+ * isn't a same-site path.
+ */
 export function sitePath(input: string, siteHost: string | null): string | null {
   const raw = input.trim();
   if (/^https?:\/\//i.test(raw)) {
@@ -36,7 +41,8 @@ export function sitePath(input: string, siteHost: string | null): string | null 
       return null;
     }
   }
-  return normalizePath(raw);
+  const path = normalizePath(raw);
+  return path === null ? null : path.replace(/\/+$/, '') || '/';
 }
 
 export interface SaveRedirectOptions {
@@ -67,12 +73,18 @@ export async function saveRedirect(
     throw new DomainError('REDIRECT_SOURCE_LIVE', undefined, 'from');
 
   const others = opts.id ? { id: { not: opts.id } } : {};
+  // Both slash variants, exactly like the storefront lookup (`SeoService.redirect`).
   const final = await resolveTarget(from, to, async (path) => {
-    const row = await tx.redirect.findFirst({ where: { from: path, ...others } });
-    return row?.to ?? null;
+    const row = await tx.redirect.findFirst({
+      where: { from: { in: redirectCandidates(path) }, ...others },
+    });
+    return row ? (sitePath(row.to, null) ?? row.to) : null;
   });
 
-  await tx.redirect.updateMany({ where: { to: from, ...others }, data: { to: final } });
+  await tx.redirect.updateMany({
+    where: { to: { in: redirectCandidates(from) }, ...others },
+    data: { to: final },
+  });
   const row = opts.id
     ? await tx.redirect.update({
         where: { id: opts.id },

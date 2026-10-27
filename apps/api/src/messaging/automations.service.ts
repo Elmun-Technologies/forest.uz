@@ -62,19 +62,36 @@ export class MessagingAutomations {
       this.delay('cart_abandoned_2h', rules.abandonedCartMinutes),
       this.delay('cart_abandoned_24h_sms', 1440),
     ]);
-    const delays = [tgDelay, smsDelay].filter((d): d is number => d !== null);
-    if (!delays.length) return 0;
+    if (tgDelay === null && smsDelay === null) return 0;
+    // Due carts only, in SQL (no starvation behind already-handled ones): an identified, non-empty,
+    // unchanged cart without an order since, whose Telegram reminder is due and not yet recorded,
+    // or whose SMS is due, not recorded and no Telegram reminder went out.
+    const tgCutoff = new Date(now.getTime() - (tgDelay ?? 0));
+    const smsCutoff = new Date(now.getTime() - (smsDelay ?? 0));
+    const ids = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT c."id" FROM "Cart" c JOIN "Customer" cu ON cu."id" = c."customerId"
+      CROSS JOIN LATERAL (
+        SELECT 'cart:' || c."id" || ':' || (extract(epoch from c."updatedAt") * 1000)::bigint AS ep
+      ) k
+      WHERE c."status" = 'ACTIVE' AND cu."deletedAt" IS NULL
+        AND c."updatedAt" >= ${new Date(now.getTime() - CART_WINDOW_MS)}
+        AND EXISTS (SELECT 1 FROM "CartItem" i WHERE i."cartId" = c."id")
+        AND NOT EXISTS (
+          SELECT 1 FROM "Order" o WHERE o."customerId" = c."customerId" AND o."createdAt" > c."updatedAt"
+        )
+        AND (
+          (${tgDelay !== null} AND cu."telegramId" IS NOT NULL AND c."updatedAt" <= ${tgCutoff}
+            AND NOT EXISTS (SELECT 1 FROM "Message" m WHERE m."dedupeKey" = k.ep || ':tg'))
+          OR (${smsDelay !== null} AND c."updatedAt" <= ${smsCutoff}
+            AND NOT EXISTS (SELECT 1 FROM "Message" m WHERE m."dedupeKey" = k.ep || ':sms')
+            AND NOT EXISTS (
+              SELECT 1 FROM "Message" m WHERE m."dedupeKey" = k.ep || ':tg'
+                AND m."status" IN ('QUEUED', 'SENT', 'DELIVERED')
+            ))
+        )
+      ORDER BY c."updatedAt" LIMIT ${BATCH}`);
     const carts = await this.prisma.cart.findMany({
-      where: {
-        status: 'ACTIVE',
-        customerId: { not: null },
-        items: { some: {} },
-        updatedAt: {
-          gte: new Date(now.getTime() - CART_WINDOW_MS),
-          lte: new Date(now.getTime() - Math.min(...delays)),
-        },
-        customer: { deletedAt: null },
-      },
+      where: { id: { in: ids.map((r) => r.id) } },
       include: {
         customer: { select: { id: true, name: true, locale: true, telegramId: true } },
         items: {
@@ -82,16 +99,11 @@ export class MessagingAutomations {
         },
       },
       orderBy: { updatedAt: 'asc' },
-      take: BATCH,
     });
     let n = 0;
     for (const cart of carts) {
       const customer = cart.customer!;
       try {
-        const ordered = await this.prisma.order.count({
-          where: { customerId: customer.id, createdAt: { gt: cart.updatedAt } },
-        });
-        if (ordered) continue;
         const age = now.getTime() - cart.updatedAt.getTime();
         const episode = `cart:${cart.id}:${cart.updatedAt.getTime()}`;
         const locale = customer.locale;
@@ -164,39 +176,29 @@ export class MessagingAutomations {
     if (!rules.scenarios.reviewRequest) return 0;
     const delay = await this.delay('review_request', rules.reviewRequestDays * 1440);
     if (delay === null) return 0;
+    // Due orders only, in SQL: delivered in the window, not reviewed, not yet asked.
+    const ids = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT o."id" FROM "Order" o JOIN "Customer" c ON c."id" = o."customerId"
+      WHERE o."status"::text IN ('DELIVERED', 'COMPLETED') AND c."deletedAt" IS NULL
+        AND EXISTS (
+          SELECT 1 FROM "OrderEvent" e
+          WHERE e."orderId" = o."id" AND e."type" = 'STATUS_CHANGED' AND e."to" = 'DELIVERED'
+            AND e."createdAt" <= ${new Date(now.getTime() - delay)}
+            AND e."createdAt" >= ${new Date(now.getTime() - REVIEW_WINDOW_MS)}
+        )
+        AND NOT EXISTS (SELECT 1 FROM "Review" r WHERE r."orderId" = o."id")
+        AND NOT EXISTS (SELECT 1 FROM "Message" m WHERE m."dedupeKey" = 'review:' || o."id")
+      ORDER BY o."createdAt" LIMIT ${BATCH}`);
     const orders = await this.prisma.order.findMany({
-      where: {
-        status: { in: ['DELIVERED', 'COMPLETED'] },
-        customer: { deletedAt: null },
-        events: {
-          some: {
-            type: 'STATUS_CHANGED',
-            to: 'DELIVERED',
-            createdAt: {
-              lte: new Date(now.getTime() - delay),
-              gte: new Date(now.getTime() - REVIEW_WINDOW_MS),
-            },
-          },
-        },
-      },
+      where: { id: { in: ids.map((r) => r.id) } },
       include: {
         customer: { select: { id: true, name: true, telegramId: true } },
         items: { take: 1, select: { nameSnapshot: true } },
       },
       orderBy: { createdAt: 'asc' },
-      take: BATCH,
     });
-    const reviewed = new Set(
-      (
-        await this.prisma.review.findMany({
-          where: { orderId: { in: orders.map((o) => o.id) } },
-          select: { orderId: true },
-        })
-      ).map((r) => r.orderId),
-    );
     let n = 0;
     for (const order of orders) {
-      if (reviewed.has(order.id)) continue;
       try {
         const viaTelegram = !!order.customer.telegramId;
         const res = await this.dispatcher.enqueue({
@@ -227,24 +229,25 @@ export class MessagingAutomations {
   async notifyWaitlist(now = new Date()): Promise<number> {
     const rules = await this.settings.get('messaging.rules');
     if (!rules.scenarios.waitlist) return 0;
+    // Sellable entries only, in SQL (an old backlog of out-of-stock entries never starves others).
+    const ids = await this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+      SELECT w."id" FROM "WaitlistEntry" w
+      JOIN "Variant" v ON v."id" = w."variantId"
+      JOIN "Product" p ON p."id" = w."productId"
+      WHERE w."notifiedAt" IS NULL AND v."active" AND p."status"::text = 'ACTIVE'
+        AND v."stock" - v."reserved" > 0
+      ORDER BY w."createdAt" LIMIT ${BATCH}`);
+    if (!ids.length) return 0;
     const entries = await this.prisma.waitlistEntry.findMany({
-      where: {
-        notifiedAt: null,
-        variantId: { not: null },
-        product: { status: 'ACTIVE' },
-      },
+      where: { id: { in: ids.map((r) => r.id) } },
       include: { product: { select: { slug: true, name: true } } },
       orderBy: { createdAt: 'asc' },
-      take: BATCH * 3,
     });
-    if (!entries.length) return 0;
     const variants = await this.prisma.variant.findMany({
-      where: { id: { in: [...new Set(entries.map((e) => e.variantId!))] }, active: true },
+      where: { id: { in: [...new Set(entries.map((e) => e.variantId!))] } },
       select: { id: true, label: true, stock: true, reserved: true },
     });
-    const sellable = new Map(
-      variants.filter((v) => v.stock - v.reserved > 0).map((v) => [v.id, v]),
-    );
+    const sellable = new Map(variants.map((v) => [v.id, v]));
     let n = 0;
     for (const entry of entries) {
       const variant = sellable.get(entry.variantId!);

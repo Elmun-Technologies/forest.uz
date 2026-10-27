@@ -88,7 +88,7 @@ describe('Meta CAPI + Custom Audiences', () => {
       event_name: 'Purchase',
       event_time: Math.floor(AT.getTime() / 1000),
       event_id: '0193a1b2-0000-7000-8000-000000000001',
-      action_source: 'website',
+      action_source: 'other',
       event_source_url: 'https://forest.uz/uz/checkout',
       user_data: {
         ph: ['172443bcef1ac1d3905d3ff30a9b7c1d188a583c54f24ab8327a91f82054f2d3'],
@@ -126,7 +126,7 @@ describe('Meta CAPI + Custom Audiences', () => {
     expect(r.failed.get(conversion().eventId)).toContain('HTTP 400');
   });
 
-  it('custom audience: create in the ad account, then users as PHONE_SHA256', async () => {
+  it('custom audience: create (empty) in the ad account, then users as PHONE_SHA256', async () => {
     const { calls, http } = stub((c) => ({
       body: c.url.endsWith('/customaudiences') ? { id: '555' } : { num_received: 1 },
     }));
@@ -134,7 +134,9 @@ describe('Meta CAPI + Custom Audiences', () => {
       { pixelId: '1', accessToken: 't', adAccountId: '42' },
       { http, baseUrl: 'https://graph.test' },
     );
-    expect(await meta.create('VIP', ['h1'])).toBe('555');
+    // Created empty: the caller stores the id before adding members.
+    expect(await meta.create('VIP')).toEqual({ id: '555', seeded: false });
+    await meta.add('555', ['h1']);
     await meta.remove('555', ['h2']);
     expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
       'POST https://graph.test/act_42/customaudiences',
@@ -233,7 +235,11 @@ describe('Google Ads conversions + Customer Match', () => {
       baseUrl: 'https://ads.test/v26',
       tokenUrl: 'https://oauth.test/token',
     });
-    expect(await g.create('VIP', ['h1'])).toBe('customers/1234567890/userLists/9');
+    expect(await g.create('VIP')).toEqual({
+      id: 'customers/1234567890/userLists/9',
+      seeded: false,
+    });
+    await g.add('customers/1234567890/userLists/9', ['h1']);
     await g.remove('customers/1234567890/userLists/9', ['h2']);
     const paths = calls
       .filter((c) => !c.url.endsWith('/token'))
@@ -308,7 +314,7 @@ describe('TikTok Events API + customer-file audiences', () => {
       { pixelId: 'P', accessToken: 'tok', advertiserId: 'A' },
       { http, baseUrl: 'https://tt.test' },
     );
-    expect(await t.create('VIP', ['h1', 'h2'])).toBe('99');
+    expect(await t.create('VIP', ['h1', 'h2'])).toEqual({ id: '99', seeded: true });
     await t.remove('99', ['h1']);
     expect(calls.map((c) => c.url.replace('https://tt.test', ''))).toEqual([
       '/dmp/custom_audience/file/upload/',
@@ -336,7 +342,9 @@ describe('Yandex Audience', () => {
       { oauthToken: 'tok' },
       { http, baseUrl: 'https://ya.test/v1/management' },
     );
-    expect(await y.create('VIP', ['h1'])).toBe('321');
+    // Upload creates the segment (id stored by the caller), confirm is a separate step.
+    expect(await y.create('VIP', ['h1'])).toEqual({ id: '321', seeded: true });
+    await y.confirm('321', 'VIP');
     await y.add('321', ['h2']);
     await y.remove('321', ['h1']);
     expect(calls.map((c) => c.url.replace('https://ya.test/v1/management', ''))).toEqual([

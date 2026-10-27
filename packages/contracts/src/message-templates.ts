@@ -17,6 +17,13 @@ export type MessageScenario =
 /** The variables the A12 editor offers (docs/08). */
 export const TEMPLATE_VARIABLES = ['ism', 'mahsulot', 'raqam', 'kod', 'link', 'vaqt'] as const;
 
+/**
+ * Opt-out slot: the engine fills it with the customer's `/obuna/<token>` link. Every marketing
+ * template that can go by SMS must contain it, so the opt-out is part of the text Eskiz approves
+ * (Eskiz rejects texts that differ from the approved template).
+ */
+export const OPT_OUT_VARIABLE = 'stop';
+
 export interface MessageTemplateMeta {
   kind: MessageKind;
   scenario: MessageScenario;
@@ -153,7 +160,8 @@ export const MESSAGE_TEMPLATES: Record<string, MessageTemplateMeta> = {
     kind: 'marketing',
     scenario: 'cart',
     label: 'Tashlangan savat (SMS)',
-    vars: ['ism', 'mahsulot', 'kod', 'link'],
+    vars: ['ism', 'mahsulot', 'kod', 'link', 'stop'],
+    required: ['stop'],
     channels: S,
   },
   advice_received: {
@@ -181,7 +189,8 @@ export const MESSAGE_TEMPLATES: Record<string, MessageTemplateMeta> = {
     kind: 'marketing',
     scenario: 'review',
     label: "Sharh so'rovi (SMS)",
-    vars: ['ism', 'raqam', 'link'],
+    vars: ['ism', 'raqam', 'link', 'stop'],
+    required: ['stop'],
     channels: S,
   },
   review_thanks_high: {
@@ -221,7 +230,8 @@ const CUSTOM_META: MessageTemplateMeta = {
   kind: 'marketing',
   scenario: 'audience',
   label: 'Auditoriya xabari',
-  vars: ['ism', 'link'],
+  vars: ['ism', 'link', 'stop'],
+  required: ['stop'],
   channels: TS,
 };
 
@@ -322,15 +332,13 @@ export function renderTemplate(
   return missing ? null : out.replace(/[ \t]{2,}/g, ' ').trim();
 }
 
-/** Opt-out every marketing message carries (docs/09 "Eslatmani o'chirish"). */
+/**
+ * Opt-out every marketing message carries (docs/09 "Eslatmani o'chirish"): Telegram gets this
+ * button; SMS texts carry the `{stop}` link inside the approved template.
+ */
 export const MARKETING_OPT_OUT = {
   telegramButton: { uz: "Eslatmani o'chirish", ru: 'Отключить напоминания' },
-  smsLine: { uz: 'Rad etish: {url}', ru: 'Отписаться: {url}' },
 } as const;
-
-export function withSmsOptOut(text: string, locale: Locale, url: string): string {
-  return `${text}\n${MARKETING_OPT_OUT.smsLine[locale].replace('{url}', url)}`;
-}
 
 /**
  * Example values for the A12 preview and "test to myself" (labelled as an example in the UI).
@@ -353,5 +361,6 @@ export function templateExampleVars(key: string, locale: Locale): Record<string,
     vaqt: '14:30',
     trek: '123456789',
     filial: locale === 'ru' ? 'Отделение BTS' : 'BTS filiali',
+    stop: `https://forest.uz/${locale}/obuna/s10001`,
   };
 }

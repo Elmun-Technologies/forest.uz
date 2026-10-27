@@ -26,16 +26,34 @@ const SIG_LEN = 16;
 type Channel = 'SMS' | 'TELEGRAM';
 const LETTER: Record<Channel, string> = { SMS: 's', TELEGRAM: 't' };
 
-function mac(body: string, secret: string): string {
-  return createHmac('sha256', secret).update(`unsub:${body}`).digest('base64url').slice(0, SIG_LEN);
+/**
+ * Dedicated key: HMAC-SHA256(SESSION_SECRET, "forest:unsubscribe:v1"), so these public tokens
+ * never MAC with the raw session secret (domain separation from sessions and deep links).
+ */
+function unsubscribeKey(secret: string): Buffer {
+  return createHmac('sha256', secret).update('forest:unsubscribe:v1').digest();
+}
+
+function mac(body: string, key: Buffer | string): string {
+  return createHmac('sha256', key).update(`unsub:${body}`).digest('base64url').slice(0, SIG_LEN);
 }
 
 export function signUnsubscribe(channel: Channel, publicId: string, secret: string): string {
   const digits = publicId.replace(/\D/g, '');
   const body = `${LETTER[channel]}${digits}`;
-  return body + mac(body, secret);
+  return body + mac(body, unsubscribeKey(secret));
 }
 
+const macEquals = (given: string, expected: string) => {
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
+/**
+ * Accepts tokens MACed with the dedicated key and — during the transition — the first-version
+ * tokens MACed with the raw secret (SMS sent before the key change must keep working).
+ */
 export function verifyUnsubscribe(
   token: string,
   secret: string,
@@ -43,9 +61,10 @@ export function verifyUnsubscribe(
   const body = token.slice(0, -SIG_LEN);
   const m = /^([st])(\d{1,12})$/.exec(body);
   if (!m || token.length <= SIG_LEN) return null;
-  const given = Buffer.from(token.slice(-SIG_LEN));
-  const expected = Buffer.from(mac(body, secret));
-  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  const given = token.slice(-SIG_LEN);
+  const ok =
+    macEquals(given, mac(body, unsubscribeKey(secret))) || macEquals(given, mac(body, secret));
+  if (!ok) return null;
   return { channel: m[1] === 's' ? 'SMS' : 'TELEGRAM', publicId: `C-${m[2]}` };
 }
 

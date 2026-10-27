@@ -17,10 +17,22 @@ export function hashPhone(e164: string, platform: AdDestination): string | null 
   return normalized ? sha256Hex(normalized) : null;
 }
 
+export interface AudienceCreated {
+  id: string;
+  /** The initial hashes are already in the audience (platforms that create from a file). */
+  seeded: boolean;
+}
+
+/**
+ * One platform audience list. `create` makes the audience and returns its id as soon as it
+ * exists; the caller stores the id before any further call (`confirm`, `add`), so a failure later
+ * never loses it and the next sync continues on the same audience instead of creating another.
+ */
 export interface AudienceListProvider {
   readonly destination: AdDestination;
-  /** Creates the platform audience with its first members; returns the platform id. */
-  create(name: string, hashes: string[]): Promise<string>;
+  create(name: string, hashes: string[]): Promise<AudienceCreated>;
+  /** Second creation step of platforms that need one (Yandex `confirm`); idempotent. */
+  confirm?(audienceId: string, name: string): Promise<void>;
   add(audienceId: string, hashes: string[]): Promise<void>;
   remove(audienceId: string, hashes: string[]): Promise<void>;
 }

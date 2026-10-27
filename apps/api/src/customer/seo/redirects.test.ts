@@ -32,6 +32,9 @@ describe('resolveTarget (no chains, no loops)', () => {
 describe('sitePath', () => {
   it('accepts same-site paths and absolute URLs on our host only', () => {
     expect(sitePath('/uz/p/x?utm=1', 'forest.uz')).toBe('/uz/p/x');
+    expect(sitePath('/uz/p/x/', 'forest.uz')).toBe('/uz/p/x');
+    expect(sitePath('/', 'forest.uz')).toBe('/');
+    expect(sitePath('https://forest.uz/', 'forest.uz')).toBe('/');
     expect(sitePath('https://forest.uz/ru/katalog', 'forest.uz')).toBe('/ru/katalog');
     expect(sitePath('https://evil.com/ru', 'forest.uz')).toBeNull();
     expect(sitePath('//evil.com/x', 'forest.uz')).toBeNull();

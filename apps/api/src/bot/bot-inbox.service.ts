@@ -115,7 +115,7 @@ export class BotInboxService {
       }),
     ]);
     if (complaint && existing?.status !== 'COMPLAINT')
-      this.alerts.complaint(updated.id, text ?? '[foto]');
+      await this.alerts.complaint(updated.id, text ?? '[foto]');
     return { conversation: updated, opened, complaint };
   }
 

@@ -3,6 +3,7 @@ import type { AdDestination, AdSignalPlatform } from '@forest/contracts';
 import {
   type AdConversion,
   AdPlatformError,
+  type AudienceCreated,
   type AudienceListProvider,
   type ConversionProvider,
   type ConversionSendResult,
@@ -23,15 +24,18 @@ export class FakeAdsState {
   readonly calls: { target: string; op: string; count: number }[] = [];
   /** Event ids the fake platform rejects (failure/backoff tests). */
   readonly rejectEvents = new Set<string>();
-  /** When set, every audience call fails with this message. */
-  audienceError: string | null = null;
+  /** Audience operations that fail (`create`, `confirm`, `add`, `remove`) — failure tests. */
+  readonly failOps = new Set<string>();
+  /** Audiences waiting for `confirm` (Yandex-style two-step creation). */
+  readonly unconfirmed = new Set<string>();
 
   reset(): void {
     this.audiences.clear();
     this.events.clear();
     this.calls.length = 0;
     this.rejectEvents.clear();
-    this.audienceError = null;
+    this.failOps.clear();
+    this.unconfirmed.clear();
   }
 }
 
@@ -39,7 +43,13 @@ export class FakeAudienceProvider implements AudienceListProvider {
   constructor(
     readonly destination: AdDestination,
     private readonly state: FakeAdsState,
-  ) {}
+  ) {
+    if (destination === 'yandex')
+      this.confirm = async (id) => {
+        this.guard('confirm', 0);
+        this.state.unconfirmed.delete(id);
+      };
+  }
 
   private lists(): Map<string, Set<string>> {
     let m = this.state.audiences.get(this.destination);
@@ -52,15 +62,20 @@ export class FakeAudienceProvider implements AudienceListProvider {
 
   private guard(op: string, count: number) {
     this.state.calls.push({ target: this.destination, op, count });
-    if (this.state.audienceError) throw new AdPlatformError(this.state.audienceError);
+    if (this.state.failOps.has(op)) throw new AdPlatformError(`fake ${op} failure`);
   }
 
-  async create(_name: string, hashes: string[]): Promise<string> {
+  /** Like the real adapters: Meta/Google create empty lists, TikTok/Yandex from the first file. */
+  async create(_name: string, hashes: string[]): Promise<AudienceCreated> {
     this.guard('create', hashes.length);
     const id = `fake-${this.destination}-${randomUUID().slice(0, 8)}`;
-    this.lists().set(id, new Set(hashes));
-    return id;
+    const seeded = this.destination === 'tiktok' || this.destination === 'yandex';
+    this.lists().set(id, new Set(seeded ? hashes : []));
+    if (this.destination === 'yandex') this.state.unconfirmed.add(id);
+    return { id, seeded };
   }
+
+  confirm?: (id: string, name: string) => Promise<void>;
 
   async add(id: string, hashes: string[]): Promise<void> {
     this.guard('add', hashes.length);

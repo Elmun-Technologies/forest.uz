@@ -163,6 +163,8 @@ export class BotService implements TelegramSender {
           kind: record.marketing ? 'marketing' : 'service',
           providerId: String(id),
           sentAt: new Date(),
+          // The chat, so replies sent before the phone was shared join the customer later.
+          payload: { chatId: String(chatId) },
         },
       });
       return id;

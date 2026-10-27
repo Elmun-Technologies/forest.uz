@@ -6,14 +6,14 @@ health rules, revalidation client, BullMQ queue `seo`), public endpoints
 redirect helper `customer/seo/redirects.ts`, admin API `apps/api/src/admin/seo/*` (`/v1/admin/seo/*`),
 provider adapters `apps/api/src/integrations/providers/seo-{search,tools,factory}.ts`, admin page
 `apps/admin/src/app/(panel)/seo` + `components/seo/*`, storefront `apps/web/src/lib/seo-meta.ts`,
-`lib/revalidate-auth.ts`, `app/api/revalidate/route.ts`, rewrites in `apps/web/next.config.ts`.
+`lib/web-signature.ts` (signed API ↔ web calls), `lib/not-found.ts` (signed 404 reports), `app/api/revalidate/route.ts`, rewrites in `apps/web/next.config.ts`.
 Contracts: `packages/contracts/src/{seo.ts,schemas/seo.ts,admin-seo-errors.ts}`. Decisions: CLAUDE.md §6
 (2026-10-27, "SEO …", "On-demand revalidation", "robots.txt, sitemaps…", "IndexNow", "Redirect manager",
 "Search queries", "CWV", "A9 permissions").
 
 Tests: unit `apps/api/src/seo/*.test.ts`, `integrations/providers/seo-providers.test.ts`,
 `customer/seo/redirects.test.ts`, `packages/contracts/src/seo.test.ts` (templates = web messages),
-`apps/web/src/lib/revalidate-auth.test.ts`; integration `apps/api/test/admin-seo.int.test.ts`
+`apps/web/src/lib/web-signature.test.ts`; integration `apps/api/test/admin-seo.int.test.ts`
 (stub web server for revalidation); e2e `e2e/tests/admin-seo.spec.ts`.
 
 ## How the pieces fit
@@ -32,7 +32,7 @@ Tests: unit `apps/api/src/seo/*.test.ts`, `integrations/providers/seo-providers.
 
 Revalidation failing (web down, wrong key) only logs a warning on the API (`WebRevalidate`): pages
 still refresh at their ISR interval (30 s–5 min). Check: `WEB_INTERNAL_URL` (compose `http://web:3000`),
-same `APP_ENCRYPTION_KEY` in api and web, clocks within ±5 min.
+the same `WEB_REVALIDATE_SECRET` (≥ 32 chars) in api and web — in production a missing secret disables revalidation and 404 reporting (API logs `WEB_REVALIDATE_SECRET is not set` at boot) — and clocks within ±5 min. The 404 log is pruned daily (job `seo.notfound.prune`: older than 90 d with < 3 hits, beyond the top 5 000).
 
 ## Owner checklist (go-live)
 1. **Verification**: A9 → Tasdiqlash kodlari: paste Google / Yandex / Bing `<meta>` tags (or the codes).
