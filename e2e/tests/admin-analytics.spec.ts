@@ -149,9 +149,15 @@ async function kpi(page: Page, id: string): Promise<number> {
 
 test.describe('A1 dashboard = DB truth', () => {
   test.skip(!DB || !hasPsql, 'needs DATABASE_URL and psql');
+  test.beforeEach(({}, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'admin panel e2e runs on desktop only');
+  });
   let seeded = false;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    if (testInfo.project.name !== 'desktop') return;
+    // The synthetic generator drives dozens of browser sessions: far beyond the 30 s hook default.
+    testInfo.setTimeout(300_000);
     if (!(await synthetic(browser))) {
       localSeed();
       seeded = true;
