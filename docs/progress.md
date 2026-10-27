@@ -1,18 +1,18 @@
 # Progress
 
-Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — API done**, storefront wiring in progress.
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — in progress** (admin auth/RBAC first).
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0 Foundation | done | see report below |
 | 1 Storefront | done | see report below; Product perf 89 (target 90) |
-| 2 Payments/delivery/SMS/auth | in progress | API done (Payme, Click, Eskiz, Telegram login, fiscal manual, BTS manual, Yandex Delivery); storefront wiring next |
-| 3 Admin core | pending | |
+| 2 Payments/delivery/SMS/auth | done | see report below; real provider runs need owner credentials + sandbox |
+| 3 Admin core | in progress | admin auth (password + TOTP), RBAC, audit, shell first |
 | 4 Analytics/heatmaps/audiences/SEO | pending | |
 | 5 Bot/automations/content | pending | |
 | 6 Hardening & launch | pending | |
 
-## Phase 2 — Payments, fiscal, delivery, SMS, auth (in progress, 2026-10-27)
+## Phase 2 — Payments, fiscal, delivery, SMS, auth (done, 2026-10-27)
 
 ### Built (API)
 - **Payme Merchant API** (JSON-RPC, all methods incl. ChangePassword, 12 h timeout, fiscal `detail`, refunds via cancel) and **Click SHOP API** (prepare/complete, md5 sign) — contract tests for every documented error code; duplicate/concurrent callbacks never double-pay. Runbook: `docs/runbooks/payments.md`.
@@ -28,7 +28,13 @@ Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthous
 - Checkout passes the geolocation pin to `/cart/quote` and `/cart?zone=` (live quote where enabled).
 
 ### Verified
-- contracts 60, api 96 unit + 120 integration (Testcontainers), ui 8 — all green.
+- CI green on GitHub incl. Playwright e2e on the docker-compose production images (run 27).
+- contracts 80, api 113 unit + 136 integration (Testcontainers), web 19 component, ui 8; storefront e2e on a production build 53 passed / 1 skipped (incl. `phase2.spec.ts` 8/8: Telegram-only cabinet, courier card owner vs masked, BTS track/branch, widget hidden without a bot).
+- Phase 2 acceptance: Payme/Click contract tests for every documented error code; duplicate/concurrent webhooks never double-pay; reservation expiry releases stock; SLA cut-off unit tests with a fixed clock.
+
+### Independent review — fixed
+High: no cancel/full refund while a courier has or is fetching the parcel. Medium: missed-pickup and return SMS/status handling, address change under the order lock (old pin dropped, pending claim locks it), stock released on RETURNED/CANCELLED, live-quote isolation (own breaker, no retries, per-IP limit), message templates backfilled by a data migration. Low: Yandex accept without HTTP inside the locking transaction, Eskiz token masked in logs, early Eskiz callbacks parked, Telegram stub merge (cart/consents, sessions revoked), polling stops for abandoned claims + `markReturned`, courier phone reset on performer change, repeated `claim_id`.
+Not done on purpose: Telegram widget replay protection (may block legitimate re-logins; unverifiable without Telegram docs); Yandex `cancelClaim` still calls Yandex inside its transaction (follow-up).
 
 ### Not verified / owner input
 - Official doc hosts (Payme, Click, Eskiz, Telegram, Yandex) are unreachable from this environment; protocols come from official GitHub templates (Payme/Click) or ≥ 2 cross-checked open-source clients (Eskiz, Telegram, Yandex). Open questions 28–59 list every unverified point. Credentials, sandbox runs, Eskiz template approval, Yandex contract + warehouse coordinates, Telegram bot + `/setdomain`, COD receipt process are needed from the owner.
