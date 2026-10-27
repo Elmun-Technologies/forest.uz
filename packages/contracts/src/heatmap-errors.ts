@@ -15,6 +15,11 @@ export const HEATMAP_ERROR_MESSAGES = {
     uz: "Yozuv bo'lagi noto'g'ri.",
     ru: 'Неверный фрагмент записи.',
   },
+  REPLAY_CONTENT_TYPE: {
+    http: 415,
+    uz: "Yozuv bo'lagi application/octet-stream bo'lishi kerak.",
+    ru: 'Фрагмент записи должен быть application/octet-stream.',
+  },
   REPLAY_TOO_LARGE: {
     http: 413,
     uz: 'Yozuv hajmi chegaradan oshdi.',

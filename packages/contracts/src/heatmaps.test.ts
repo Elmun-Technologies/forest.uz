@@ -13,6 +13,8 @@ import {
   normalizeHeatmapPath,
   replayReason,
   replaySampled,
+  scrubReplayEvent,
+  scrubReplayUrl,
 } from './heatmaps';
 
 const page = (over: Partial<HeatmapPageAgg> = {}): HeatmapPageAgg => ({
@@ -219,5 +221,64 @@ describe('heatmap insights', () => {
     ]);
     const fine = page({ reach: { 25: 95, 50: 90, 75: 80, 100: 30 } });
     expect(heatmapInsights({ page: page(), mobile: fine, elements: [] })).toEqual([]);
+  });
+});
+
+describe('replay URL scrubbing', () => {
+  it('drops queries and capability segments, keeps assets and other schemes', () => {
+    expect(scrubReplayUrl('https://forest.uz/uz/t/AbC123token?x=1#y')).toBe(
+      'https://forest.uz/uz/t/:token',
+    );
+    expect(scrubReplayUrl('/ru/buyurtma/ord_9f8e7d')).toBe('/ru/buyurtma/:id');
+    expect(scrubReplayUrl('/uz/katalog?utm_source=x&phone=998901234567')).toBe('/uz/katalog');
+    expect(scrubReplayUrl('/_next/image?url=a&w=640')).toBe('/_next/image?url=a&w=640');
+    expect(scrubReplayUrl('tel:+998712000000')).toBe('tel:+998712000000');
+    expect(scrubReplayUrl('https://t.me/forest_bot?start=abc')).toBe('https://t.me/forest_bot');
+  });
+
+  it('scrubs Meta href, snapshot and mutation link attributes in place', () => {
+    const meta = scrubReplayEvent({
+      type: 4,
+      timestamp: 1,
+      data: { href: 'http://shop/uz/t/SECRET?a=1', width: 1, height: 1 },
+    });
+    expect(meta.data.href).toBe('http://shop/uz/t/:token');
+    const full = scrubReplayEvent({
+      type: 2,
+      timestamp: 1,
+      data: {
+        node: {
+          type: 0,
+          childNodes: [
+            {
+              type: 2,
+              tagName: 'a',
+              attributes: { href: '/uz/t/SECRET', class: 'x' },
+              childNodes: [],
+            },
+            { type: 2, tagName: 'img', attributes: { src: '/_next/image?url=a' }, childNodes: [] },
+          ],
+        },
+      },
+    });
+    expect(JSON.stringify(full)).not.toContain('SECRET');
+    expect(JSON.stringify(full)).toContain('/_next/image?url=a');
+    const mutation = scrubReplayEvent({
+      type: 3,
+      timestamp: 1,
+      data: {
+        source: 0,
+        adds: [
+          {
+            parentId: 1,
+            node: { type: 2, tagName: 'form', attributes: { action: '/uz/buyurtma/SECRET' } },
+          },
+        ],
+        attributes: [{ id: 3, attributes: { href: 'https://shop/uz/t/SECRET?z' } }],
+        texts: [],
+        removes: [],
+      },
+    });
+    expect(JSON.stringify(mutation)).not.toContain('SECRET');
   });
 });

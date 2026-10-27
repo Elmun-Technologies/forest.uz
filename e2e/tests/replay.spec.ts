@@ -17,7 +17,7 @@ test('session replay: consented checkout typing is recorded masked and plays in 
   baseURL,
 }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'one browser is enough for the round trip');
-  test.slow();
+  test.setTimeout(240_000); // cold dev compiles of checkout, /r.js and the admin page
 
   // A visitor with analytics + recording consent (real UA; automation flag hidden like the
   // synthetic traffic, or the ingest drops the session as a bot).

@@ -4,6 +4,7 @@ import {
   type ReplayGateConfig,
   type ReplayReason,
   replayReason,
+  scrubReplayEvent,
 } from '@forest/contracts/core';
 import { RECORD_OPTIONS } from './options';
 
@@ -65,8 +66,11 @@ export function startRecorder(win: Win, boot: RecorderBoot): void {
     stopRecording =
       record({
         ...RECORD_OPTIONS,
+        // Page URL and link/form URLs lose query strings and capability tokens (`/t/<token>`)
+        // before they leave the browser; a copy, so rrweb's own node records stay untouched.
         emit: (e) => {
-          buffer.push(e as RecordedEvent);
+          const ev = e as RecordedEvent;
+          buffer.push(ev.type >= 2 && ev.type <= 4 ? scrubReplayEvent(structuredClone(ev)) : ev);
         },
       }) ?? undefined;
   };

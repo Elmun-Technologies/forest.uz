@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isProxiedAsset, isSnapshotPath, sanitizeSnapshot } from './snapshot';
+import { proxiedAssetUrl, sanitizeSnapshot, snapshotUrl, viaProxy } from './snapshot';
 
 describe('heatmap snapshot sanitizer', () => {
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -36,16 +36,72 @@ describe('heatmap snapshot sanitizer', () => {
     );
   });
 
-  it('accepts storefront paths and proxied assets only', () => {
-    expect(isSnapshotPath('/')).toBe(true);
-    expect(isSnapshotPath('/p/divan-toplami')).toBe(true);
-    expect(isSnapshotPath('/../admin')).toBe(false);
-    expect(isSnapshotPath('//evil.example')).toBe(false);
-    expect(isSnapshotPath('/a?b')).toBe(false);
-    expect(isProxiedAsset('_next/static/media/m.woff2')).toBe(true);
-    expect(isProxiedAsset('_next/image')).toBe(true);
-    expect(isProxiedAsset('api/v1/admin')).toBe(false);
-    expect(isProxiedAsset('_next/static/../../etc')).toBe(false);
-    expect(isProxiedAsset('uz/katalog')).toBe(false);
+  const WEB = 'http://web:3000';
+
+  it('snapshot URLs are storefront locale pages only (no traversal, no encodings)', () => {
+    expect(snapshotUrl(WEB, '/')?.href).toBe('http://web:3000/uz');
+    expect(snapshotUrl(WEB, '/p/divan-toplami')?.href).toBe('http://web:3000/uz/p/divan-toplami');
+    for (const bad of [
+      '/../api/settings/public',
+      '/%2e%2e/api/settings/public',
+      '/%252e%252e/api/x',
+      '/a/..',
+      '/.',
+      '//evil.example',
+      '/a\\..\\api',
+      '/a?b',
+      'katalog',
+    ])
+      expect(snapshotUrl(WEB, bad), bad).toBeNull();
+  });
+
+  it('proxies only /_next/static files and the image optimizer', () => {
+    expect(proxiedAssetUrl(WEB, '_next/static/media/m.woff2', '?x=1')?.href).toBe(
+      'http://web:3000/_next/static/media/m.woff2',
+    );
+    expect(
+      proxiedAssetUrl(WEB, '_next/static/chunks/[root-of-the-server]__a.css', '')?.pathname,
+    ).toBe('/_next/static/chunks/[root-of-the-server]__a.css');
+    expect(proxiedAssetUrl(WEB, '_next/image', '?url=a&w=640&q=75')?.href).toBe(
+      'http://web:3000/_next/image?url=a&w=640&q=75',
+    );
+    for (const bad of [
+      '_next/static/%2e%2e/%2e%2e/api/settings/public',
+      '_next/static/%252e%252e/api',
+      '_next/static/../../api',
+      '_next/static/./x',
+      '_next/static//x',
+      '_next/static\\..\\api',
+      'api/v1/admin',
+      'uz/katalog',
+      '_next/data/x.json',
+    ])
+      expect(proxiedAssetUrl(WEB, bad, ''), bad).toBeNull();
+  });
+
+  it('replay events load storefront assets through the same-origin proxy', () => {
+    const events = [
+      {
+        type: 4,
+        timestamp: 1,
+        data: { href: 'https://forest.uz/uz/checkout', width: 1, height: 1 },
+      },
+      {
+        type: 2,
+        timestamp: 2,
+        data: {
+          node: {
+            attributes: {
+              src: 'https://forest.uz/_next/image?url=a&w=640',
+              href: 'https://evil.example/x',
+            },
+          },
+        },
+      },
+    ];
+    const out = JSON.stringify(viaProxy(events));
+    expect(out).toContain('"src":"/sf/_next/image?url=a&w=640"');
+    expect(out).toContain('https://evil.example/x'); // other hosts stay — the admin CSP blocks them
+    expect(viaProxy([{ type: 3, timestamp: 1 }])).toEqual([{ type: 3, timestamp: 1 }]);
   });
 });

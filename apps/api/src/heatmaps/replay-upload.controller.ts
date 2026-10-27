@@ -19,25 +19,47 @@ function cookie(req: Request, name: string): string | null {
   return typeof v === 'string' && v.length <= 2000 ? v : null;
 }
 
+const CHUNK_TYPES = new Set(['application/octet-stream', 'application/gzip']);
+
 /**
- * Reads the raw body (the recorder sends `application/octet-stream` gzip, which no body parser
- * touches) with a hard cap; an oversized body is drained, not buffered.
+ * Reads the raw body: the recorder sends `application/octet-stream` gzip, which no body parser
+ * touches. Any other type is refused before reading (a JSON body would already have been
+ * consumed by Nest's parser and the stream would never end), and an oversized body is rejected
+ * as soon as it crosses the cap — the rest is drained, never buffered.
  */
 function readBody(req: Request, limit: number): Promise<Buffer> {
+  const type = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+  if (!CHUNK_TYPES.has(type)) return Promise.reject(new DomainError('REPLAY_CONTENT_TYPE'));
   if (Buffer.isBuffer(req.body)) return Promise.resolve(req.body);
-  const declared = Number(req.headers['content-length'] ?? 0);
-  if (declared > limit) return Promise.reject(new DomainError('REPLAY_TOO_LARGE'));
+  if (req.readableEnded) return Promise.reject(new DomainError('REPLAY_CHUNK_INVALID'));
+  if (Number(req.headers['content-length'] ?? 0) > limit)
+    return Promise.reject(new DomainError('REPLAY_TOO_LARGE'));
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    req.on('data', (c: Buffer) => {
+    const stop = () => {
+      req.off('data', onData);
+      req.off('end', onEnd);
+      req.off('error', onError);
+    };
+    const onData = (c: Buffer) => {
       size += c.length;
-      if (size <= limit) chunks.push(c);
-    });
-    req.on('end', () =>
-      size > limit ? reject(new DomainError('REPLAY_TOO_LARGE')) : resolve(Buffer.concat(chunks)),
-    );
-    req.on('error', reject);
+      if (size <= limit) return void chunks.push(c);
+      stop();
+      req.resume(); // drain the rest without keeping it
+      reject(new DomainError('REPLAY_TOO_LARGE'));
+    };
+    const onEnd = () => {
+      stop();
+      resolve(Buffer.concat(chunks));
+    };
+    const onError = (e: Error) => {
+      stop();
+      reject(e);
+    };
+    req.on('data', onData);
+    req.on('end', onEnd);
+    req.on('error', onError);
   });
 }
 

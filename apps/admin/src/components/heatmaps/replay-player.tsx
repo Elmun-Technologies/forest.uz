@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Replayer as ReplayerType } from 'rrweb';
 import 'rrweb/dist/style.css';
 import { adminFetch, errorText } from '../../lib/client-api';
+import { viaProxy } from '../../lib/snapshot';
 import { COPY, formatDuration, MARKER, markerLabel } from './copy';
 
 const SPEEDS = [1, 2, 4] as const;
@@ -53,7 +54,7 @@ export function ReplayPlayer({ sessionId, onClose }: { sessionId: string; onClos
     const root = host.current;
     void import('rrweb').then(({ Replayer }) => {
       if (!alive) return;
-      const r = new Replayer(data.events as ConstructorParameters<typeof Replayer>[0], {
+      const r = new Replayer(viaProxy(data.events) as ConstructorParameters<typeof Replayer>[0], {
         root,
         skipInactive: true,
         showWarning: false,

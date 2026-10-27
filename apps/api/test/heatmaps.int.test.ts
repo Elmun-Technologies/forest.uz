@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import {
   type HeatmapDto,
   type ReplayListDto,
@@ -206,10 +206,86 @@ describe('session replay + heatmaps A3 (integration)', () => {
       expect((await upload(sid, { body: chunk([]) })).status).toBe(400);
     });
 
+    it('refuses other content types at once (no hanging on a consumed JSON body)', async () => {
+      const sid = sessionIdWith(true);
+      await newSession(sid);
+      const res = await request(app.getHttpServer())
+        .post(`/v1/t/replay?sid=${sid}`)
+        .timeout(5000)
+        .set('Content-Type', 'application/json')
+        .set('Cookie', `fr_sid=${sid}; fr_aid=${aid}; ${consentCookie(true)}`)
+        .send({ a: 1 });
+      expect(res.status).toBe(415);
+    });
+
+    it('needs analytics not refused, and stores URLs without tokens or queries', async () => {
+      const sid = sessionIdWith(true);
+      await newSession(sid);
+      const noAnalytics = await request(app.getHttpServer())
+        .post(`/v1/t/replay?sid=${sid}`)
+        .set('Content-Type', 'application/octet-stream')
+        .set(
+          'Cookie',
+          `fr_sid=${sid}; fr_aid=${aid}; fr_consent=${encodeURIComponent(
+            JSON.stringify({ v: 1, analytics: false, marketing: false, replay: true, ts: 1 }),
+          )}`,
+        )
+        .send(chunk());
+      expect(noAnalytics.status).toBe(403);
+
+      const res = await upload(sid, {
+        body: chunk([
+          {
+            type: 4,
+            timestamp: Date.now(),
+            data: { href: 'https://forest.uz/uz/t/SECRETTOKEN1?utm=x', width: 390, height: 844 },
+          },
+          {
+            type: 3,
+            timestamp: Date.now(),
+            data: {
+              source: 0,
+              adds: [
+                {
+                  parentId: 1,
+                  node: {
+                    type: 2,
+                    tagName: 'a',
+                    attributes: { href: '/uz/buyurtma/SECRETID2' },
+                    childNodes: [],
+                  },
+                },
+              ],
+              attributes: [],
+              texts: [],
+              removes: [],
+            },
+          },
+        ]),
+      });
+      expect(res.status).toBe(201);
+      const key = [...files.objects.keys()].find((k) => k.includes(sid))!;
+      const stored = gunzipSync(files.objects.get(key)!.body).toString();
+      expect(stored).not.toMatch(/SECRETTOKEN1|SECRETID2|utm=x/);
+      expect(stored).toContain('https://forest.uz/uz/t/:token');
+    });
+
     it('applies the sample rule, the checkout rate and the kill switch', async () => {
       const sid = sessionIdWith(false);
       await newSession(sid);
       expect((await upload(sid)).status).toBe(403); // outside the 30 % sample
+      // `checkout` needs proof: the session's stored checkout page view (409 = retry later).
+      expect((await upload(sid, { reason: 'checkout' })).status).toBe(409);
+      await prisma.event.create({
+        data: {
+          id: randomUUID(),
+          ts: new Date(),
+          sessionId: sid,
+          anonymousId: aid,
+          name: 'page_view',
+          path: '/ru/checkout',
+        },
+      });
       expect((await upload(sid, { reason: 'checkout' })).status).toBe(201); // checkout = 100 %
       await setRules({ replayEnabled: false });
       try {

@@ -1,3 +1,5 @@
+import { scrubPath } from './tracking';
+
 /**
  * Session replay and heatmaps (docs/07, admin A3). Zod-free: shared by the storefront replay gate,
  * the recorder bundle, the API (upload checks, aggregation) and the admin UI.
@@ -15,6 +17,8 @@ export const REPLAY_LIMITS = {
   /** 2 h of 10 s chunks. */
   chunksPerSession: 720,
   sessionCompressedBytes: 40 * 1024 * 1024,
+  /** All sessions together per Tashkent day (storage cost guard; beyond → 413, recording stops). */
+  dailyCompressedBytes: 5 * 1024 * 1024 * 1024,
   chunksPerMinutePerSession: 30,
   chunksPerMinutePerIp: 120,
   /** The recorder uploads this often. */
@@ -82,6 +86,68 @@ export function replayPrefix(day: string, sessionId: string): string {
 
 /** Strict session-id shape accepted by the upload (tracker UUIDs; nothing path-like). */
 export const REPLAY_SESSION_ID_RE = /^[0-9a-zA-Z-]{8,64}$/;
+
+/** URL attributes that may carry capability tokens or query strings (links, forms). */
+const URL_ATTRIBUTES = new Set(['href', 'action', 'formaction', 'ping']);
+
+/**
+ * A URL as it may be stored in a recording: http(s) and relative URLs lose query and hash and
+ * get `scrubPath` (tracking token, order id, phone/email-like segments → placeholders); build
+ * assets (`/_next/…`) stay as they are (the player needs them); other schemes are kept.
+ */
+export function scrubReplayUrl(value: string): string {
+  const v = value.trim();
+  const absolute = /^[a-z][a-z0-9+.-]*:/i.test(v) || v.startsWith('//');
+  if (absolute && !/^(?:https?:)?\/\//i.test(v)) return value; // tel:, mailto:, data:, blob:…
+  let url: URL;
+  try {
+    url = new URL(v, 'http://relative.invalid');
+  } catch {
+    return value;
+  }
+  if (url.pathname.startsWith('/_next/')) return value;
+  const path = scrubPath(url.pathname);
+  return absolute ? `${url.origin}${path}` : path;
+}
+
+interface SerializedNode {
+  attributes?: Record<string, unknown>;
+  childNodes?: SerializedNode[];
+}
+
+function scrubAttributes(attrs: Record<string, unknown> | undefined): void {
+  if (!attrs) return;
+  for (const [name, value] of Object.entries(attrs))
+    if (typeof value === 'string' && URL_ATTRIBUTES.has(name.toLowerCase()))
+      attrs[name] = scrubReplayUrl(value);
+}
+
+function scrubNode(node: SerializedNode | undefined): void {
+  if (!node) return;
+  scrubAttributes(node.attributes);
+  for (const child of node.childNodes ?? []) scrubNode(child);
+}
+
+/**
+ * Removes URLs that could carry secrets from one rrweb event, in place: the page URL of Meta
+ * events (type 4) and link/form URL attributes of full snapshots (type 2) and DOM mutations
+ * (type 3, source 0). Run by the recorder before upload and again by the API on every chunk.
+ */
+export function scrubReplayEvent<E>(event: E): E {
+  const e = event as { type?: unknown; data?: Record<string, unknown> } | null;
+  const data = e?.data;
+  if (!e || !data || typeof data !== 'object') return event;
+  if (e.type === 4 && typeof data.href === 'string') data.href = scrubReplayUrl(data.href);
+  else if (e.type === 2) scrubNode(data.node as SerializedNode | undefined);
+  else if (e.type === 3 && data.source === 0) {
+    for (const add of (data.adds as { node?: SerializedNode }[] | undefined) ?? [])
+      scrubNode(add.node);
+    for (const change of (data.attributes as
+      { attributes?: Record<string, unknown> }[] | undefined) ?? [])
+      scrubAttributes(change.attributes);
+  }
+  return event;
+}
 
 // ───────────────────────── Heatmaps ─────────────────────────
 
