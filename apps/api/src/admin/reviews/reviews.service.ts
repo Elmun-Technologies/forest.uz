@@ -118,7 +118,8 @@ export class AdminReviewsService {
   }
 
   async gallery(actor: AuditActor, id: string, input: ReviewGalleryInput): Promise<AdminReviewDto> {
-    return this.change(actor, id, 'review.gallery', async (r, tx) => {
+    let replaced: string | null = null;
+    const dto = await this.change(actor, id, 'review.gallery', async (r, tx) => {
       const data: Prisma.ReviewUpdateInput = {};
       if (input.afterFileId !== undefined) {
         if (!r.photoFileIds.includes(input.afterFileId))
@@ -135,6 +136,7 @@ export class AdminReviewsService {
         )
           throw new DomainError('REVIEW_PHOTO_NOT_FOUND', undefined, 'beforeFileId');
         data.beforeFileId = input.beforeFileId;
+        if (r.beforeFileId && r.beforeFileId !== input.beforeFileId) replaced = r.beforeFileId;
       }
       if (input.inGallery !== undefined && input.inGallery !== r.inGallery) {
         if (input.inGallery) {
@@ -152,6 +154,10 @@ export class AdminReviewsService {
       }
       return data;
     });
+    // A replaced staff upload is no longer referenced: drop its row and object. Customer photos
+    // stay (they are still in `photoFileIds`, which `discardUnreferenced` checks).
+    if (replaced) await this.uploads.discardUnreferenced([replaced]);
+    return dto;
   }
 
   /** Staff "before" photo for a pair (public bucket), then linked like `gallery({beforeFileId})`. */

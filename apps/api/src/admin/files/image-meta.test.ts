@@ -48,6 +48,19 @@ describe('imageMeta (magic bytes, header size)', () => {
     ).toMatchObject({ width: 1920, height: 1080 });
   });
 
+  it('rejects absurd dimensions (int4 overflow, decompression bombs)', () => {
+    const b = Buffer.alloc(33);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b, 0);
+    b.write('IHDR', 12, 'ascii');
+    b.writeUInt32BE(0xffffffff, 16);
+    b.writeUInt32BE(10, 20);
+    expect(imageMeta(b)).toBeNull();
+    b.writeUInt32BE(20_001, 16);
+    expect(imageMeta(b)).toBeNull();
+    b.writeUInt32BE(20_000, 16);
+    expect(imageMeta(b)).toMatchObject({ width: 20_000, height: 10 });
+  });
+
   it('rejects anything else (SVG, GIF, text) whatever the name says', () => {
     expect(imageMeta(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'))).toBeNull();
     expect(imageMeta(Buffer.from('GIF89a........'))).toBeNull();

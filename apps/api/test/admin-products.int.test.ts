@@ -122,7 +122,7 @@ describe('admin products A11 (integration)', () => {
     expect(meta.status).toBe(200);
     expect(meta.body.kpis.activeProducts).toBeGreaterThanOrEqual(8);
     expect(meta.body.kpis.missingIkpuVariants).toBeGreaterThanOrEqual(14);
-    expect(meta.body.kpis.feedsConnected).toBe(0);
+    expect(meta.body.kpis).not.toHaveProperty('feedsConnected');
     expect(meta.body.locks).toEqual({ source: 'local', price: false, stock: false });
     expect(meta.body.seller).toEqual({ name: 'Forest', isOfficial: true });
 
@@ -395,6 +395,22 @@ describe('admin products A11 (integration)', () => {
     res = await owner.get(`/v1/admin/products/${p.id}`);
     expect(res.body.locks).toEqual({ source: 'moysklad', price: false, stock: true });
 
+    // A variant linked to MoySklad: its SKU and active flag belong to the reconcile.
+    await prisma.variant.update({ where: { id: v.id }, data: { moyskladId: `ms-${run}` } });
+    res = await owner.send('patch', `/v1/admin/products/variants/${v.id}`, { sku: `t-${run}-x` });
+    expect(res.body.error).toMatchObject({ code: 'CATALOG_MOYSKLAD_READONLY', field: 'sku' });
+    res = await owner.send('patch', `/v1/admin/products/variants/${v.id}`, { active: false });
+    expect(res.body.error).toMatchObject({ code: 'CATALOG_MOYSKLAD_READONLY', field: 'active' });
+    res = await owner.send('patch', `/v1/admin/products/variants/${v.id}`, {
+      sku: v.sku,
+      active: true,
+      label: { uz: '1 litr', ru: '1 литр' },
+    });
+    expect(res.status).toBe(200);
+    // Deleting a MoySklad import would only bring it back, without our content.
+    res = await owner.send('delete', `/v1/admin/products/${p.id}`);
+    expect(res.body.error.code).toBe('CATALOG_MOYSKLAD_READONLY');
+
     await prisma.integration.update({
       where: { key: 'moysklad' },
       data: { status: 'DISCONNECTED', config: {} },
@@ -426,5 +442,105 @@ describe('admin products A11 (integration)', () => {
       seo: { uz: { title: 'x'.repeat(61), description: '' }, ru: { title: '', description: '' } },
     });
     expect(res.status).toBe(400);
+  });
+
+  it('active variants need a price ≥ 1 so’m; compare-at edits keep the exact price', async () => {
+    const p = await create('price');
+    let res = await addVariant(p.id, { sku: `t-${run}-p0`, priceSoum: 0, ikpu: IKPU });
+    expect(res.body.error).toMatchObject({ code: 'PRODUCT_PRICE_REQUIRED', field: 'priceSoum' });
+    res = await addVariant(p.id, { sku: `t-${run}-p0`, priceSoum: 0, ikpu: IKPU, active: false });
+    expect(res.status).toBe(201);
+    const v = res.body.variants[0];
+    res = await owner.send('patch', `/v1/admin/products/variants/${v.id}`, { active: true });
+    expect(res.body.error.code).toBe('PRODUCT_PRICE_REQUIRED');
+    // A price with tiyin (MoySklad) is never rewritten by an edit of another field.
+    await prisma.variant.update({
+      where: { id: v.id },
+      data: { priceTiyin: 12_345_678n, active: true },
+    });
+    res = await owner.send('patch', `/v1/admin/products/variants/${v.id}`, {
+      priceSoum: 123_457,
+      compareAtSoum: 150_000,
+    });
+    expect(res.status).toBe(200);
+    const row = await prisma.variant.findUniqueOrThrow({ where: { id: v.id } });
+    expect(row.priceTiyin).toBe(12_345_678n);
+    expect(row.compareAtTiyin).toBe(15_000_000n);
+    // Activation checks every active variant's price.
+    await prisma.variant.update({ where: { id: v.id }, data: { priceTiyin: 0n } });
+    res = await owner.send('patch', `/v1/admin/products/${p.id}`, { status: 'ACTIVE' });
+    expect(res.body.error.code).toBe('PRODUCT_PRICE_REQUIRED');
+  });
+
+  it('video URLs must be https', async () => {
+    const p = await create('video');
+    for (const videoUrl of ['javascript:alert(1)', 'data:text/html,x', 'http://youtu.be/x']) {
+      const res = await owner.send('patch', `/v1/admin/products/${p.id}`, { videoUrl });
+      expect(res.status, videoUrl).toBe(400);
+    }
+    const ok = await owner.send('patch', `/v1/admin/products/${p.id}`, {
+      videoUrl: 'https://youtu.be/abc',
+    });
+    expect(ok.body.videoUrl).toBe('https://youtu.be/abc');
+  });
+
+  it('slug change follows the home hero card; deleting a draft stops its gift codes', async () => {
+    const p = await create('hero');
+    const setting = await prisma.setting.findUniqueOrThrow({ where: { key: 'home.media' } });
+    const original = setting.value as { hero: { productSlug: string | null } | null };
+    try {
+      await prisma.setting.update({
+        where: { key: 'home.media' },
+        data: {
+          value: {
+            ...(original as object),
+            hero: {
+              beforeKey: 'b.jpg',
+              afterKey: 'a.jpg',
+              alt: { uz: '', ru: '' },
+              ...(original.hero ?? {}),
+              productSlug: p.slug,
+            },
+          },
+        },
+      });
+      const res = await owner.send('patch', `/v1/admin/products/${p.id}`, {
+        slug: slug('hero-new'),
+      });
+      expect(res.status).toBe(200);
+      const after = await prisma.setting.findUniqueOrThrow({ where: { key: 'home.media' } });
+      expect((after.value as { hero: { productSlug: string } }).hero.productSlug).toBe(
+        slug('hero-new'),
+      );
+      const audit = await prisma.auditLog.findFirst({
+        where: { entityId: p.id, action: 'product.update' },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(audit?.after).toMatchObject({ homeHeroSlug: slug('hero-new') });
+    } finally {
+      await prisma.setting.update({
+        where: { key: 'home.media' },
+        data: { value: setting.value ?? {} },
+      });
+    }
+
+    const g = await create('gift');
+    const gv = (await addVariant(g.id, { sku: `t-${run}-gift` })).body.variants[0];
+    const promo = await prisma.promoCode.create({
+      data: {
+        code: `TGIFT${run.toUpperCase()}`.slice(0, 32),
+        type: 'GIFT',
+        value: 0,
+        giftVariantId: gv.id,
+      },
+    });
+    try {
+      const res = await owner.send('delete', `/v1/admin/products/${g.id}`);
+      expect(res.status).toBe(204);
+      const after = await prisma.promoCode.findUniqueOrThrow({ where: { id: promo.id } });
+      expect(after).toMatchObject({ giftVariantId: null, active: false });
+    } finally {
+      await prisma.promoCode.delete({ where: { id: promo.id } });
+    }
   });
 });

@@ -68,9 +68,6 @@ export interface AdminProductKpisDto {
   lowStockVariants: number;
   /** Active variants of non-archived products without a valid IKPU. */
   missingIkpuVariants: number;
-  /** Product feeds (Meta, Google Merchant, TikTok) arrive in Phase 4: always 0 for now. */
-  feedsConnected: number;
-  feedsTotal: number;
 }
 
 export interface AdminCategoryOptionDto {

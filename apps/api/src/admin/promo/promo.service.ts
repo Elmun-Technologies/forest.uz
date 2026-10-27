@@ -258,10 +258,11 @@ export class AdminPromoService {
         const v = p.giftVariantId
           ? await tx.variant.findUnique({
               where: { id: p.giftVariantId },
-              select: { active: true, priceTiyin: true },
+              select: { active: true, priceTiyin: true, product: { select: { status: true } } },
             })
           : null;
-        if (!v || !v.active)
+        // A gift must be sellable: an inactive variant or a DRAFT/ARCHIVED product never ships.
+        if (!v || !v.active || v.product.status !== 'ACTIVE')
           throw new DomainError('PROMO_GIFT_INVALID', undefined, 'giftVariantId');
         if (v.priceTiyin > capOfMinCart)
           throw new DomainError('PROMO_OVER_MARGIN_GUARD', guard, 'minCartSoum');

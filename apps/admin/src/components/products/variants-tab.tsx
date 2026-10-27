@@ -244,11 +244,13 @@ function VariantForm({
   const [d, setD] = useState(() => draftOf(variant, lowStockDefault));
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setD((x) => ({ ...x, [k]: v }));
   const { locks } = product;
+  // MoySklad's reconcile owns SKU and active/archived for linked variants (CLAUDE.md §6).
+  const linkedLock = locks.source === 'moysklad' && !!variant?.linkedToMoysklad;
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const body = {
-      sku: d.sku,
+      ...(linkedLock ? {} : { sku: d.sku, active: d.active }),
       label: d.label,
       ikpu: d.ikpu.trim(),
       packageCode: d.packageCode.trim(),
@@ -258,7 +260,6 @@ function VariantForm({
       colorHex: d.colorHex.trim(),
       barcode: d.barcode.trim(),
       lowStockAt: d.lowStockAt ?? lowStockDefault,
-      active: d.active,
       ...(locks.price ? {} : { priceSoum: d.priceSoum ?? 0, compareAtSoum: d.compareAtSoum }),
       ...(locks.stock ? {} : { stock: d.stock ?? 0 }),
     };
@@ -294,12 +295,13 @@ function VariantForm({
         maxLength={60}
       />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="SKU">
+        <Field label="SKU" hint={linkedLock ? COPY.moyskladOwned : undefined}>
           {(p) => (
             <Input
               {...p}
               className={compactInput}
               required
+              disabled={linkedLock}
               value={d.sku}
               onChange={(e) => set('sku', e.target.value)}
             />
@@ -322,7 +324,7 @@ function VariantForm({
           {(p) => (
             <NumberInput
               {...p}
-              min={0}
+              min={d.active ? 1 : 0}
               required
               value={d.priceSoum}
               disabled={locks.price}
@@ -433,10 +435,16 @@ function VariantForm({
         </Field>
       </div>
       <div className="flex items-center gap-3">
-        <Switch id="variant-active" checked={d.active} onCheckedChange={(v) => set('active', v)} />
+        <Switch
+          id="variant-active"
+          checked={d.active}
+          disabled={linkedLock}
+          onCheckedChange={(v) => set('active', v)}
+        />
         <label htmlFor="variant-active" className="font-semibold">
           Faol (saytda sotiladi)
         </label>
+        {linkedLock ? <span className="text-xs text-muted">{COPY.moyskladOwned}</span> : null}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button

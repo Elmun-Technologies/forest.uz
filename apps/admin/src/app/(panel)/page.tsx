@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '../../components/page';
 import { requireFullSession } from '../../lib/api';
 import { formatLongDate } from '../../lib/format';
-import { settingsTabsFor } from '../../lib/nav';
+import { navFor, settingsTabsFor } from '../../lib/nav';
 
 export const metadata: Metadata = { title: 'Dashboard · Forest Admin' };
 
@@ -15,7 +15,17 @@ export const metadata: Metadata = { title: 'Dashboard · Forest Admin' };
  */
 export default async function DashboardPage() {
   const me = await requireFullSession();
-  const shortcuts = settingsTabsFor(me.staff.role);
+  // Every built section the role may open (sidebar items with a page), then the settings tabs.
+  const shortcuts = [
+    ...navFor(me.staff.role)
+      .flatMap((g) => g.items)
+      .filter((i) => i.href && i.href !== '/' && i.href !== '/settings')
+      .map((i) => ({ href: i.href as string, label: i.label })),
+    ...settingsTabsFor(me.staff.role).map((t) => ({
+      href: t.href,
+      label: `Sozlamalar · ${t.label}`,
+    })),
+  ];
   return (
     <>
       <PageHeader title="Dashboard" subtitle={formatLongDate()} />
@@ -24,7 +34,7 @@ export default async function DashboardPage() {
         <p className="max-w-2xl text-sm leading-relaxed text-muted">
           {hasPermission(me.staff.role, 'analytics.view')
             ? "Ko'rsatkichlar (sessiyalar, buyurtmalar, tushum, konversiya), sotuv voronkasi va «Diqqat talab qiladi» ro'yxati birinchi tomon analitikasi bilan 4-bosqichda ulanadi. Hozircha bu yerda namunaviy raqamlar ko'rsatilmaydi."
-            : "Buyurtmalar va SLA ogohlantirishlari shu yerda paydo bo'ladi — ular keyingi bosqichlarda ulanadi."}
+            : "Ish bo'limlari pastda va chap menyuda. Dashboard ko'rsatkichlari (SLA ogohlantirishlari, kam qoldiq) birinchi tomon analitikasi bilan 4-bosqichda qo'shiladi."}
         </p>
       </Panel>
       {shortcuts.length > 0 ? (
@@ -38,7 +48,7 @@ export default async function DashboardPage() {
                 prefetch={false}
                 className="rounded-pill bg-canvas px-4 py-2 text-[13px] font-semibold hover:bg-sage"
               >
-                Sozlamalar · {t.label}
+                {t.label}
               </Link>
             ))}
           </div>

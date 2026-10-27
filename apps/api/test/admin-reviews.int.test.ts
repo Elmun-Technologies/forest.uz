@@ -248,6 +248,24 @@ describe('admin reviews & gallery A15 (integration)', () => {
       .attach('file', png(800, 600), 'before.png');
     expect(up.status).toBe(201);
     expect(up.body.before.url).toMatch(new RegExp(`/reviews/${second.id}/`));
+    // Replacing the staff "before" photo drops the old upload (row + object); a customer photo
+    // used as "before" is never deleted.
+    const staffBefore = up.body.before.fileId as string;
+    const own = await photo('b2');
+    await prisma.review.update({
+      where: { id: second.id },
+      data: { photoFileIds: { push: own } },
+    });
+    res = await owner.send('patch', `/v1/admin/reviews/${second.id}/gallery`, {
+      beforeFileId: own,
+    });
+    expect(res.body.before.fileId).toBe(own);
+    expect(await prisma.file.findUnique({ where: { id: staffBefore } })).toBeNull();
+    res = await owner.send('patch', `/v1/admin/reviews/${second.id}/gallery`, {
+      beforeFileId: null,
+    });
+    expect(res.body.before).toBeNull();
+    expect(await prisma.file.findUnique({ where: { id: own } })).not.toBeNull();
 
     let gallery = await owner.get('/v1/admin/reviews/gallery');
     expect(gallery.body.map((g: { reviewId: string }) => g.reviewId)).toEqual([
@@ -263,7 +281,9 @@ describe('admin reviews & gallery A15 (integration)', () => {
 
     const home = await request(app.getHttpServer()).get('/v1/content/home').expect(200);
     expect(home.body.gallery).toHaveLength(2);
-    expect(home.body.gallery[0].before).not.toBeNull();
+    // `second` (first now) lost its pair above; `first` keeps a1 as "before".
+    expect(home.body.gallery[0].before).toBeNull();
+    expect(home.body.gallery[1].before).not.toBeNull();
 
     // Rejecting takes it out of the public gallery at once.
     await owner.send('patch', `/v1/admin/reviews/${second.id}/status`, { status: 'REJECTED' });

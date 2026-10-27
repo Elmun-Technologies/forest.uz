@@ -8,6 +8,11 @@ export const ADMIN_CATALOG_ERROR_MESSAGES = {
     uz: "Faollashtirish uchun har bir faol variantda IKPU (MXIK) kodi bo'lishi kerak: {skus}.",
     ru: 'Для активации у каждого активного варианта должен быть код ИКПУ (MXIK): {skus}.',
   },
+  PRODUCT_PRICE_REQUIRED: {
+    http: 409,
+    uz: "Faol variantning narxi kamida 1 so'm bo'lishi kerak: {skus}.",
+    ru: 'У активного варианта цена должна быть не меньше 1 сума: {skus}.',
+  },
   PRODUCT_SLUG_TAKEN: {
     http: 409,
     uz: 'Bu manzil (slug) boshqa mahsulotda band. Boshqasini tanlang.',
@@ -40,8 +45,8 @@ export const ADMIN_CATALOG_ERROR_MESSAGES = {
   },
   CATALOG_MOYSKLAD_READONLY: {
     http: 409,
-    uz: "MoySklad ulangan: narx, qoldiq va variantlar ro'yxati MoySklad'da o'zgartiriladi.",
-    ru: 'MoySklad подключён: цены, остатки и список вариантов меняются в MoySklad.',
+    uz: "MoySklad ulangan: narx, qoldiq, SKU, faollik va variantlar ro'yxati MoySklad'da o'zgartiriladi (arxivlash ham).",
+    ru: 'MoySklad подключён: цены, остатки, SKU, активность и список вариантов меняются в MoySklad (архивация тоже).',
   },
   FILE_TYPE_UNSUPPORTED: {
     http: 400,

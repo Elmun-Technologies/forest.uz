@@ -132,6 +132,22 @@ describe('admin promo codes A14 (integration)', () => {
     });
     expect(res.body.error.code).toBe('PROMO_GIFT_INVALID');
     const brush = await prisma.variant.findUniqueOrThrow({ where: { sku: 'FR-BR-40' } });
+    // A variant of a product that isn't on sale can't be a gift.
+    const draft = await prisma.product.update({
+      where: { id: brush.productId },
+      data: { status: 'DRAFT' },
+    });
+    try {
+      res = await owner.post('/v1/admin/promo', {
+        code: code('GD'),
+        type: 'GIFT',
+        giftVariantId: brush.id,
+        minCartSoum: 1_000_000,
+      });
+      expect(res.body.error.code).toBe('PROMO_GIFT_INVALID');
+    } finally {
+      await prisma.product.update({ where: { id: draft.id }, data: { status: 'ACTIVE' } });
+    }
     res = await owner.post('/v1/admin/promo', {
       code: code('G'),
       type: 'GIFT',

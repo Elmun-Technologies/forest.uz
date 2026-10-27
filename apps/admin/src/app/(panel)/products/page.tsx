@@ -88,7 +88,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           </div>
         }
       />
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      {/* No feeds tile until the feeds exist (Phase 4): no placeholder numbers. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <KpiTile
           label={COPY.kpiActive}
           value={`${kpis.activeProducts} · ${kpis.activeVariants} variant`}
@@ -97,11 +98,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           label={COPY.kpiLow}
           value={`${kpis.lowStockVariants} variant`}
           tone={kpis.lowStockVariants > 0 ? 'warn' : 'panel'}
-        />
-        <KpiTile
-          label={COPY.kpiFeeds}
-          value={`${kpis.feedsConnected} / ${kpis.feedsTotal}`}
-          hint={COPY.kpiFeedsHint}
         />
         <KpiTile
           label={COPY.kpiIkpu}

@@ -9,7 +9,23 @@ export interface ImageMeta {
   height: number | null;
 }
 
+/** Larger than any real product photo; also keeps `File.width/height` within int4. */
+export const MAX_IMAGE_SIDE = 20_000;
+
+/** Type + size, or null for anything that isn't a JPEG/PNG/WebP of sane dimensions. */
 export function imageMeta(buf: Buffer): ImageMeta | null {
+  const meta = sniff(buf);
+  if (!meta) return null;
+  const { width, height } = meta;
+  if (
+    (width !== null && (width < 1 || width > MAX_IMAGE_SIDE)) ||
+    (height !== null && (height < 1 || height > MAX_IMAGE_SIDE))
+  )
+    return null;
+  return meta;
+}
+
+function sniff(buf: Buffer): ImageMeta | null {
   if (buf.length >= 24 && buf.readUInt32BE(0) === 0x89504e47 && buf.readUInt32BE(4) === 0x0d0a1a0a)
     return {
       mime: 'image/png',

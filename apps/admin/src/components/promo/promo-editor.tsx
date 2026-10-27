@@ -14,7 +14,7 @@ import { type FormEvent, useState } from 'react';
 import { FormError } from '../auth-card';
 import { adminFetch, errorText } from '../../lib/client-api';
 import { compactInput, NumberInput, selectClass } from '../products/fields';
-import { fromDateInput, soum, toDateInput } from '../products/format';
+import { fromDateTimeInput, soum, toDateTimeInput } from '../products/format';
 import { AUDIENCE_LABEL, COPY, PROMO_TYPE_LABEL, STATE_LABEL, STATE_TONE } from './copy';
 
 interface Draft {
@@ -42,8 +42,8 @@ const draftOf = (p: AdminPromoDto | null): Draft => ({
   segmentId: p?.segmentId ?? '',
   usageLimit: p?.usageLimit ?? null,
   perCustomerLimit: p?.perCustomerLimit ?? 1,
-  startsAt: toDateInput(p?.startsAt ?? null),
-  endsAt: toDateInput(p?.endsAt ?? null),
+  startsAt: toDateTimeInput(p?.startsAt ?? null),
+  endsAt: toDateTimeInput(p?.endsAt ?? null),
   utmSource: p?.utmSource ?? '',
 });
 
@@ -56,7 +56,8 @@ export function PromoEditor({
   summary: AdminPromoSummaryDto;
 }) {
   const router = useRouter();
-  const [d, setD] = useState(() => draftOf(promo));
+  const [initial] = useState(() => draftOf(promo));
+  const [d, setD] = useState(initial);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -93,8 +94,12 @@ export function PromoEditor({
       segmentId: d.audience === 'SEGMENT' ? d.segmentId || null : null,
       usageLimit: d.usageLimit,
       perCustomerLimit: d.perCustomerLimit ?? 1,
-      startsAt: fromDateInput(d.startsAt),
-      endsAt: fromDateInput(d.endsAt, true),
+      // Untouched dates are not re-sent: the inputs have minute precision and would round off
+      // an exact stored time (e.g. 23:59:59) on every save.
+      ...(!promo || d.startsAt !== initial.startsAt
+        ? { startsAt: fromDateTimeInput(d.startsAt) }
+        : {}),
+      ...(!promo || d.endsAt !== initial.endsAt ? { endsAt: fromDateTimeInput(d.endsAt) } : {}),
       utmSource: d.utmSource.trim(),
     });
   }
@@ -291,7 +296,7 @@ export function PromoEditor({
             {(p) => (
               <Input
                 {...p}
-                type="date"
+                type="datetime-local"
                 className={compactInput}
                 value={d.startsAt}
                 onChange={(e) => set('startsAt', e.target.value)}
@@ -302,7 +307,7 @@ export function PromoEditor({
             {(p) => (
               <Input
                 {...p}
-                type="date"
+                type="datetime-local"
                 className={compactInput}
                 value={d.endsAt}
                 onChange={(e) => set('endsAt', e.target.value)}

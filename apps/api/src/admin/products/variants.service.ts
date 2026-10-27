@@ -19,6 +19,7 @@ import {
   AdminProductsService,
   lockProduct,
   mapIkpuTrigger,
+  MIN_PRICE_TIYIN,
   mapUniqueError,
 } from './products.service';
 
@@ -78,6 +79,8 @@ export class AdminVariantsService {
         if (product.status === 'ACTIVE' && input.active && !isValidIkpu(input.ikpu))
           throw new DomainError('PRODUCT_IKPU_REQUIRED', { skus: input.sku }, 'ikpu');
         assertCompareAt(input.priceSoum, input.compareAtSoum);
+        if (input.active && input.priceSoum < 1)
+          throw new DomainError('PRODUCT_PRICE_REQUIRED', { skus: input.sku }, 'priceSoum');
         const created = await tx.variant.create({
           data: {
             productId,
@@ -152,6 +155,18 @@ export class AdminVariantsService {
         ] as const) {
           if (changed(key, prev[key])) (data as Record<string, unknown>)[key] = input[key];
         }
+        // The MoySklad reconcile re-SKUs and re-activates linked variants: edits here would be
+        // silently undone, so they are made (or archived) in MoySklad.
+        if (
+          locks.source === 'moysklad' &&
+          before.moyskladId &&
+          (changed('sku', prev.sku) || changed('active', prev.active))
+        )
+          throw new DomainError(
+            'CATALOG_MOYSKLAD_READONLY',
+            undefined,
+            changed('sku', prev.sku) ? 'sku' : 'active',
+          );
         const priceChanged = changed('priceSoum', prev.priceSoum);
         const compareChanged = changed('compareAtSoum', prev.compareAtSoum);
         if ((priceChanged || compareChanged) && locks.price)
@@ -163,13 +178,20 @@ export class AdminVariantsService {
         const price = input.priceSoum ?? prev.priceSoum;
         const compareAt =
           input.compareAtSoum !== undefined ? input.compareAtSoum : prev.compareAtSoum;
-        if (priceChanged || compareChanged) {
-          assertCompareAt(price, compareAt);
-          data.priceTiyin = soumToTiyin(price);
+        if (priceChanged || compareChanged) assertCompareAt(price, compareAt);
+        // Only the changed column is written: the DTO rounds tiyin to so'm, so rewriting an
+        // untouched price from it could change a (MoySklad) price with tiyin.
+        if (priceChanged) data.priceTiyin = soumToTiyin(price);
+        if (compareChanged)
           data.compareAtTiyin = compareAt === null ? null : soumToTiyin(compareAt);
-        }
 
         const after = { ...before, ...data } as Variant;
+        if (
+          after.active &&
+          after.priceTiyin < MIN_PRICE_TIYIN &&
+          (priceChanged || (!before.active && after.active))
+        )
+          throw new DomainError('PRODUCT_PRICE_REQUIRED', { skus: after.sku }, 'priceSoum');
         if (product.status === 'ACTIVE') {
           const others = product.variants.filter((v) => v.id !== variantId && v.active);
           if (before.active && after.active === false && others.length === 0)

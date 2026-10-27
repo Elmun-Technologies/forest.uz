@@ -14,8 +14,10 @@ import {
   productSeoTitle,
   type ProductUpdateInput,
   RELATION_KINDS,
+  settingSchemas,
   type RelationKind,
   slugify,
+  soumToTiyin,
   tiyinToSoumInt,
 } from '@forest/contracts';
 import { Prisma } from '@forest/db';
@@ -123,8 +125,6 @@ export class AdminProductsService {
           return a > 0 && a < v.lowStockAt;
         }).length,
         missingIkpuVariants: variants.filter((v) => !isValidIkpu(v.ikpu)).length,
-        feedsConnected: 0,
-        feedsTotal: 3,
       },
       categories: categories.map((c) => ({ id: c.id, slug: c.slug, name: localized(c.name) })),
       locks,
@@ -328,6 +328,7 @@ export class AdminProductsService {
   }
 
   async update(actor: AuditActor, id: string, input: ProductUpdateInput): Promise<AdminProductDto> {
+    let heroMoved = false;
     try {
       await this.prisma.$transaction(async (tx) => {
         await lockProduct(tx, id);
@@ -368,7 +369,10 @@ export class AdminProductsService {
           const taken = await tx.product.findUnique({ where: { slug }, select: { id: true } });
           if (taken) throw new DomainError('PRODUCT_SLUG_TAKEN', undefined, 'slug');
           data.slug = slug;
-          await this.moveSlug(tx, before.slug, slug);
+          if (await this.moveSlug(tx, before.slug, slug)) {
+            heroMoved = true;
+            note('homeHeroSlug', before.slug, slug);
+          }
         }
 
         if (input.categoryIds) {
@@ -427,6 +431,7 @@ export class AdminProductsService {
     } catch (e) {
       throw mapUniqueError(e);
     }
+    if (heroMoved) this.settings.invalidate();
     return this.get(id);
   }
 
@@ -436,10 +441,19 @@ export class AdminProductsService {
       await lockProduct(tx, id);
       const p = await tx.product.findUnique({
         where: { id },
-        include: { variants: { select: { id: true, sku: true } }, images: true },
+        include: {
+          variants: { select: { id: true, sku: true, moyskladId: true } },
+          images: true,
+        },
       });
       if (!p) throw new DomainError('PRODUCT_NOT_FOUND');
       if (p.status !== 'DRAFT') throw new DomainError('PRODUCT_DELETE_NOT_DRAFT');
+      // A MoySklad import would only come back on the next reconcile, without our content.
+      if (
+        p.variants.some((v) => v.moyskladId) &&
+        (await this.source.locks(tx)).source === 'moysklad'
+      )
+        throw new DomainError('CATALOG_MOYSKLAD_READONLY');
       const variantIds = p.variants.map((v) => v.id);
       const [sold, reviews, inBundles] = await Promise.all([
         tx.orderItem.count({ where: { variantId: { in: variantIds } } }),
@@ -449,6 +463,11 @@ export class AdminProductsService {
       if (sold > 0 || reviews > 0) throw new DomainError('PRODUCT_HAS_ORDERS');
       if (inBundles > 0) throw new DomainError('PRODUCT_VARIANT_IN_BUNDLE');
       await tx.cartItem.deleteMany({ where: { variantId: { in: variantIds } } });
+      // Same as a variant delete: a gift code pointing at a removed variant stops working.
+      await tx.promoCode.updateMany({
+        where: { giftVariantId: { in: variantIds } },
+        data: { giftVariantId: null, active: false },
+      });
       await tx.favorite.deleteMany({ where: { productId: id } });
       await tx.seoMeta.deleteMany({ where: { path: productSeoPath(p.slug) } });
       await tx.product.delete({ where: { id } });
@@ -540,7 +559,7 @@ export class AdminProductsService {
    * docs/10 "301 for changed slugs automatically": old → new per locale, older redirects that
    * pointed at the old path follow (no chains), SEO rows move with the product.
    */
-  private async moveSlug(tx: Tx, oldSlug: string, newSlug: string): Promise<void> {
+  private async moveSlug(tx: Tx, oldSlug: string, newSlug: string): Promise<boolean> {
     await this.claimPaths(tx, newSlug);
     for (const l of LOCALES) {
       const from = `/${l}/p/${oldSlug}`;
@@ -557,6 +576,17 @@ export class AdminProductsService {
       where: { path: productSeoPath(oldSlug) },
       data: { path: productSeoPath(newSlug) },
     });
+    return this.moveHeroSlug(tx, oldSlug, newSlug);
+  }
+
+  /** The home hero's "Shu natija uchun" card links by slug (`home.media`): follow the rename. */
+  private async moveHeroSlug(tx: Tx, oldSlug: string, newSlug: string): Promise<boolean> {
+    const row = await tx.setting.findUnique({ where: { key: 'home.media' } });
+    const parsed = settingSchemas['home.media'].safeParse(row?.value);
+    if (!parsed.success || parsed.data.hero?.productSlug !== oldSlug) return false;
+    const value = { ...parsed.data, hero: { ...parsed.data.hero, productSlug: newSlug } };
+    await tx.setting.update({ where: { key: 'home.media' }, data: { value } });
+    return true;
   }
 
   /** Blank title and description = template → no row. Returns the diff when something changed. */
@@ -607,14 +637,20 @@ export async function lockProduct(tx: Tx, id: string): Promise<void> {
 
 /** docs/04 invariant 1, surfaced before the DB trigger: every active variant has a valid IKPU. */
 export function assertActivatable(
-  variants: readonly { sku: string; active: boolean; ikpu: string | null }[],
+  variants: readonly { sku: string; active: boolean; ikpu: string | null; priceTiyin: bigint }[],
 ): void {
   const active = variants.filter((v) => v.active);
   if (active.length === 0) throw new DomainError('PRODUCT_LAST_VARIANT', undefined, 'status');
   const missing = active.filter((v) => !isValidIkpu(v.ikpu)).map((v) => v.sku);
   if (missing.length > 0)
     throw new DomainError('PRODUCT_IKPU_REQUIRED', { skus: missing.join(', ') }, 'status');
+  const free = active.filter((v) => v.priceTiyin < MIN_PRICE_TIYIN).map((v) => v.sku);
+  if (free.length > 0)
+    throw new DomainError('PRODUCT_PRICE_REQUIRED', { skus: free.join(', ') }, 'status');
 }
+
+/** An active variant is never sold for less than 1 so'm (a 0 price would be a free checkout). */
+export const MIN_PRICE_TIYIN = soumToTiyin(1);
 
 /** The constraints migration's IKPU triggers raise check_violation with these texts. */
 export function mapIkpuTrigger(e: unknown): unknown {

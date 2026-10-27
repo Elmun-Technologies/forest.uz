@@ -75,7 +75,8 @@ export const productUpdateSchema = z
     specs: z.array(z.object({ key: localizedRequired(80), value: localizedRequired(200) })).max(30),
     badges: z.array(z.enum(PRODUCT_BADGES)).max(3),
     surfaces: z.array(z.enum(SURFACES)).max(SURFACES.length),
-    videoUrl: blankToNull(z.url().max(500)),
+    // https only: rendered as a link/embed on the storefront.
+    videoUrl: blankToNull(z.url({ protocol: /^https$/ }).max(500)),
     coverageM2PerL: z.number().positive().max(999).nullable(),
     dryTimeMinutes: z.number().int().positive().max(100_000).nullable(),
     isBestseller: z.boolean(),
