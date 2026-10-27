@@ -11,8 +11,10 @@ kill_timeout = "30s"
   image = "redis:7-alpine"
 
 [processes]
-  # Through the image's entrypoint so it still drops to the `redis` user; sh expands the secret.
-  app = "sh -c 'exec docker-entrypoint.sh redis-server --dir /data --appendonly yes --maxmemory 150mb --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\"'"
+  # The password goes into a 0600 config file owned by `redis` (printf is a shell builtin), never
+  # onto a command line where `ps` would show it; then the image's entrypoint drops to `redis`
+  # (a first argument ending in .conf is run as `redis-server <conf> …`).
+  app = "sh -c 'umask 077 && printf \"requirepass %s\\n\" \"$REDIS_PASSWORD\" > /run/redis-auth.conf && chown redis /run/redis-auth.conf && exec docker-entrypoint.sh /run/redis-auth.conf --dir /data --appendonly yes --maxmemory 150mb --maxmemory-policy noeviction'"
 
 [mounts]
   source = "redisdata"

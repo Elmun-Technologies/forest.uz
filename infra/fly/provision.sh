@@ -7,7 +7,8 @@
 # (infra/compose.yml) — CLAUDE.md §6 / §15, docs/runbooks/deploy-demo.md.
 #
 # Needs: flyctl (logged in: `fly auth login`), jq, openssl. Optional: gh (logged in) + GH_REPO to
-# store the shared APP_ENCRYPTION_KEY straight into the repository's Actions secrets.
+# store the secrets shared with Vercel (WEB_REVALIDATE_SECRET, EDGE_PROXY_SECRET) straight into the
+# repository's `demo` environment; otherwise they are printed once.
 #
 # Usage (from the repo root):
 #   DEMO_WEB_URL=https://forest-demo-web.vercel.app \
@@ -171,11 +172,9 @@ stage_secrets "$API_APP" "S3_BUCKET_PUBLIC=$BUCKET_PUBLIC" "S3_BUCKET_PRIVATE=$B
   "S3_PUBLIC_URL=$S3_PUBLIC_URL"
 
 say "API secrets ($API_APP)"
-GENERATED_KEY=""
-if ! has_secret "$API_APP" APP_ENCRYPTION_KEY; then
-  GENERATED_KEY="$(openssl rand -base64 32)"
-  stage_secrets "$API_APP" "APP_ENCRYPTION_KEY=$GENERATED_KEY"
-fi
+# Fly-only: the integration-credential key never leaves the API (the storefront doesn't need it).
+has_secret "$API_APP" APP_ENCRYPTION_KEY ||
+  stage_secrets "$API_APP" "APP_ENCRYPTION_KEY=$(openssl rand -base64 32)"
 has_secret "$API_APP" SESSION_SECRET || stage_secrets "$API_APP" "SESSION_SECRET=$(rand_hex 32)"
 has_secret "$API_APP" TELEGRAM_WEBHOOK_SECRET ||
   stage_secrets "$API_APP" "TELEGRAM_WEBHOOK_SECRET=$(rand_hex 16)"
@@ -189,13 +188,27 @@ fi
 stage_secrets "$API_APP" "OWNER_EMAIL=$OWNER_EMAIL" "APP_URL=$DEMO_WEB_URL" \
   "ADMIN_URL=$DEMO_ADMIN_URL" "API_URL=$API_URL" "WEB_INTERNAL_URL=$DEMO_WEB_URL"
 
-if [ -n "$GENERATED_KEY" ] && [ -n "${GH_REPO:-}" ] && command -v gh >/dev/null; then
-  printf '%s' "$GENERATED_KEY" | gh secret set DEMO_APP_ENCRYPTION_KEY -R "$GH_REPO"
-  echo "  stored DEMO_APP_ENCRYPTION_KEY in $GH_REPO Actions secrets"
-  GENERATED_KEY_STORED=true
-else
-  GENERATED_KEY_STORED=false
+# Shared with Vercel (same value on both sides), so GitHub holds them too and the workflow writes
+# them into the Vercel projects: WEB_REVALIDATE_SECRET signs API → storefront calls (web only),
+# EDGE_PROXY_SECRET marks web/admin-proxied /api calls whose client IP the API may trust.
+gh_ready=false
+if [ -n "${GH_REPO:-}" ] && command -v gh >/dev/null; then
+  # Deploy jobs run in the `demo` environment (add required reviewers in the GitHub UI).
+  gh api -X PUT "repos/$GH_REPO/environments/demo" >/dev/null && gh_ready=true
 fi
+PRINT_ONCE=()
+for name in WEB_REVALIDATE_SECRET EDGE_PROXY_SECRET; do
+  has_secret "$API_APP" "$name" && continue
+  value="$(rand_hex 32)"
+  stage_secrets "$API_APP" "$name=$value"
+  if $gh_ready; then
+    printf '%s' "$value" | gh secret set "DEMO_$name" --env demo -R "$GH_REPO"
+    echo "  stored DEMO_$name in $GH_REPO environment 'demo'"
+  else
+    PRINT_ONCE+=("DEMO_$name=$value")
+  fi
+done
+unset value
 
 say "Secrets staged (names only; applied on the next API deploy)"
 printf '  %s\n' "${SET_NAMES[@]}"
@@ -208,20 +221,17 @@ Done. Next steps (docs/runbooks/deploy-demo.md):
 1. Tigris key scope — the app uses ONE key (id printed above) for both buckets. Keys made by
    'fly storage create' may be limited to their own bucket: open 'fly storage dashboard
    $BUCKET_PUBLIC' → Access keys → that key → add Editor on '$BUCKET_PRIVATE'.
-2. GitHub → Settings → Secrets and variables → Actions:
+2. GitHub → Settings → Environments → demo: add required reviewers, then its secrets/variables:
      variables: FLY_API_APP=$API_APP  DEMO_WEB_URL=$DEMO_WEB_URL
                 DEMO_ADMIN_URL=$DEMO_ADMIN_URL  DEMO_S3_PUBLIC_URL=$S3_PUBLIC_URL
      secrets:   FLY_API_TOKEN, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID_WEB,
-                VERCEL_PROJECT_ID_ADMIN, DEMO_APP_ENCRYPTION_KEY
+                VERCEL_PROJECT_ID_ADMIN, DEMO_WEB_REVALIDATE_SECRET, DEMO_EDGE_PROXY_SECRET
 3. Run the "Deploy demo" workflow with seed = true (first time).
 EOF
-if [ -n "$GENERATED_KEY" ] && ! $GENERATED_KEY_STORED; then
-  cat <<EOF
-
-DEMO_APP_ENCRYPTION_KEY (shown once — save it as that GitHub secret now; the storefront on
-Vercel verifies the API's revalidation calls with it, and Fly can't show it again):
-  $GENERATED_KEY
-EOF
+if [ "${#PRINT_ONCE[@]}" -gt 0 ]; then
+  echo
+  echo "Shown once — save as secrets of the GitHub environment 'demo' now (Fly can't show them again):"
+  printf '  %s\n' "${PRINT_ONCE[@]}"
 fi
 if [ -n "$GENERATED_OWNER_PW" ]; then
   cat <<EOF

@@ -4,7 +4,8 @@
 # Deployed by .github/workflows/deploy-demo.yml from the repo root:
 #   flyctl deploy . --config infra/fly/api.fly.toml --app "$FLY_API_APP" --remote-only --ha=false
 # `app` below is a default; the workflow and infra/fly/provision.sh pass the real name.
-# Secrets (DATABASE_URL, REDIS_URL, S3_*, APP_ENCRYPTION_KEY, …) are set by provision.sh.
+# Secrets (DATABASE_URL, REDIS_URL, S3_*, APP_ENCRYPTION_KEY, WEB_REVALIDATE_SECRET,
+# EDGE_PROXY_SECRET, …) are set by provision.sh.
 app = "forest-demo-api"
 # Frankfurt: the closest maintained Fly region to Tashkent (Warsaw/Bucharest were retired),
 # the usual transit point for Uzbek traffic, and the same city as Vercel's fra1 functions, so
@@ -31,12 +32,15 @@ kill_timeout = "30s"
   # Demo: fake Payme/Click/SMS/Telegram/Yandex/MoySklad adapters (no external calls).
   PROVIDERS_MODE = "fake"
   ALLOW_FAKE_PROVIDERS = "true"
-  # Dev outbox (fake SMS incl. OTP codes) so testers can log in. It makes every OTP public and
-  # lets anyone fetch the next admin TOTP code: acceptable only because the demo holds no real data.
+  # Dev endpoints on, but no DEV_ENDPOINTS_TOKEN is provisioned: only the narrow public OTP
+  # lookup answers (GET /v1/dev/outbox?to=<phone>: that phone's `otp` SMS of the last 5 minutes),
+  # so testers can log in. Everything else (full outbox, fake shipment, Telegram login, bot) is a
+  # 404, and the admin TOTP helper is off in production (ALLOW_DEV_ADMIN_TOTP unset).
   DEV_ENDPOINTS = "true"
-  # Browser → Vercel (sets X-Forwarded-For to the client IP) → Fly proxy (appends Vercel's
-  # egress IP) → API. Client = 2nd entry from the right. Direct calls to *.fly.dev can spoof it;
-  # see docs/runbooks/deploy-demo.md "Client IP".
+  # Browser → Vercel (sets X-Forwarded-For to the client IP) → web/admin middleware (adds the
+  # EDGE_PROXY_SECRET header) → Fly proxy (appends Vercel's egress IP) → API: client = 2nd entry
+  # from the right. Requests without the header (direct *.fly.dev calls) keep only the peer
+  # address (apps/api/src/common/edge-proxy.ts), so they can't choose their IP.
   TRUST_PROXY_HOPS = "2"
   # Tigris: region "auto", virtual-hosted bucket addressing (path style is refused).
   S3_REGION = "auto"

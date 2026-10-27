@@ -103,9 +103,10 @@ names are global — pick another `DEMO_PREFIX` if one is taken. It:
 2. creates the Tigris buckets (public one with `--public`) and stores the printed access key as
    the API's `S3_ACCESS_KEY`/`S3_SECRET_KEY`/`S3_ENDPOINT`;
 3. stages (`fly secrets set --stage`, applied by the first API deploy) every API secret below;
-4. prints the names of all secrets it set, plus — **once** — the generated `APP_ENCRYPTION_KEY`
-   (unless `GH_REPO` is set and `gh` is logged in, then it is stored as the GitHub secret
-   `DEMO_APP_ENCRYPTION_KEY` directly) and the admin owner's initial password.
+4. prints the names of all secrets it set, plus — **once** — the two secrets shared with Vercel
+   (`DEMO_WEB_REVALIDATE_SECRET`, `DEMO_EDGE_PROXY_SECRET`) and the admin owner's initial
+   password. With `GH_REPO` set and `gh` logged in it creates the GitHub environment `demo` and
+   stores the two shared secrets there itself.
 
 **Tigris key scope (manual, once).** The API uses one key for both buckets. Keys made by
 `fly storage create` may be scoped to their own bucket: open `fly storage dashboard
@@ -120,21 +121,30 @@ Fly secrets of the API app (values generated or derived by the script; never com
 | `REDIS_URL` | `redis://:<generated>@<redis app>.internal:6379?family=6` (`.internal` is IPv6-only; ioredis defaults to IPv4) |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | from `fly storage create` |
 | `S3_BUCKET_PUBLIC`, `S3_BUCKET_PRIVATE`, `S3_PUBLIC_URL` | bucket names, `https://<public bucket>.t3.tigrisfiles.io` |
-| `APP_ENCRYPTION_KEY` | 32 random bytes, base64 — **must equal** the storefront's (revalidation HMAC key is derived from it) |
+| `APP_ENCRYPTION_KEY` | 32 random bytes, base64 — Fly only (integration credentials, TOTP secrets); never given to Vercel |
+| `WEB_REVALIDATE_SECRET` | 32 random bytes, hex — **same value on the storefront** (signs API → web calls: revalidation, 404 reports; missing = fail closed) |
+| `EDGE_PROXY_SECRET` | 32 random bytes, hex — **same value on web and admin** (their middleware marks proxied `/api/*` calls; see Client IP) |
 | `SESSION_SECRET`, `TELEGRAM_WEBHOOK_SECRET` | random hex |
 | `OWNER_EMAIL`, `OWNER_INITIAL_PASSWORD` | your input / generated (seed creates the owner) |
 | `APP_URL`, `WEB_INTERNAL_URL` | storefront Vercel URL (`WEB_INTERNAL_URL` = where the API posts `/api/revalidate`) |
 | `ADMIN_URL` | admin Vercel URL (admin CSRF `Origin` check) |
 | `API_URL` | `https://<api app>.fly.dev` |
 
-Other secret apps: `<db app>` `POSTGRES_PASSWORD`, `<redis app>` `REDIS_PASSWORD`. Non-secret API
+Other secret apps: `<db app>` `POSTGRES_PASSWORD`, `<redis app>` `REDIS_PASSWORD` (Redis reads it
+from a 0600 config file written at start, never from its command line). `DEV_ENDPOINTS_TOKEN` is
+deliberately **not** set (see 4. "Dev endpoints"). Non-secret API
 settings (`PROVIDERS_MODE=fake`, `ALLOW_FAKE_PROVIDERS=true`, `DEV_ENDPOINTS=true`,
 `TRUST_PROXY_HOPS=2`, `S3_REGION=auto`, `S3_FORCE_PATH_STYLE=false`, `NODE_ENV=production`) are
 in `infra/fly/api.fly.toml` `[env]`.
 
-### 2.3 GitHub repository secrets and variables
+### 2.3 GitHub environment `demo`, secrets and variables
 
-Settings → Secrets and variables → Actions.
+Settings → Environments → **New environment `demo`** (`provision.sh` creates it when `GH_REPO` is
+set) → **Required reviewers**: add yourself (and *Prevent self-review* off if you deploy alone);
+optionally *Deployment branches* = `main` + `demo`. Every workflow job that touches a credential
+(`api`, `seed`, `web`/`admin`) runs in this environment, so it waits for an approval and only then
+can read the environment's secrets. Put the **secrets in the environment** (not at repository
+level) and the **variables at repository level** (the smoke job has no environment).
 
 | Secrets | How to get it |
 |---|---|
@@ -143,7 +153,8 @@ Settings → Secrets and variables → Actions.
 | `VERCEL_ORG_ID` | team ID (`team_…`) or personal Vercel ID (2.1) |
 | `VERCEL_PROJECT_ID_WEB` | storefront project ID |
 | `VERCEL_PROJECT_ID_ADMIN` | admin project ID |
-| `DEMO_APP_ENCRYPTION_KEY` | printed (or stored) by `provision.sh` |
+| `DEMO_WEB_REVALIDATE_SECRET` | printed (or stored) by `provision.sh` |
+| `DEMO_EDGE_PROXY_SECRET` | printed (or stored) by `provision.sh` |
 
 | Variables | Example |
 |---|---|
@@ -153,32 +164,50 @@ Settings → Secrets and variables → Actions.
 | `DEMO_S3_PUBLIC_URL` | `https://forest-demo-public.t3.tigrisfiles.io` |
 
 The workflow writes the Vercel environment (Production) itself on every run: both projects get
-`API_INTERNAL_URL` and `API_URL` (= `https://<api app>.fly.dev`) and `APP_URL`; web also
-`S3_PUBLIC_URL` and `APP_ENCRYPTION_KEY` (sensitive); admin also `WEB_INTERNAL_URL` (heatmap
-backdrop). Build-time values are stored as non-sensitive so `vercel pull` can hand them to the
-build — Next bakes rewrites, middleware env and image hosts at build time (CLAUDE.md §17).
+`API_INTERNAL_URL` and `API_URL` (= `https://<api app>.fly.dev`), `APP_URL` and
+`EDGE_PROXY_SECRET` (sensitive); web also `S3_PUBLIC_URL` and `WEB_REVALIDATE_SECRET`
+(sensitive, set in a web-only step); admin also `WEB_INTERNAL_URL` (heatmap backdrop). Vercel
+never gets `APP_ENCRYPTION_KEY` (a run removes it if an older run stored it; the web reads it only
+as a dev fallback outside production). Build-time values are stored as non-sensitive so `vercel
+pull` can hand them to the build — Next bakes rewrites, the middleware's API origin and image
+hosts at build time (CLAUDE.md §17); `EDGE_PROXY_SECRET` is read by the middleware at run time
+(checked in a production build: it is not inlined).
+
+**Workflow hardening.** Secrets are set as `env` of the single steps that use them — never of a
+job, so third-party actions (checkout, pnpm/node/flyctl setup), `pnpm install` lifecycle scripts
+and the Next build never see them; `vercel build` runs without the token. Actions are pinned by
+commit SHA (resolved 2026-10-27 with `git ls-remote`): `actions/checkout` v4 =
+`11d5960a326750d5838078e36cf38b85af677262`, `actions/setup-node` v4 =
+`49933ea5288caeca8642d1e84afbd3f7d6820020`, `pnpm/action-setup` v4 =
+`b906affcce14559ad1aafd4ab0e942779e9f58b1` (peeled annotated tag),
+`superfly/flyctl-actions/setup-flyctl` 1.5 = `fc53c09e1bc3be6f54706524e3b82c4f462f77be`. The
+Vercel CLI is pinned to 63.1.2; flyctl itself is installed in its latest release by the action.
 
 ## 3. Deploy
 
 Actions → **Deploy demo** → *Run workflow* (first time: **seed = true**). Pushing to a `demo`
 branch also deploys (no seed). Jobs:
 
-1. **preflight** — fails fast listing any missing secret/variable.
-2. **api** — `flyctl deploy --remote-only --ha=false` (Fly's builder, target `demo`); the
+1. **api** — first lists any missing secret/variable, then `flyctl deploy --remote-only --ha=false` (Fly's builder, target `demo`); the
    `release_command` runs `prisma migrate deploy` before the new machine takes traffic (event
    partitions are ensured by the API on boot); waits for `/ready` (DB + Redis).
-3. **seed** (optional) — `fly ssh console` → `tsx src/seed/index.ts --allow-production`
+2. **seed** (optional) — `fly ssh console` → `tsx src/seed/index.ts --allow-production`
    (idempotent; `seed_force` adds `--force`, overwriting catalog/content). Uploads the seed photos
    to the public bucket and creates the owner account.
-4. **web / admin** — per project: settings → env → `vercel pull` → `vercel build --prod` →
-   `vercel deploy --prebuilt --prod`.
-5. **smoke** — `/ready`, storefront `/uz`, `/api/settings/public` (through the rewrite),
-   `/robots.txt`, admin `/login`, an unsigned `POST /api/revalidate` must be **401**, and a seed
-   photo from the public bucket (warning only).
+3. **web / admin** — per project: `pnpm install` (no secrets yet) → settings → env → `vercel
+   pull` → `vercel build --prod` (no token) → `vercel deploy --prebuilt --prod`.
+4. **smoke** — `/ready`, storefront `/uz`, `/api/settings/public` (through the rewrite),
+   `/robots.txt`, admin `/login`, an unsigned `POST /api/revalidate` must be **401**, the dev
+   outbox listing and `POST /v1/dev/admin-totp` must be **404**, and a seed photo from the public
+   bucket (warning only).
+
+Each of `api`, `seed` and `web`/`admin` waits for an approval of the `demo` environment (the
+two Vercel jobs wait at the same time and can be approved together).
 
 First admin login: `OWNER_EMAIL` + the printed password → forced TOTP enrolment (any
-authenticator app). Storefront OTP codes are not sent anywhere: read them at
-`<web>/api/dev/outbox` (dev endpoints are on in the demo).
+authenticator app; the demo has no TOTP helper). Storefront OTP codes are not sent anywhere: a
+tester reads the code for the phone they typed at
+`<web>/api/dev/outbox?to=998901234567` (that phone's OTP SMS of the last 5 minutes only).
 
 ## 4. How the pieces fit (checked against the code)
 
@@ -199,7 +228,7 @@ authenticator app). Storefront OTP codes are not sent anywhere: read them at
   `fly secrets set`) and the GitHub variables, then redeploy.
 - **`/api/revalidate`** is a filesystem route, so it wins over the `/api/*` rewrite on Vercel as
   in compose. Without Caddy it is reachable from the internet; it accepts only bodies signed with
-  the key derived from `APP_ENCRYPTION_KEY` (HMAC-SHA256, ±300 s timestamp) and answers 401
+  a key derived from `WEB_REVALIDATE_SECRET` (HMAC-SHA256, ±300 s timestamp) and answers 401
   otherwise (smoke-tested). The API posts to `WEB_INTERNAL_URL` after commits; failures only delay
   freshness to the ISR window.
 - **SEO files.** `/robots.txt`, `/sitemap.xml`, `/sitemaps/:file` and `/<key>.txt` (IndexNow) are
@@ -219,30 +248,44 @@ authenticator app). Storefront OTP codes are not sent anywhere: read them at
 ### Client IP (rate limits)
 
 The API keys OTP/checkout/lead/admin-login limits on Express `req.ip` with
-`trust proxy = TRUST_PROXY_HOPS` (docs/runbooks/deploy-network.md). In the demo the chain is:
+`trust proxy = TRUST_PROXY_HOPS` (docs/runbooks/deploy-network.md). The demo sets `2` plus an
+edge marker: the web and admin middleware (`apps/*/src/lib/edge-proxy.ts`) put
+`X-Forest-Edge: <EDGE_PROXY_SECRET>` on every proxied `/api/*` request (a value sent by the browser
+is dropped), and the API (`apps/api/src/common/edge-proxy.ts`) trusts the forwarded chain only when
+that header matches (constant-time); any other request keeps just the last X-Forwarded-For entry.
 
-| Path | `X-Forwarded-For` at the API | `TRUST_PROXY_HOPS=2` gives |
+| Path | `X-Forwarded-For` at the API | client IP the API uses |
 |---|---|---|
-| Browser → Vercel rewrite → Fly proxy → API | `client, vercel-egress` (Vercel overwrites XFF with the client IP; Fly appends its peer) | client ✔ |
-| Webhook / anyone → `*.fly.dev` directly | `<whatever the caller sent>, caller` | the caller's own XFF entry — **spoofable** |
+| Browser → Vercel rewrite (+ edge header) → Fly proxy → API | `client, vercel-egress` (Vercel overwrites XFF with the client IP; Fly appends its peer) | client ✔ |
+| Webhook / anyone → `*.fly.dev` directly | `<whatever the caller sent>, caller` → reduced to `caller` | the caller's real address ✔ |
 | Vercel server code (RSC, route handlers) → API | `vercel-egress` | the Vercel egress IP (as in compose, where it is the web container) |
 
 With `1` every visitor would share Vercel's few egress IPs (5 OTP sends/hour for the whole
-demo). `2` is correct for real browser traffic; the cost is that a client calling the Fly URL
-directly can pick its IP and dodge per-IP limits. Per-phone OTP caps, per-account admin lockout and
-the per-customer rules still hold, and fake providers send nothing that costs money — acceptable
-for a demo. A production-grade fix (not implemented) would add a shared-secret request header on
-Vercel's rewrite (project routing rule / request-header transform) and let the API trust the
-forwarded client IP only when that header matches. **Verify after the first deploy:** two
-networks must hit separate OTP limits; one network gets 429 after 5 sends/hour. If Fly's XFF
-order differs from the table, adjust `TRUST_PROXY_HOPS` in `api.fly.toml`.
+demo). Without `EDGE_PROXY_SECRET` (compose, dev) nothing changes: Caddy is the trusted hop.
+Checked locally on production builds (`next start` and the standalone server): the middleware's
+request header reaches the rewrite destination, a browser-sent `X-Forest-Edge` is replaced or
+removed, `Set-Cookie` and query strings pass, and `/api/revalidate` stays the filesystem route.
+Not checkable here: Vercel's edge itself — **verify after the first deploy**: two networks must hit
+separate OTP limits, one network gets 429 after 5 sends/hour, and a direct `*.fly.dev` call with a
+forged `X-Forwarded-For` is limited by its real address.
 
-### `DEV_ENDPOINTS=true` in the demo
+### Dev endpoints in the demo
 
-Needed so testers can read OTP codes (`/v1/dev/outbox`). It also exposes `POST /v1/dev/admin-totp`
-(the next TOTP code for any staff email) and fake payment/shipment controls — admin login is then
-effectively password-only. Fine for synthetic data; set `DEV_ENDPOINTS = "false"` in
-`api.fly.toml` (and redeploy) before showing the demo to anyone untrusted for longer periods.
+`DEV_ENDPOINTS=true` stays the master switch, but the demo provisions **no**
+`DEV_ENDPOINTS_TOKEN`, so with `NODE_ENV=production`:
+
+- `GET /v1/dev/outbox?to=<phone>` (no token) answers only that phone's `otp` messages of the
+  last 5 minutes — enough for testers to log in; without `to` it is a 404, there is no listing.
+- everything else under `/v1/dev/*` (full outbox and DELETE, fake shipment, Telegram login, bot
+  updates/cart links, stored events) needs `X-Dev-Token` = `DEV_ENDPOINTS_TOKEN` → 404 on the demo.
+- `POST /v1/dev/admin-totp` is additionally a 404 in production unless `ALLOW_DEV_ADMIN_TOTP=true`
+  (only the CI e2e stack sets it), so admin 2FA stays real.
+- `POST /v1/dev/fake-pay` is not a dev endpoint but the fake payment provider's callback (the
+  storefront's `/fake-pay` page); it stays open in fake mode, addressed by the order's random
+  public id.
+
+To drive the demo with fake shipments etc. temporarily: `fly secrets set DEV_ENDPOINTS_TOKEN=$(openssl
+rand -hex 32) -a <api app>` and send it as `X-Dev-Token`; unset it afterwards.
 
 ## 5. Operations
 
@@ -288,8 +331,9 @@ the provider pages before committing to a budget.
 | Hosting | Vercel (fra1) + Fly.io (fra), EU | UZ-hosted VPS, Docker Compose + Caddy, Cloudflare |
 | Data | seed/synthetic only, no PII | real customers (PII must stay in Uzbekistan) |
 | Providers | fake (`ALLOW_FAKE_PROVIDERS=true`), dev endpoints on | sandbox/live, dev endpoints off |
-| Client IP | `TRUST_PROXY_HOPS=2`, spoofable via `*.fly.dev` | Caddy (+ Cloudflare ranges), not spoofable |
-| `/api/revalidate` | public, HMAC only | blocked by Caddy + HMAC |
+| Client IP | `TRUST_PROXY_HOPS=2` + `EDGE_PROXY_SECRET` marker from the web/admin middleware | Caddy (+ Cloudflare ranges) |
+| `/api/revalidate` | public, HMAC (`WEB_REVALIDATE_SECRET`) only | blocked by Caddy + HMAC |
+| Dev endpoints | OTP lookup only (no token, no admin TOTP) | off |
 | Storage | Tigris (virtual-hosted, `S3_FORCE_PATH_STYLE=false`) | UZ S3-compatible provider |
 | DB | single Postgres 16 container + volume snapshots | managed backups daily + PITR |
 | Admin | `*.vercel.app` | own admin domain, X-Frame-Options/HSTS from Caddy as well |
