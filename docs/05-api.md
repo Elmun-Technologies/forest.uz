@@ -39,13 +39,14 @@ PATCH /track/:token/address        # allowed until HANDED_TO_COURIER (OTP-confir
 
 POST /auth/otp/send                # {phone}
 POST /auth/otp/verify              # {phone, code} → session cookie, cart merge
-POST /auth/telegram                # Telegram Login widget payload (hash verified)
+POST /auth/telegram                # Telegram Login widget payload (hash verified; docs/runbooks/messaging-and-fiscal.md)
 POST /auth/logout
 
 GET  /me                           # profile, consents
 GET  /me/orders · POST /me/orders/:id/repeat
 GET/POST/DELETE /me/addresses · /me/favorites
 POST /me/reviews                   # verified purchase only, multipart photos, photoConsent
+POST /me/telegram/link             # attach Telegram (widget payload) to the OTP account
 PATCH /me/consents
 POST /me/data-export · POST /me/data-delete
 
@@ -67,7 +68,7 @@ POST /webhooks/yandex-delivery     # claim status callbacks (if enabled) + polli
 POST /webhooks/bts                 # if BTS provides callbacks; else polling job
 POST /webhooks/moysklad            # entity change notifications
 POST /webhooks/telegram            # Bot API updates (X-Telegram-Bot-Api-Secret-Token)
-POST /webhooks/eskiz               # SMS delivery status callback
+POST /webhooks/eskiz/:token        # SMS delivery status callback (unsigned → secret path token)
 ```
 
 ## Admin (`/v1/admin/*`, RBAC)

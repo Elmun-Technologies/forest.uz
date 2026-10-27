@@ -1,16 +1,32 @@
 # Progress
 
-Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — in progress** (Payme/Click done).
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — API done**, storefront wiring in progress.
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0 Foundation | done | see report below |
 | 1 Storefront | done | see report below; Product perf 89 (target 90) |
-| 2 Payments/delivery/SMS/auth | in progress | Payme + Click done; Eskiz, Yandex Delivery, BTS, Telegram login, fiscal next |
+| 2 Payments/delivery/SMS/auth | in progress | API done (Payme, Click, Eskiz, Telegram login, fiscal manual, BTS manual, Yandex Delivery); storefront wiring next |
 | 3 Admin core | pending | |
 | 4 Analytics/heatmaps/audiences/SEO | pending | |
 | 5 Bot/automations/content | pending | |
 | 6 Hardening & launch | pending | |
+
+## Phase 2 — Payments, fiscal, delivery, SMS, auth (in progress, 2026-10-27)
+
+### Built (API)
+- **Payme Merchant API** (JSON-RPC, all methods incl. ChangePassword, 12 h timeout, fiscal `detail`, refunds via cancel) and **Click SHOP API** (prepare/complete, md5 sign) — contract tests for every documented error code; duplicate/concurrent callbacks never double-pay. Runbook: `docs/runbooks/payments.md`.
+- **Eskiz SMS**: token cache + single-flight login, 401 re-login, no blind resend; delivery-status callback protected by a per-install secret path. **Telegram login** (Login Widget hash check, 24 h freshness) + linking Telegram to a phone account; customers may exist without a phone. Runbook: `docs/runbooks/messaging-and-fiscal.md`.
+- **Fiscal**: manual receipt provider; an order can be COMPLETED only with receipt proof (manual receipt, payment receipt URL, or Payme fiscal detail).
+- **BTS** manual mode (operator waybill + statuses drive order transitions and SMS) until BTS shares API docs.
+- **Yandex Delivery**: estimate-only claim creation, explicit paid accept (refused in test mode — no sandbox), idempotent request ids, cancel with fee check, per-minute sync job with leases/backoff, optional unsigned callback → re-read, courier info in tracking (phone only for the order owner), optional live quote (off). Runbook: `docs/runbooks/delivery.md`.
+- Delivery status state machine in `@forest/contracts`; reservations/expiry and SLA cut-off from Phase 1.
+
+### Verified
+- contracts 60, api 96 unit + 120 integration (Testcontainers), ui 8 — all green.
+
+### Not verified / owner input
+- Official doc hosts (Payme, Click, Eskiz, Telegram, Yandex) are unreachable from this environment; protocols come from official GitHub templates (Payme/Click) or ≥ 2 cross-checked open-source clients (Eskiz, Telegram, Yandex). Open questions 28–59 list every unverified point. Credentials, sandbox runs, Eskiz template approval, Yandex contract + warehouse coordinates, Telegram bot + `/setdomain`, COD receipt process are needed from the owner.
 
 ## Phase 1 — Storefront (2026-10-26)
 

@@ -58,6 +58,7 @@ Payme · Click · COD · Yandex Delivery · BTS · MoySklad · Fiscal (OFD) · I
 ## Delivery
 
 ### Yandex Delivery (Tashkent express, 12 h)
+> Implemented (Phase 2): sources, request/response fields, status mapping, unverified points and the go-live checklist are in `docs/runbooks/delivery.md` — it supersedes the notes below.
 - B2B Cargo/Express API (OAuth bearer token). Typical flow: `check-price` (quote) → `claims/create` → `claims/accept` → status via `claims/info` polling/callback → `cancel`. Courier info & position for tracking page.
 - Quote used in checkout if live quote enabled; otherwise zone price from settings.
 - "Call courier" button in A7 creates the claim when order is `READY`.
@@ -88,6 +89,7 @@ Payme · Click · COD · Yandex Delivery · BTS · MoySklad · Fiscal (OFD) · I
 - Spec: `09-telegram-bot.md`.
 
 ### Eskiz (SMS)
+> Implemented (Phase 2): sources, verified/unverified points and our token/callback design in `docs/runbooks/messaging-and-fiscal.md` (supersedes the notes below; Telegram login, fiscal manual provider and BTS manual mode are documented there too).
 - `POST https://notify.eskiz.uz/api/auth/login` → token (refresh before expiry); `POST /api/message/sms/send` (`mobile_phone` 998XXXXXXXXX, `message`, `from`, `callback_url`).
 - **SMS texts must be pre-approved templates** in Eskiz — keep templates fixed (OTP, order status, cart, review) and submit them early.
 - Playmobile: backup `SmsProvider`.
