@@ -9,7 +9,11 @@ import {
 } from '@forest/contracts';
 import { Prisma } from '@forest/db';
 import { NotificationsService } from '../commerce/notifications.service';
-import { type Actor, OrderLifecycleService } from '../commerce/order-lifecycle.service';
+import {
+  type Actor,
+  OrderLifecycleService,
+  type TxHook,
+} from '../commerce/order-lifecycle.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import type {
   CourierInfo,
@@ -236,7 +240,7 @@ export class YandexShipmentService {
    * dispatched until `acceptClaim`. Idempotent: the request_id is persisted before the call, so a
    * retry after a timeout or crash returns the same claim from Yandex.
    */
-  async createClaim(orderId: string, actor: Actor): Promise<ShipmentSummary> {
+  async createClaim(orderId: string, actor: Actor, audit?: TxHook): Promise<ShipmentSummary> {
     const provider = await this.provider();
     const yandex = provider instanceof YandexDeliveryProvider ? provider : null;
 
@@ -383,6 +387,7 @@ export class YandexShipmentService {
           data: { carrier: 'YANDEX', claimId: externalId, requestId },
         },
       });
+      await audit?.(tx);
       return updated;
     });
     return this.summary(saved);
@@ -395,7 +400,7 @@ export class YandexShipmentService {
    * another staff member within the lease is a no-op), (2) call Yandex, (3) record the outcome.
    * A claim already accepted (here or in the Yandex cabinet) is a no-op.
    */
-  async acceptClaim(shipmentId: string, actor: Actor): Promise<ShipmentSummary> {
+  async acceptClaim(shipmentId: string, actor: Actor, audit?: TxHook): Promise<ShipmentSummary> {
     const provider = await this.provider();
     if (provider instanceof YandexDeliveryProvider && provider.isTestMode)
       throw new DomainError('DELIVERY_TEST_MODE');
@@ -443,6 +448,7 @@ export class YandexShipmentService {
               data: { carrier: 'YANDEX', claimId },
             },
           });
+        if (accepted) await audit?.(tx);
       });
       if (failure) throw failure;
     }
@@ -483,6 +489,7 @@ export class YandexShipmentService {
     shipmentId: string,
     actor: Actor,
     opts: { allowPaid?: boolean } = {},
+    audit?: TxHook,
   ): Promise<ShipmentSummary> {
     const provider = await this.provider();
     await this.prisma.$transaction(
@@ -513,6 +520,7 @@ export class YandexShipmentService {
             },
           },
         });
+        await audit?.(tx);
       },
       { timeout: 30_000 },
     );
@@ -709,7 +717,12 @@ export class YandexShipmentService {
    * Staff found the parcel of a failed claim back in the warehouse (e.g. the claim died after
    * pickup — `DELIVERY_NEEDS_ATTENTION`): shipment and order → RETURNED, stock hold released.
    */
-  async markReturned(shipmentId: string, actor: Actor, now = new Date()): Promise<ShipmentSummary> {
+  async markReturned(
+    shipmentId: string,
+    actor: Actor,
+    now = new Date(),
+    audit?: TxHook,
+  ): Promise<ShipmentSummary> {
     const saved = await this.prisma.$transaction(async (tx) => {
       const s = await this.lockBoth(tx, shipmentId);
       if (s.carrier !== 'YANDEX' || s.status !== 'FAILED' || s.order.status !== 'HANDED_TO_COURIER')
@@ -740,6 +753,7 @@ export class YandexShipmentService {
         },
       });
       await this.lifecycle.advanceForDelivery(tx, s.orderId, 'RETURNED', actor);
+      await audit?.(tx);
       return updated;
     });
     return this.summary(saved);

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DomainError } from '@forest/contracts';
 import type { Prisma } from '@forest/db';
 import { PrismaService } from '../prisma/prisma.service';
+import type { TxHook } from './order-lifecycle.service';
 
 type Tx = Prisma.TransactionClient;
 
@@ -26,6 +27,14 @@ export async function fiscalEvidence(tx: Tx, orderId: string): Promise<FiscalEvi
   const data = paid?.providerData as { fiscalDetail?: unknown } | null | undefined;
   if (paid?.method === 'PAYME' && data?.fiscalDetail === true) return 'payme_detail';
   return null;
+}
+
+type ReceiptFields = { receiptNumber: string | null; url: string | null };
+
+export interface ReceiptChange {
+  corrected: boolean;
+  before: ReceiptFields | null;
+  after: ReceiptFields;
 }
 
 export interface ManualReceiptInput {
@@ -58,20 +67,24 @@ function cleanNumber(v: string | null | undefined): string | null {
 
 /**
  * Manual fiscal provider (docs/06): the operator issues the receipt on the cash register (COD,
- * or Click until it is known to fiscalize — docs/13 q.34) and records it here. Admin UI and RBAC
- * come in Phase 3; this is the service method it will call.
+ * or Click until it is known to fiscalize — docs/13 q.34) and records it here from the admin order
+ * page (`orders.edit`).
  */
 @Injectable()
 export class FiscalService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Records (or corrects) the sale receipt of an order. Audited; OrderEvent FISCAL_RECEIPT. */
+  /**
+   * Records (or corrects) the sale receipt of an order. Audited; OrderEvent FISCAL_RECEIPT. With
+   * `audit`, the caller writes the audit row (admin `AuditService`, same transaction) instead.
+   */
   async recordManualReceipt(
     orderId: string,
     input: ManualReceiptInput,
     staffId: string,
     ip: string | null = null,
-  ): Promise<{ id: string }> {
+    audit?: (tx: Parameters<TxHook>[0], change: ReceiptChange) => Promise<void>,
+  ): Promise<{ id: string; corrected: boolean }> {
     const url = cleanUrl(input.receiptUrl);
     const receiptNumber = cleanNumber(input.receiptNumber);
     if (!url && !receiptNumber)
@@ -116,18 +129,25 @@ export class FiscalService {
           },
         },
       });
-      await tx.auditLog.create({
-        data: {
-          staffId,
-          action: before ? 'order.fiscal_receipt_corrected' : 'order.fiscal_receipt_recorded',
-          entity: 'Order',
-          entityId: orderId,
-          before: before ? { receiptNumber: before.receiptNumber, url: before.url } : undefined,
+      if (audit)
+        await audit(tx, {
+          corrected: Boolean(before),
+          before: before ? { receiptNumber: before.receiptNumber, url: before.url } : null,
           after: { receiptNumber, url },
-          ip,
-        },
-      });
-      return { id: row.id };
+        });
+      else
+        await tx.auditLog.create({
+          data: {
+            staffId,
+            action: before ? 'order.fiscal_receipt_corrected' : 'order.fiscal_receipt_recorded',
+            entity: 'Order',
+            entityId: orderId,
+            before: before ? { receiptNumber: before.receiptNumber, url: before.url } : undefined,
+            after: { receiptNumber, url },
+            ip,
+          },
+        });
+      return { id: row.id, corrected: Boolean(before) };
     });
   }
 }

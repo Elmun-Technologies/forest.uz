@@ -22,10 +22,33 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import type { PaymentProvider } from '../integrations/providers/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
-import { CartService } from './cart.service';
+import { CartService, type CartWithItems } from './cart.service';
 import { orderPageUrl, orderPublicId, trackingToken } from './ids';
 import { NotificationsService } from './notifications.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
+
+/** Who places the order: the storefront customer, or staff taking a phone order (A6). */
+interface PlaceOptions {
+  source: 'web' | 'phone';
+  staffId: string | null;
+  /** Runs inside the order transaction (admin audit row). */
+  audit?: (tx: Prisma.TransactionClient, order: { id: string; number: string }) => Promise<void>;
+}
+
+const WEB: PlaceOptions = { source: 'web', staffId: null };
+
+/** Phone order taken by staff: COD, lines chosen by the operator (no cookie cart, no promo). */
+export interface StaffOrderInput {
+  name: string;
+  phone: string;
+  region: string;
+  district?: string | null;
+  addressLine: string;
+  zoneKey: string;
+  comment?: string | null;
+  locale: Locale;
+  lines: { variantId: string; qty: number }[];
+}
 import { PromoService } from './promo.service';
 import { ReservationsService } from './reservations.service';
 
@@ -112,11 +135,75 @@ export class CheckoutService {
     }
   }
 
+  /**
+   * POST /admin/orders (A6 manual phone order, Idempotency-Key): the operator's lines go into a
+   * detached cart row that the regular checkout transaction converts, so pricing, IKPU, stock
+   * reservations and COD limits are exactly the storefront's (CLAUDE.md §6).
+   */
+  async placeForStaff(
+    key: string,
+    input: StaffOrderInput,
+    staffId: string,
+    audit?: PlaceOptions['audit'],
+  ): Promise<{ orderNumber: string; replayed: boolean }> {
+    const requestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
+    try {
+      await this.prisma.idempotencyKey.create({ data: { key, scope: 'admin_order', requestHash } });
+    } catch (e) {
+      if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002')) throw e;
+      const existing = await this.prisma.idempotencyKey.findUniqueOrThrow({ where: { key } });
+      const done = existing.response as { orderNumber?: string } | null;
+      if (existing.scope !== 'admin_order' || existing.requestHash !== requestHash || !done)
+        throw new DomainError('IDEMPOTENCY_CONFLICT');
+      return { orderNumber: String(done.orderNumber), replayed: true };
+    }
+    let cartId: string | null = null;
+    try {
+      const store = await this.settings.get('store.info');
+      const cart = await this.carts.createDetached(input.lines);
+      cartId = cart.id;
+      const result = await this.place(
+        cart,
+        {
+          name: input.name,
+          phone: input.phone,
+          region: input.region,
+          district: input.district ?? null,
+          addressLine: input.addressLine,
+          lat: null,
+          lng: null,
+          zoneKey: input.zoneKey,
+          paymentMethod: 'COD',
+          comment: input.comment ?? null,
+          offerVersion: store.offerVersion,
+          consents: { smsMarketing: false, telegram: false },
+        },
+        input.locale,
+        null,
+        { source: 'phone', staffId, audit },
+      );
+      await this.prisma.idempotencyKey.update({
+        where: { key },
+        data: { status: 201, response: { orderNumber: result.orderNumber } },
+      });
+      return { orderNumber: result.orderNumber, replayed: false };
+    } catch (e) {
+      await this.prisma.idempotencyKey.delete({ where: { key } }).catch(() => undefined);
+      // The detached cart is only an input carrier: never leave it behind unconverted.
+      if (cartId)
+        await this.prisma.cart
+          .deleteMany({ where: { id: cartId, status: 'ACTIVE' } })
+          .catch(() => undefined);
+      throw e;
+    }
+  }
+
   private async place(
-    cart: Awaited<ReturnType<CartService['current']>>,
+    cart: CartWithItems | null,
     input: CheckoutInput,
     locale: Locale,
     deviceHash: string | null,
+    opts: PlaceOptions = WEB,
   ): Promise<CheckoutResultDto> {
     if (!cart || cart.items.length === 0) throw new DomainError('CART_EMPTY');
     const [zones, rules, flags, promoRules] = await Promise.all([
@@ -226,7 +313,7 @@ export class CheckoutService {
             deliveryZone: zone.key,
             carrier: zone.carrier,
             offerVersion: input.offerVersion,
-            source: 'web',
+            source: opts.source,
             items: {
               create: priced.lines.map((l) => {
                 const v = byId.get(l.variantId)!;
@@ -265,9 +352,9 @@ export class CheckoutService {
               create: {
                 type: 'CREATED',
                 to: 'NEW',
-                actorType: 'CUSTOMER',
-                actorId: customer.id,
-                data: { paymentMethod: input.paymentMethod, zone: zone.key },
+                actorType: opts.staffId ? 'STAFF' : 'CUSTOMER',
+                actorId: opts.staffId ?? customer.id,
+                data: { paymentMethod: input.paymentMethod, zone: zone.key, source: opts.source },
               },
             },
           },
@@ -305,8 +392,12 @@ export class CheckoutService {
         );
         await tx.customer.update({
           where: { id: customer.id },
-          data: { leadSource: customer.leadSource ?? 'checkout', leadAt: customer.leadAt ?? now },
+          data: {
+            leadSource: customer.leadSource ?? (opts.staffId ? 'phone' : 'checkout'),
+            leadAt: customer.leadAt ?? now,
+          },
         });
+        await opts.audit?.(tx, created);
         return created;
       },
       { timeout: 15_000 },

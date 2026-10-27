@@ -22,6 +22,12 @@ import { ReservationsService } from './reservations.service';
 
 type Tx = Prisma.TransactionClient;
 
+/**
+ * Extra work committed with a change, inside the transaction that records it (admin passes its
+ * `AuditService.record`, CLAUDE.md §6). Runs after the state change, so a throw rolls both back.
+ */
+export type TxHook = (tx: Tx) => Promise<void>;
+
 export interface Actor {
   type: ActorType;
   id?: string | null;
@@ -241,10 +247,36 @@ export class OrderLifecycleService {
 
   /**
    * DELIVERED (or a rejected return request) → COMPLETED. Throws FISCAL_RECEIPT_REQUIRED without a
-   * receipt for the sale. RBAC comes with the admin controller (Phase 3).
+   * receipt for the sale. RBAC: the admin orders controller.
    */
-  async completeOrder(orderId: string, actor: Actor): Promise<void> {
-    await this.prisma.$transaction((tx) => this.transition(tx, orderId, 'COMPLETED', actor));
+  async completeOrder(orderId: string, actor: Actor, audit?: TxHook): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.transition(tx, orderId, 'COMPLETED', actor);
+      await audit?.(tx);
+    });
+  }
+
+  /**
+   * Staff cancel before the parcel leaves (docs/02). A paid order is cancelled by refunding it
+   * (ORDER_PAID_REFUND_FIRST); open payment attempts expire so no late callback can pay a
+   * cancelled order; DELIVERY_IN_PROGRESS while a courier is out (transition). Stock is released.
+   */
+  async cancelOrder(orderId: string, actor: Actor, reason: string, audit?: TxHook): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.lockOrder(tx, orderId);
+      const payments = await tx.payment.findMany({ where: { orderId } });
+      if (payments.some((p) => p.status === 'PAID' || p.status === 'PARTIALLY_REFUNDED'))
+        throw new DomainError('ORDER_PAID_REFUND_FIRST');
+      // Order → payment lock order, like the webhooks.
+      for (const p of payments.filter((x) =>
+        ['PENDING', 'FAILED', 'COD_PENDING'].includes(x.status),
+      )) {
+        await this.lockPayment(tx, p.id);
+        await this.setPaymentStatus(tx, p.id, 'EXPIRED', actor);
+      }
+      await this.transition(tx, orderId, 'CANCELLED', actor, { reason });
+      await audit?.(tx);
+    });
   }
 
   private async setPaymentStatus(
@@ -506,11 +538,12 @@ export class OrderLifecycleService {
   /**
    * Admin refund record for Click (reversal is done in the Click cabinet — docs/runbooks/payments)
    * and COD. Payme refunds are initiated in the Payme cabinet and arrive as CancelTransaction.
-   * RBAC (Owner/Manager) is enforced by the admin controller (Phase 3).
+   * RBAC (Owner/Manager, `orders.cancel_refund`) is enforced by the admin orders controller.
    */
   async recordManualRefund(
     paymentId: string,
     input: { amountTiyin: bigint; reason: string; staffId: string },
+    audit?: TxHook,
   ): Promise<{ refundId: string; full: boolean }> {
     return this.prisma.$transaction(async (tx) => {
       const { orderId } = await tx.payment.findUniqueOrThrow({
@@ -522,17 +555,19 @@ export class OrderLifecycleService {
       await this.lockPayment(tx, paymentId);
       const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
       if (p.method === 'PAYME') throw new DomainError('REFUND_VIA_PROVIDER_CABINET');
-      return this.refundInTx(
+      const result = await this.refundInTx(
         tx,
         paymentId,
         { type: 'STAFF', id: input.staffId },
         { amountTiyin: input.amountTiyin, reason: input.reason, refundedBy: input.staffId },
       );
+      await audit?.(tx);
+      return result;
     });
   }
 
   /** COD: operator confirmed by phone → order CONFIRMED, SLA starts, reservation becomes a hold. */
-  async confirmCod(orderId: string, actor: Actor, now = new Date()): Promise<void> {
+  async confirmCod(orderId: string, actor: Actor, now = new Date(), audit?: TxHook): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.transition(tx, orderId, 'CONFIRMED', actor);
       await this.reservations.confirm(tx, orderId);
@@ -540,6 +575,7 @@ export class OrderLifecycleService {
         where: { id: orderId },
         data: { slaDueAt: await this.slaDueAt(tx, orderId, now) },
       });
+      await audit?.(tx);
     });
     // COD: nothing is paid yet — "confirmed, pay the courier" (not the order_paid text).
     await this.notifications.orderStatus(orderId, 'order_confirmed');

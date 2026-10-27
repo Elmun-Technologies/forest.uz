@@ -8,7 +8,11 @@ import {
 } from '@forest/contracts';
 import type { Prisma } from '@forest/db';
 import { NotificationsService } from '../commerce/notifications.service';
-import { type Actor, OrderLifecycleService } from '../commerce/order-lifecycle.service';
+import {
+  type Actor,
+  OrderLifecycleService,
+  type TxHook,
+} from '../commerce/order-lifecycle.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface ManualShipmentInput {
@@ -78,7 +82,8 @@ export function manualShipmentNotices(
  * BTS manual mode (docs/06 Delivery, CLAUDE.md §6): the operator records the waybill and each
  * status; the shipment follows the delivery state machine, every change is appended to its
  * history and written to OrderEvent, the order is advanced consistently (OrderLifecycleService
- * .advanceForDelivery) and the customer gets the matching service SMS. Admin UI + RBAC: Phase 3.
+ * .advanceForDelivery) and the customer gets the matching service SMS. Admin: A7 delivery block
+ * (`orders.edit`); `audit` runs in the change's transaction (unchanged input calls it not).
  */
 @Injectable()
 export class ManualShipmentService {
@@ -93,6 +98,7 @@ export class ManualShipmentService {
     input: ManualShipmentInput,
     staffId: string,
     now = new Date(),
+    audit?: TxHook,
   ): Promise<ManualShipmentResult> {
     if (!DELIVERY_STATUSES.includes(input.status) || input.status === 'NOT_CREATED')
       throw new DomainError('VALIDATION_FAILED', undefined, 'status');
@@ -191,6 +197,7 @@ export class ManualShipmentService {
           n.template,
           input.status,
         );
+      await audit?.(tx);
       return { changed: true as const, notices, orderSteps, orderStatus };
     });
 

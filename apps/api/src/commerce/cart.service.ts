@@ -109,6 +109,31 @@ export class CartService {
     return cart;
   }
 
+  /**
+   * Cart row with no cookie or customer, for an order staff take by phone
+   * (`CheckoutService.placeForStaff` converts it in the order transaction). Same checks as addItem.
+   */
+  async createDetached(lines: { variantId: string; qty: number }[]): Promise<CartWithItems> {
+    if (lines.length === 0) throw new DomainError('CART_EMPTY');
+    if (lines.length > MAX_LINES)
+      throw new DomainError('VALIDATION_FAILED', { maxLines: MAX_LINES });
+    const variants = await this.prisma.variant.findMany({
+      where: { id: { in: lines.map((l) => l.variantId) } },
+      include: { product: { select: { status: true } } },
+    });
+    for (const l of lines) {
+      const v = variants.find((x) => x.id === l.variantId);
+      if (!v || !v.active || v.product.status !== 'ACTIVE')
+        throw new DomainError('PRODUCT_NOT_FOUND', { variantId: l.variantId });
+      if (v.stock - v.reserved < l.qty)
+        throw new DomainError('INSUFFICIENT_STOCK', { sku: v.sku }, 'lines');
+    }
+    return this.prisma.cart.create({
+      data: { items: { create: lines.map((l) => ({ variantId: l.variantId, qty: l.qty })) } },
+      include: cartInclude,
+    });
+  }
+
   private async reload(id: string): Promise<CartWithItems> {
     return this.prisma.cart.findUniqueOrThrow({ where: { id }, include: cartInclude });
   }

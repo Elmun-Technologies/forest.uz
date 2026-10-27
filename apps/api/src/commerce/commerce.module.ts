@@ -64,6 +64,13 @@ export class OrdersScheduler implements OnApplicationBootstrap {
     OrdersProcessor,
     OrdersScheduler,
   ],
-  exports: [CartService, OrdersService, OrderLifecycleService, NotificationsService, FiscalService],
+  exports: [
+    CartService,
+    CheckoutService,
+    OrdersService,
+    OrderLifecycleService,
+    NotificationsService,
+    FiscalService,
+  ],
 })
 export class CommerceModule {}
