@@ -1,0 +1,24 @@
+# Forest DEMO Redis 7 on Fly.io (sessions, rate limits, caches, BullMQ queues).
+# Private only: reachable at <app>.internal:6379 (IPv6 → REDIS_URL carries ?family=6 for ioredis).
+# BullMQ requires maxmemory-policy noeviction (an evicted job key corrupts a queue); AOF on the
+# volume keeps queues and sessions across restarts. REDIS_PASSWORD is a Fly secret (provision.sh).
+app = "forest-demo-redis"
+primary_region = "fra"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  image = "redis:7-alpine"
+
+[processes]
+  # Through the image's entrypoint so it still drops to the `redis` user; sh expands the secret.
+  app = "sh -c 'exec docker-entrypoint.sh redis-server --dir /data --appendonly yes --maxmemory 150mb --maxmemory-policy noeviction --requirepass \"$REDIS_PASSWORD\"'"
+
+[mounts]
+  source = "redisdata"
+  destination = "/data"
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

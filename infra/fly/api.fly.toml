@@ -1,0 +1,69 @@
+# Forest DEMO API on Fly.io (NestJS API + BullMQ workers/jobs + webhooks + bot), CLAUDE.md §6.
+# Demo only: fake providers, synthetic data. Production runs on the UZ VPS (infra/compose.yml).
+#
+# Deployed by .github/workflows/deploy-demo.yml from the repo root:
+#   flyctl deploy . --config infra/fly/api.fly.toml --app "$FLY_API_APP" --remote-only --ha=false
+# `app` below is a default; the workflow and infra/fly/provision.sh pass the real name.
+# Secrets (DATABASE_URL, REDIS_URL, S3_*, APP_ENCRYPTION_KEY, …) are set by provision.sh.
+app = "forest-demo-api"
+# Frankfurt: the closest maintained Fly region to Tashkent (Warsaw/Bucharest were retired),
+# the usual transit point for Uzbek traffic, and the same city as Vercel's fra1 functions, so
+# SSR → API calls stay in-region. See docs/runbooks/deploy-demo.md.
+primary_region = "fra"
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
+[build]
+  # Relative to this file. Target `demo` = production runtime + Prisma CLI and seed tooling.
+  dockerfile = "../docker/api.Dockerfile"
+  build-target = "demo"
+
+[deploy]
+  # Runs once per deploy in a temporary machine with the new image and the app's secrets; a
+  # failure aborts the deploy. Event partitions are ensured by the API itself on boot.
+  release_command = "/app/packages/db/node_modules/.bin/prisma migrate deploy --schema=/app/packages/db/prisma/schema.prisma"
+  strategy = "rolling"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  LOG_LEVEL = "info"
+  # Demo: fake Payme/Click/SMS/Telegram/Yandex/MoySklad adapters (no external calls).
+  PROVIDERS_MODE = "fake"
+  ALLOW_FAKE_PROVIDERS = "true"
+  # Dev outbox (fake SMS incl. OTP codes) so testers can log in. It makes every OTP public and
+  # lets anyone fetch the next admin TOTP code: acceptable only because the demo holds no real data.
+  DEV_ENDPOINTS = "true"
+  # Browser → Vercel (sets X-Forwarded-For to the client IP) → Fly proxy (appends Vercel's
+  # egress IP) → API. Client = 2nd entry from the right. Direct calls to *.fly.dev can spoof it;
+  # see docs/runbooks/deploy-demo.md "Client IP".
+  TRUST_PROXY_HOPS = "2"
+  # Tigris: region "auto", virtual-hosted bucket addressing (path style is refused).
+  S3_REGION = "auto"
+  S3_FORCE_PATH_STYLE = "false"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  # Never stop: BullMQ repeatable jobs (reservations, payment reminders, sync, sitemaps…) run
+  # inside this process.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  [[http_service.checks]]
+    # Readiness = DB + Redis reachable (apps/api/src/health). /health is liveness only.
+    grace_period = "30s"
+    interval = "15s"
+    timeout = "5s"
+    method = "GET"
+    path = "/ready"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"

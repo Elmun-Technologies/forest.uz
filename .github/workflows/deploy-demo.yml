@@ -1,0 +1,211 @@
+# DEMO deployment: API → Fly.io, storefront + admin → Vercel (CLAUDE.md §6, §15).
+# Fake providers and synthetic data only; production stays on the UZ VPS (infra/compose.yml).
+# One-time setup (Fly apps, DB, Redis, buckets, Fly secrets): infra/fly/provision.sh.
+# Runbook, secret and variable names: docs/runbooks/deploy-demo.md.
+name: Deploy demo
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Run the idempotent seed after the API deploy (first deploy, or to add missing rows)
+        type: boolean
+        default: false
+      seed_force:
+        description: Seed with --force (overwrites catalog/content with the seed values)
+        type: boolean
+        default: false
+  push:
+    branches: [demo]
+
+concurrency:
+  group: deploy-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash # -eo pipefail
+
+env:
+  NODE_VERSION: 22
+  VERCEL_CLI_VERSION: 63.1.2
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+  VERCEL_TELEMETRY_DISABLED: 1
+  FLY_API_APP: ${{ vars.FLY_API_APP }}
+  DEMO_WEB_URL: ${{ vars.DEMO_WEB_URL }}
+  DEMO_ADMIN_URL: ${{ vars.DEMO_ADMIN_URL }}
+  DEMO_S3_PUBLIC_URL: ${{ vars.DEMO_S3_PUBLIC_URL }}
+
+jobs:
+  preflight:
+    name: Check secrets and variables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Required configuration is present
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID_WEB: ${{ secrets.VERCEL_PROJECT_ID_WEB }}
+          VERCEL_PROJECT_ID_ADMIN: ${{ secrets.VERCEL_PROJECT_ID_ADMIN }}
+          DEMO_APP_ENCRYPTION_KEY: ${{ secrets.DEMO_APP_ENCRYPTION_KEY }}
+        run: |
+          missing=0
+          for name in FLY_API_TOKEN VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID_WEB \
+            VERCEL_PROJECT_ID_ADMIN DEMO_APP_ENCRYPTION_KEY FLY_API_APP DEMO_WEB_URL \
+            DEMO_ADMIN_URL DEMO_S3_PUBLIC_URL; do
+            if [ -z "${!name}" ]; then echo "::error::missing secret/variable $name"; missing=1; fi
+          done
+          exit "$missing"
+
+  api:
+    name: API → Fly.io
+    needs: preflight
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+      # Remote builder (Fly), target `demo`; the release_command runs `prisma migrate deploy`
+      # before the new machine starts. One machine: BullMQ jobs and the bot live in-process.
+      - name: Deploy
+        run: >-
+          flyctl deploy . --config infra/fly/api.fly.toml --app "$FLY_API_APP"
+          --dockerfile infra/docker/api.Dockerfile --build-target demo
+          --remote-only --ha=false --wait-timeout 10m
+      - name: Wait for /ready
+        run: |
+          for _ in $(seq 1 40); do
+            curl -sf "https://$FLY_API_APP.fly.dev/ready" && exit 0
+            sleep 6
+          done
+          flyctl logs --app "$FLY_API_APP" --no-tail | tail -n 100
+          exit 1
+
+  seed:
+    name: Seed (idempotent)
+    needs: api
+    if: github.event_name == 'workflow_dispatch' && inputs.seed
+    runs-on: ubuntu-latest
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      SEED_ARGS: ${{ inputs.seed_force && '--allow-production --force' || '--allow-production' }}
+    steps:
+      - uses: superfly/flyctl-actions/setup-flyctl@1.5
+      # NODE_ENV=production in the image, so the seed needs --allow-production (demo data only).
+      - name: Seed through the running API machine
+        run: |
+          flyctl ssh console --app "$FLY_API_APP" \
+            -C "sh -c 'cd /app/packages/db && exec ./node_modules/.bin/tsx src/seed/index.ts $SEED_ARGS'" 2>&1 \
+            | tee seed.log
+          if grep -q 'object storage unavailable' seed.log; then
+            echo "::error::seed could not use the Tigris buckets (key scope? docs/runbooks/deploy-demo.md §Tigris)"
+            exit 1
+          fi
+
+  vercel:
+    name: ${{ matrix.app }} → Vercel
+    needs: [api, seed]
+    # Runs when the seed was skipped too, never after a failed API deploy or seed.
+    if: ${{ !cancelled() && needs.api.result == 'success' && needs.seed.result != 'failure' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: web
+            root: apps/web
+            project_secret: VERCEL_PROJECT_ID_WEB
+          - app: admin
+            root: apps/admin
+            project_secret: VERCEL_PROJECT_ID_ADMIN
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets[matrix.project_secret] }}
+      DEMO_APP_ENCRYPTION_KEY: ${{ secrets.DEMO_APP_ENCRYPTION_KEY }}
+      APP: ${{ matrix.app }}
+      ROOT_DIR: ${{ matrix.root }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: npm install --global "vercel@$VERCEL_CLI_VERSION"
+      # Monorepo settings: the build runs from the repo root with Root Directory = apps/<app>
+      # (its vercel.json holds install/build commands, region fra1 and the rewrite-cache opt-out).
+      - name: Project settings (root directory, Node 22, region fra1)
+        run: |
+          team=""
+          case "$VERCEL_ORG_ID" in team_*) team="?teamId=$VERCEL_ORG_ID" ;; esac
+          code=$(curl -sS -o resp.json -w '%{http_code}' -X PATCH \
+            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID$team" \
+            -H "Authorization: Bearer $VERCEL_TOKEN" -H 'Content-Type: application/json' \
+            -d "{\"rootDirectory\":\"$ROOT_DIR\",\"framework\":\"nextjs\",\"nodeVersion\":\"22.x\",\"serverlessFunctionRegion\":\"fra1\"}")
+          if [ "$code" != 200 ]; then
+            echo "::warning::could not update project settings (HTTP $code); set Root Directory=$ROOT_DIR and Node.js 22.x in the Vercel dashboard"
+            cat resp.json
+          fi
+          rm -f resp.json
+      # Production env of the project. Build-time values (rewrites, middleware, image hosts) are
+      # stored as plain config (--no-sensitive) so `vercel pull` can hand them to the build.
+      - name: Environment variables
+        run: |
+          api="https://$FLY_API_APP.fly.dev"
+          put() { vercel env add "$1" production --value "$2" --force --yes "${@:3}" --token "$VERCEL_TOKEN" >/dev/null; echo "set $1"; }
+          put API_INTERNAL_URL "$api" --no-sensitive
+          put API_URL "$api" --no-sensitive
+          put APP_URL "$DEMO_WEB_URL" --no-sensitive
+          if [ "$APP" = web ]; then
+            put S3_PUBLIC_URL "$DEMO_S3_PUBLIC_URL" --no-sensitive
+            # Verifies the API's signed POST /api/revalidate (key derived from it on both sides).
+            put APP_ENCRYPTION_KEY "$DEMO_APP_ENCRYPTION_KEY" --sensitive
+          else
+            put WEB_INTERNAL_URL "$DEMO_WEB_URL" --no-sensitive
+          fi
+      - run: vercel pull --yes --environment=production --token "$VERCEL_TOKEN"
+      # The same values on the process too: Next bakes rewrites/middleware env at build time
+      # (CLAUDE.md §17), so they must not depend on how the CLI merges the pulled env file.
+      - name: Build
+        run: |
+          export API_INTERNAL_URL="https://$FLY_API_APP.fly.dev" API_URL="https://$FLY_API_APP.fly.dev"
+          if [ "$APP" = web ]; then export S3_PUBLIC_URL="$DEMO_S3_PUBLIC_URL"; fi
+          vercel build --prod --token "$VERCEL_TOKEN"
+      - name: Deploy
+        # --regions: a prebuilt deploy doesn't reliably pick up the root directory's vercel.json.
+        run: vercel deploy --prebuilt --prod --regions fra1 --token "$VERCEL_TOKEN"
+
+  smoke:
+    name: Smoke check
+    needs: vercel
+    runs-on: ubuntu-latest
+    steps:
+      - name: API, storefront, admin
+        run: |
+          check() { # url expected-code
+            for _ in $(seq 1 10); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' -L --max-time 20 "$1")
+              [ "$code" = "$2" ] && { echo "ok $code $1"; return 0; }
+              sleep 6
+            done
+            echo "::error::$1 answered $code, expected $2"; return 1
+          }
+          fail=0
+          check "https://$FLY_API_APP.fly.dev/ready" 200 || fail=1
+          check "$DEMO_WEB_URL/uz" 200 || fail=1
+          # Browser → Vercel rewrite → Fly API (first-party /api).
+          check "$DEMO_WEB_URL/api/settings/public" 200 || fail=1
+          check "$DEMO_WEB_URL/robots.txt" 200 || fail=1
+          check "$DEMO_ADMIN_URL/login" 200 || fail=1
+          # The revalidation hook is public on Vercel (no Caddy): unsigned calls must be refused.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -d '{"tags":["catalog"]}' "$DEMO_WEB_URL/api/revalidate")
+          if [ "$code" = 401 ]; then echo "ok 401 unsigned /api/revalidate"; else echo "::error::unsigned /api/revalidate answered $code"; fail=1; fi
+          # Seed photo in the public bucket (warning only: absent until the first seed).
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$DEMO_S3_PUBLIC_URL/seed/photos/hero-brand.jpg")
+          [ "$code" = 200 ] || echo "::warning::public bucket photo answered $code (seed not run, or bucket not public)"
+          exit "$fail"

@@ -19,3 +19,5 @@ edge shares a limit (logins fail with 429) — or visitors can spoof their IP.
   when they do (space-separated CIDRs).
 - Check after deploy: two requests from different networks to `POST /v1/auth/otp/send` must hit
   separate limits; one network must get 429 after 5 sends/hour.
+- Demo on Vercel + Fly.io (no Caddy): `TRUST_PROXY_HOPS=2` — chain, spoofing caveat and check in
+  `docs/runbooks/deploy-demo.md` ("Client IP").
