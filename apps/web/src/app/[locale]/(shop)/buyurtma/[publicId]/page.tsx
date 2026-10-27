@@ -1,4 +1,4 @@
-import type { Locale, OrderPublicDto, OrderTimelineStepDto } from '@forest/contracts';
+import type { Locale, OrderPublicDto, OrderTimelineStepDto, TrackingDto } from '@forest/contracts';
 import { cn, Price } from '@forest/ui';
 import { Check, Send } from 'lucide-react';
 import type { Metadata } from 'next';
@@ -8,11 +8,13 @@ import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { ClientMessages } from '@/components/client-messages';
 import { AutoRefresh } from '@/components/order/auto-refresh';
+import { BranchCard, CourierCard } from '@/components/order/carrier-parts';
 import { needsPayment, OrderItems, PrepVideo, trackingPath } from '@/components/order/order-parts';
 import { RetryPayment } from '@/components/order/retry-payment';
 import { logoAlt, logos } from '@/components/ui/brand-logos';
 import { Logo } from '@/components/ui/logo';
-import { ApiError, apiGet } from '@/lib/api';
+import { ApiError, apiGet, apiGetOptional } from '@/lib/api';
+import { CARRIER_ACTIVE, trackingToken, waitingBranch } from '@/lib/carrier';
 import { getHomeContent } from '@/lib/data';
 import { formatWhen, placeName } from '@/lib/format';
 
@@ -50,12 +52,23 @@ const label = 'text-[13px] font-semibold tracking-[0.08em] text-muted uppercase'
 export default async function OrderPage({ params }: Props) {
   const { locale, publicId } = await params;
   setRequestLocale(locale);
-  const [o, home, t, tc] = await Promise.all([
+  const [o, home, t, tc, tt] = await Promise.all([
     loadOrder(publicId, locale),
     getHomeContent(locale),
     getTranslations('order'),
     getTranslations('common'),
+    getTranslations('track'),
   ]);
+  // Courier/branch details live in the tracking read model; ask for it only once a carrier is
+  // involved (same owner rule: full courier number only for this customer/browser).
+  const token = trackingToken(o);
+  const tracking =
+    token && CARRIER_ACTIVE.has(o.deliveryStatus)
+      ? await apiGetOptional<TrackingDto>(`/track/${encodeURIComponent(token)}`, locale, {
+          personal: true,
+        })
+      : null;
+  const branch = tracking ? waitingBranch(tracking) : null;
   const online = o.paymentMethod !== 'COD';
   const pay = needsPayment(o);
   const failed = o.paymentStatus === 'FAILED';
@@ -183,6 +196,30 @@ export default async function OrderPage({ params }: Props) {
                   />
                 ))}
               </ol>
+              {tracking && (tracking.courier || tracking.carrierRef || branch) ? (
+                <div
+                  data-testid="order-carrier"
+                  className="mt-4 flex flex-col gap-3 border-t border-line pt-4"
+                >
+                  {tracking.courier ? (
+                    <CourierCard
+                      courier={tracking.courier}
+                      carrier={tracking.carrier}
+                      locale={locale}
+                      loginNext={`/buyurtma/${o.publicId}`}
+                      compact
+                    />
+                  ) : null}
+                  {branch ? <BranchCard branch={branch} /> : null}
+                  {tracking.carrierRef ? (
+                    <span className="text-[13px] text-muted">
+                      {tracking.carrier === 'BTS'
+                        ? tt('trackNumber', { ref: tracking.carrierRef })
+                        : tt('carrierRef', { ref: tracking.carrierRef })}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </section>
           )}
         </div>
@@ -316,7 +353,9 @@ export default async function OrderPage({ params }: Props) {
       return s.at ? t('stepDeliveredBy', { when: when(s.at) }) : null;
     if (s.at) return when(s.at);
     if (s.key === 'PACKING' && s.state === 'current') return t('stepPacking');
-    if (s.key === 'SHIPPED' && s.state !== 'done') return t('stepShipped');
+    // "Courier details appear here" — unless they already do (courier card below the timeline).
+    if (s.key === 'SHIPPED' && s.state !== 'done')
+      return tracking?.courier ? null : t('stepShipped');
     return null;
   }
 }

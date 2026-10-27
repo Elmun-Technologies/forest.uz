@@ -93,6 +93,7 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
     region,
     isCity ? district || null : null,
     cart?.totals.subtotalSoum,
+    coords,
   );
 
   // Keep the chosen option if still offered, otherwise preselect the fastest (first) one.
@@ -106,17 +107,18 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
   }, [quote]);
 
   // Price shipping for the chosen zone (totals, free-shipping threshold, COD limit).
+  // With the map pin, a live-quoted zone prices the totals exactly like the option and the order.
   useEffect(() => {
     if (!zoneKey) return;
     let live = true;
     clientApi.cart
-      .get(zoneKey)
+      .get(zoneKey, coords)
       .then((dto) => live && setCart(dto))
       .catch(() => undefined);
     return () => {
       live = false;
     };
-  }, [zoneKey, setCart]);
+  }, [zoneKey, coords, setCart]);
 
   const total = cart?.totals.totalSoum ?? 0;
   const codOverLimit = codMaxSoum !== null && total > codMaxSoum;

@@ -22,6 +22,11 @@ Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthous
 - **Yandex Delivery**: estimate-only claim creation, explicit paid accept (refused in test mode — no sandbox), idempotent request ids, cancel with fee check, per-minute sync job with leases/backoff, optional unsigned callback → re-read, courier info in tracking (phone only for the order owner), optional live quote (off). Runbook: `docs/runbooks/delivery.md`.
 - Delivery status state machine in `@forest/contracts`; reservations/expiry and SLA cut-off from Phase 1.
 
+### Built (storefront)
+- Telegram Login Widget on `/kirish` and "Telegram'ni bog'lash" in Kabinet → Sozlamalar (only when `auth.telegramBot` is set; script on idle/interaction, `onauth` → API, shared post-login path with OTP); Telegram-only (phone-less) customers in the cabinet.
+- Tracking/order pages: courier card (name, car, plate, ETA, call link with extension for the owner, masked number + login hint otherwise), carrier history with API labels, BTS track number + waiting branch, address change disabled with the reason once the carrier has the address.
+- Checkout passes the geolocation pin to `/cart/quote` and `/cart?zone=` (live quote where enabled).
+
 ### Verified
 - contracts 60, api 96 unit + 120 integration (Testcontainers), ui 8 — all green.
 
@@ -49,7 +54,7 @@ High: provider resolved before the order is written; cancelled orders no longer 
 ### Mocked / not yet real
 - All integrations run on fake providers locally; Payme/Click real adapters exist (Phase 2) but need credentials.
 - Product photos, hero before/after and lead photo are stock placeholders; IKPU codes are placeholders; app icon is derived from the logo.
-- Hidden until data/API exists: reviews/ratings (no reviews yet), Telegram login, repeat order, courier phone/map, "buy new" price comparison, Ilhom/Brend pages.
+- Hidden until data/API exists: reviews/ratings (no reviews yet), repeat order, courier map, "buy new" price comparison, Ilhom/Brend pages. (Telegram login and courier phone shipped in Phase 2 — shown when the bot/courier data exist.)
 
 ### Owner action needed
 - Real photos (products, before/after), real prices/stock, IKPU + package codes; review RU strings in `apps/web/messages/RU_REVIEW.md`; open questions in `docs/13-open-questions.md` (incl. 28–36 for payments).

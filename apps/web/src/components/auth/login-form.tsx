@@ -11,23 +11,23 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from 'react';
-import { useRouter } from '@/i18n/navigation';
-import { useCart } from '@/components/cart/cart-provider';
-import { ClientApiError, clientApi } from '@/lib/client-api';
-import { mergeLocalFavourites } from '@/lib/favourites';
+import { TelegramLogin } from '@/components/auth/telegram-login';
+import { useAfterLogin, useAuthErrorMessage } from '@/components/auth/use-after-login';
+import { clientApi } from '@/lib/client-api';
 import { useHydrated } from '@/lib/use-hydrated';
 
 const CELLS = 4;
 
 /**
- * Phone → 4-digit SMS code login (design: Kirish). On success the guest cart and favourites are
- * merged into the account (cart by the API, favourites here) and the visitor returns to `next`.
+ * Phone → 4-digit SMS code login (design: Kirish), plus "Telegram orqali kirish" when the API has
+ * a bot (`telegramBot`). On success the guest cart and favourites are merged into the account
+ * (cart by the API, favourites here) and the visitor returns to `next`.
  */
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({ next, telegramBot }: { next: string; telegramBot: string | null }) {
   const t = useTranslations('login');
   const tc = useTranslations('common');
-  const router = useRouter();
-  const { refresh } = useCart();
+  const afterLogin = useAfterLogin(next);
+  const apiMessage = useAuthErrorMessage();
   const [phone, setPhone] = useState('');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState<string[]>(Array(CELLS).fill(''));
@@ -45,12 +45,6 @@ export function LoginForm({ next }: { next: string }) {
   }, [sentTo]);
 
   const left = Math.max(0, Math.ceil((resendAt - now) / 1000));
-
-  function apiMessage(e: unknown): string {
-    if (e instanceof ClientApiError && e.code === 'NETWORK') return tc('network');
-    if (e instanceof ClientApiError && e.status < 500) return e.message;
-    return tc('generic');
-  }
 
   async function send(ev?: FormEvent) {
     ev?.preventDefault();
@@ -79,10 +73,7 @@ export function LoginForm({ next }: { next: string }) {
     setError(null);
     try {
       await clientApi.auth.verifyOtp(sentTo, digits);
-      await mergeLocalFavourites();
-      await refresh();
-      router.replace(next);
-      router.refresh();
+      await afterLogin();
     } catch (e) {
       setBusy(false);
       setError(apiMessage(e));
@@ -241,6 +232,17 @@ export function LoginForm({ next }: { next: string }) {
       <p role="alert" aria-live="assertive" className="text-[13px] font-medium text-danger">
         {error}
       </p>
+
+      {telegramBot ? (
+        <>
+          <div aria-hidden className="flex items-center gap-4 text-[13px] text-muted">
+            <span className="h-px flex-1 bg-line" />
+            {t('or')}
+            <span className="h-px flex-1 bg-line" />
+          </div>
+          <TelegramLogin bot={telegramBot} mode="login" onSuccess={afterLogin} />
+        </>
+      ) : null}
     </div>
   );
 }

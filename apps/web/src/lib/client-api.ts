@@ -24,6 +24,7 @@ import type {
   ProductReviewsDto,
   SearchResultDto,
 } from '@forest/contracts';
+import type { TelegramAuthPayload } from './telegram-widget';
 
 export class ClientApiError extends Error {
   constructor(
@@ -100,11 +101,17 @@ export interface AddressInput {
 }
 
 const enc = encodeURIComponent;
+const pinQuery = (pin?: { lat: number; lng: number } | null) =>
+  pin ? `&lat=${pin.lat.toFixed(6)}&lng=${pin.lng.toFixed(6)}` : '';
 
 export const clientApi = {
   cart: {
-    /** `zone` prices shipping for that delivery zone (checkout); default = the express zone. */
-    get: (zone?: string) => request<CartDto>('GET', zone ? `/cart?zone=${enc(zone)}` : '/cart'),
+    /**
+     * `zone` prices shipping for that delivery zone (checkout); default = the express zone.
+     * With `pin` a zone that has the live carrier quote on is priced like `/cart/quote`.
+     */
+    get: (zone?: string, pin?: { lat: number; lng: number } | null) =>
+      request<CartDto>('GET', zone ? `/cart?zone=${enc(zone)}${pinQuery(pin)}` : '/cart'),
     addItem: (input: { variantId: string; qty: number }) =>
       request<CartDto>('POST', '/cart/items', input),
     setQty: (variantId: string, qty: number) =>
@@ -113,10 +120,11 @@ export const clientApi = {
       request<CartDto>('DELETE', `/cart/items/${encodeURIComponent(variantId)}`),
     applyPromo: (code: string) => request<CartDto>('POST', '/cart/promo', { code }),
     removePromo: () => request<CartDto>('DELETE', '/cart/promo'),
-    quote: (region: string, district?: string | null) =>
+    /** `pin` (checkout geolocation) lets zones with a live carrier quote price the trip. */
+    quote: (region: string, district?: string | null, pin?: { lat: number; lng: number } | null) =>
       request<DeliveryOptionDto[]>(
         'GET',
-        `/cart/quote?region=${enc(region)}${district ? `&district=${enc(district)}` : ''}`,
+        `/cart/quote?region=${enc(region)}${district ? `&district=${enc(district)}` : ''}${pinQuery(pin)}`,
       ),
   },
   checkout: {
@@ -139,11 +147,15 @@ export const clientApi = {
       request<{ resendInSec: number; expiresInSec: number }>('POST', '/auth/otp/send', { phone }),
     verifyOtp: (phone: string, code: string) =>
       request<MeDto>('POST', '/auth/otp/verify', { phone, code }),
+    /** Telegram Login Widget `onauth` payload, passed through unchanged (all fields are signed). */
+    telegram: (payload: TelegramAuthPayload) => request<MeDto>('POST', '/auth/telegram', payload),
     logout: () => request<void>('POST', '/auth/logout'),
   },
   me: {
     get: () => request<MeDto>('GET', '/me'),
     update: (input: MeUpdateInput) => request<MeDto>('PATCH', '/me', input),
+    linkTelegram: (payload: TelegramAuthPayload) =>
+      request<MeDto>('POST', '/me/telegram/link', payload),
     addresses: () => request<AddressDto[]>('GET', '/me/addresses'),
     addAddress: (input: AddressInput) => request<AddressDto>('POST', '/me/addresses', input),
     updateAddress: (id: string, input: AddressUpdateInput) =>

@@ -27,12 +27,17 @@ export function storeRegion(region: string) {
 /**
  * Delivery options for a region/district (GET /cart/quote). Re-quotes when `revision` changes
  * (cart subtotal) because free-shipping thresholds depend on it. `null` region = nothing to quote.
+ * `pin` (checkout geolocation, only once the visitor granted it) lets zones with a live carrier
+ * quote price the trip; without it the API answers with the zone price.
  */
 export function useDeliveryQuote(
   region: string | null,
   district: string | null,
   revision: unknown,
+  pin: { lat: number; lng: number } | null = null,
 ) {
+  const lat = pin?.lat ?? null;
+  const lng = pin?.lng ?? null;
   const [state, setState] = useState<{
     options: DeliveryOptionDto[];
     status: 'idle' | 'loading' | 'ready' | 'error';
@@ -46,13 +51,13 @@ export function useDeliveryQuote(
     let live = true;
     setState((s) => ({ ...s, status: 'loading' }));
     clientApi.cart
-      .quote(region, district)
+      .quote(region, district, lat !== null && lng !== null ? { lat, lng } : null)
       .then((options) => live && setState({ options, status: 'ready' }))
       .catch(() => live && setState({ options: [], status: 'error' }));
     return () => {
       live = false;
     };
-  }, [region, district, revision]);
+  }, [region, district, revision, lat, lng]);
 
   return state;
 }

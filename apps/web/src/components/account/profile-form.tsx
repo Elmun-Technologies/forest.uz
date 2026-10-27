@@ -6,15 +6,21 @@ import { Button, cn, Field, Input, inputClasses } from '@forest/ui';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { TelegramLink } from '@/components/account/telegram-link';
 import { useToast } from '@/components/ui/toast';
 import { ClientApiError, clientApi } from '@/lib/client-api';
 
-/** Name + message language, data export and deletion request (docs/02 "Customers & consent"). */
-export function ProfileForm({ me }: { me: MeDto }) {
+/**
+ * Name + message language, Telegram link (when the API has a bot or one is linked), data export
+ * and deletion request (docs/02 "Customers & consent").
+ */
+export function ProfileForm({ me, telegramBot }: { me: MeDto; telegramBot: string | null }) {
   const t = useTranslations('account');
   const tc = useTranslations('common');
   const toast = useToast();
   const router = useRouter();
+  // Telegram-only customers have no phone (the field is hidden for them).
+  const phone = me.phone;
   const [name, setName] = useState(me.name ?? '');
   const [locale, setLocale] = useState(me.locale);
   const [busy, setBusy] = useState<string | null>(null);
@@ -87,16 +93,10 @@ export function ProfileForm({ me }: { me: MeDto }) {
             />
           )}
         </Field>
-        {me.phone ? (
+        {phone ? (
           <Field label={t('phone')}>
             {(p) => (
-              <Input
-                {...p}
-                value={formatUzPhone(me.phone ?? '')}
-                readOnly
-                className="bg-off"
-                data-private
-              />
+              <Input {...p} value={formatUzPhone(phone)} readOnly className="bg-off" data-private />
             )}
           </Field>
         ) : null}
@@ -117,6 +117,7 @@ export function ProfileForm({ me }: { me: MeDto }) {
           {t('save')}
         </Button>
       </form>
+      <TelegramLink telegram={me.telegram} bot={telegramBot} />
       <section className="flex flex-col gap-4 rounded-lg bg-panel p-6 lg:rounded-xl lg:p-10">
         <h2 className="text-2xl font-medium tracking-[-0.03em]">{t('data')}</h2>
         <p className="text-sm text-muted">{t('dataHint')}</p>

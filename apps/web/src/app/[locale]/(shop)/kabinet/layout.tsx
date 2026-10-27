@@ -33,12 +33,14 @@ export default async function AccountLayout({
   const me = await getMe(locale);
   if (!me) redirect({ href: `${routes.login}?next=${encodeURIComponent(routes.account)}`, locale });
   const t = await getTranslations('account');
-  // Telegram-only accounts have no phone yet; show the Telegram handle instead.
-  const phone = me!.phone
+  // Telegram-only accounts have no phone; show the Telegram handle instead (or a generic label
+  // when the Telegram account has no username either).
+  const contact = me!.phone
     ? formatUzPhone(me!.phone)
     : me!.telegram?.username
       ? `@${me!.telegram.username}`
-      : '';
+      : null;
+  const title = me!.name ?? contact ?? t('telegramAccount');
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-wrap items-start gap-2.5 px-3 pb-16 lg:gap-4 lg:px-6 lg:pt-2">
@@ -51,12 +53,15 @@ export default async function AccountLayout({
             {me!.name ? me!.name.trim().slice(0, 1).toUpperCase() : <User size={26} />}
           </span>
           <span className="flex min-w-0 flex-1 flex-col gap-1">
-            <span className="truncate text-xl font-semibold tracking-[-0.02em] lg:text-2xl">
-              {me!.name ?? phone}
+            <span
+              data-testid="account-identity"
+              className="truncate text-xl font-semibold tracking-[-0.02em] lg:text-2xl"
+            >
+              {title}
             </span>
-            {me!.name ? (
+            {me!.name && contact ? (
               <span className="tabular text-sm text-on-dark-muted" data-private>
-                {phone}
+                {contact}
               </span>
             ) : null}
           </span>

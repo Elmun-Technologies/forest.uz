@@ -37,3 +37,16 @@ popup, consent). Please confirm or correct:
 | `legal.title` / `legal.draft` | «Условия и политики» / «Черновик. Перед публикацией текст проверит юрист…» | OK? |
 | `login.terms` | «условия использования» (links to the offer) | We have no separate «terms of use» page — the link opens the public offer. Rename to «публичную оферту»? Same question for UZ «foydalanish shartlari». |
 | `common.carrier.*` | «Яндекс Экспресс», «BTS Почта», «Самовывоз» | Same question as `header.topTashkent`. |
+
+## Phase 2 storefront (Telegram login, courier, BTS)
+
+| Key | RU | Question |
+|---|---|---|
+| `telegram.login` / `telegram.link` | «Войти через Telegram» / «Привязать Telegram» | The visible button inside the official widget is Telegram's own text (language from `data-lang`); ours is the placeholder until it loads. OK? |
+| `account.telegramHint` | «Привяжите аккаунт Telegram — в следующий раз войдёте без SMS-кода.» | OK? |
+| `track.courierYandex` | «{name} · курьер Яндекса» | Same carrier-name question as `header.topTashkent` («Яндекс Доставка»?). |
+| `track.callExt` | «После соединения добавочный: {ext}» | Wording for the Yandex forwarded number's extension. |
+| `track.callLogin` | «Номер курьера виден только владельцу заказа. Войти» | OK? |
+| `track.branchTitle` | «Ждёт в отделении» | BTS calls it «филиал» — «Ждёт в филиале BTS»? |
+| `track.addressLocked` | «Адрес уже передан службе доставки, изменить его на сайте нельзя. Напишите в Telegram-бот или позвоните оператору.» | OK? |
+| Privacy (CMS seed, `maxfiylik`) | Telegram login data sentence (UZ + RU) | **Lawyer:** confirm the wording of the data received from Telegram (Telegram ID, name, username, photo link) in «Что собираем». Lives in the CMS seed, editable in admin later. |

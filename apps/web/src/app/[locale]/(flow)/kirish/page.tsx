@@ -7,7 +7,7 @@ import { ClientMessages } from '@/components/client-messages';
 import { Link, redirect } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { getMe } from '@/lib/customer';
-import { getHomeContent } from '@/lib/data';
+import { getHomeContent, getSettings } from '@/lib/data';
 import { alternates } from '@/lib/seo';
 import logoWhite from '../../../../../public/brand/forest-logo-white.png';
 import logoGreen from '../../../../../public/brand/forest-logo-green.png';
@@ -38,13 +38,20 @@ function safeNext(raw: string | string[] | undefined): string {
   return v.replace(/^\/(uz|ru)(?=\/|$)/, '') || routes.account;
 }
 
-/** `/{locale}/kirish` — SMS code login (design: Kirish). Telegram Login is not wired yet. */
+/**
+ * `/{locale}/kirish` — SMS code login (design: Kirish) + Telegram Login Widget when the API has a
+ * connected bot (`settings.auth.telegramBot`; hidden otherwise).
+ */
 export default async function LoginPage({ params, searchParams }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
   const next = safeNext((await searchParams).next);
   if (await getMe(locale)) redirect({ href: next, locale });
-  const [t, home] = await Promise.all([getTranslations('login'), getHomeContent(locale)]);
+  const [t, home, settings] = await Promise.all([
+    getTranslations('login'),
+    getHomeContent(locale),
+    getSettings(locale),
+  ]);
   // Admin-managed photo (hero "after" or lead image); without one the panel stays brand green.
   const photo = home?.hero?.after ?? home?.leadImage ?? null;
 
@@ -79,8 +86,8 @@ export default async function LoginPage({ params, searchParams }: Props) {
           </h1>
           <p className="leading-relaxed text-muted">{t('lead')}</p>
         </div>
-        <ClientMessages namespaces={['login']}>
-          <LoginForm next={next} />
+        <ClientMessages namespaces={['login', 'telegram']}>
+          <LoginForm next={next} telegramBot={settings?.auth?.telegramBot ?? null} />
         </ClientMessages>
         <p className="max-w-[440px] text-xs leading-normal text-muted">
           {t.rich('terms', {

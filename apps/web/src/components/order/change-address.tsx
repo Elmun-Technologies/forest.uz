@@ -49,6 +49,12 @@ export function ChangeAddress({
       setOpen(false);
       router.refresh();
     } catch (err) {
+      // The carrier took the address meanwhile: re-render, the page then explains the lock.
+      if (err instanceof ClientApiError && err.code === 'ADDRESS_LOCKED') {
+        toast(err.message, 'critical');
+        router.refresh();
+        return;
+      }
       const unauthorized = err instanceof ClientApiError && err.status === 401;
       setError({
         login: unauthorized,
@@ -113,7 +119,7 @@ export function ChangeAddress({
           />
         )}
       </Field>
-      <div role="alert" className="text-[13px] font-medium text-danger">
+      <div role="alert" aria-live="assertive" className="text-[13px] font-medium text-danger">
         {error ? (
           <>
             {error.message}{' '}

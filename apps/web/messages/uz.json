@@ -672,7 +672,16 @@
     "saved": "Manzil yangilandi",
     "loginToChange": "Manzilni faqat buyurtma bergan raqam egasi o'zgartira oladi. Kiring va qayta urinib ko'ring.",
     "login": "Kirish",
-    "notFound": "Buyurtma topilmadi. Havolani tekshiring yoki Telegram botga yozing."
+    "notFound": "Buyurtma topilmadi. Havolani tekshiring yoki Telegram botga yozing.",
+    "courierYandex": "{name} · Yandex kuryer",
+    "call": "Qo'ng'iroq",
+    "callLabel": "Kuryerga qo'ng'iroq qilish · {name}",
+    "callExt": "Ulangach qo'shimcha raqam: {ext}",
+    "callLogin": "Kuryer raqami faqat buyurtma egasiga ko'rinadi. <login>Kirish</login>",
+    "historyTitleBts": "BTS trek tarixi",
+    "trackNumber": "Trek {ref}",
+    "branchTitle": "Filialda kutmoqda",
+    "addressLocked": "Manzil kuryer xizmatiga yuborilgan, uni saytda o'zgartirib bo'lmaydi. Telegram botga yozing yoki operatorga qo'ng'iroq qiling."
   },
   "login": {
     "metaTitle": "Kirish",
@@ -691,7 +700,15 @@
     "terms": "Davom etish orqali <offer>foydalanish shartlari</offer> va <privacy>maxfiylik siyosati</privacy>ga rozilik bildirasiz.",
     "photoTitle": "Buyurtmalar, manzillar va sevimlilar bir joyda",
     "homeLabel": "Forest bosh sahifa",
-    "success": "Xush kelibsiz!"
+    "success": "Xush kelibsiz!",
+    "or": "yoki"
+  },
+  "telegram": {
+    "login": "Telegram orqali kirish",
+    "link": "Telegram'ni bog'lash",
+    "loadFailed": "Telegram tugmasini yuklab bo'lmadi. Telefon raqam bilan kiring yoki keyinroq urinib ko'ring.",
+    "checking": "Telegram ma'lumotlari tekshirilmoqda…",
+    "ready": "{label}: Telegram tugmasi tayyor"
   },
   "account": {
     "metaTitle": "Shaxsiy kabinet",
@@ -785,7 +802,13 @@
     "deleteRequest": "Hisobni o'chirishni so'rash",
     "deleteConfirm": "Hisob va shaxsiy ma'lumotlar o'chiriladi. Buyurtmalar tarixi qonun talab qilgan muddat saqlanadi. Davom etasizmi?",
     "deleteRequested": "So'rov qabul qilindi. {date} gacha bajariladi.",
-    "loginAgain": "Sessiya tugadi. Qayta kiring."
+    "loginAgain": "Sessiya tugadi. Qayta kiring.",
+    "telegramTitle": "Telegram",
+    "telegramLinked": "Telegram ulangan",
+    "telegramNoUsername": "Username ko'rsatilmagan",
+    "telegramHint": "Telegram akkauntingizni bog'lang — keyingi safar SMS kodsiz kirasiz.",
+    "telegramDone": "Telegram bog'landi",
+    "telegramAccount": "Telegram akkaunt"
   },
   "legal": {
     "title": "Shartlar va siyosat",

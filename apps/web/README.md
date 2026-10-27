@@ -46,9 +46,25 @@ New pages just render their content; use the container
 ## Customer & flow helpers
 
 - `getMe(locale)` / `getMyAddresses(locale)` (`src/lib/customer.ts`): signed-in customer or null.
+- Login: `useAfterLogin(next)` (`components/auth/use-after-login.ts`) is the single post-login
+  step for SMS code and Telegram (favourites merge → cart refresh → `next` → `router.refresh()`,
+  which lets the middleware set `fr_ident`); `useAuthErrorMessage()` maps `ClientApiError`s.
+- Telegram Login Widget: `<TelegramLogin bot mode="login|link" onSuccess />`
+  (`components/auth/telegram-login.tsx`, script helper `lib/telegram-widget.ts`). Render it only
+  when `settings.auth.telegramBot` is set (it is `null` until the Telegram integration is
+  connected — dev has none). It injects `telegram-widget.js?22` on idle or on the first
+  pointer/focus, uses `data-onauth` (never redirect mode), and is used only on `/kirish` and
+  Kabinet → Sozlamalar (`TelegramLink`). Never import it into shared chrome.
+- Telegram-only customers have `me.phone === null` (cabinet shows `@username`, checkout asks for
+  a phone); never format `me.phone` without a null check.
+- Carrier details (`components/order/carrier-parts.tsx`, helpers in `lib/carrier.ts`):
+  `CourierCard` (call link only for an unmasked number, `tel:<phone>,<ext>`), `CarrierHistory`,
+  `BranchCard` (BTS branch = latest `AT_BRANCH` history `place`). Tracking renders them from
+  `TrackingDto`; the order page loads `/track/<token>` only when `deliveryStatus` is carrier-side.
 - Favourites: `useFavourite(productId)` (`src/lib/favourites.ts`) — localStorage for guests,
   `/me/favorites` for identified visitors; `mergeLocalFavourites()` runs after OTP login.
-- Delivery quote: `useDeliveryQuote(region, district, revision)` + `optionEta` (`components/cart/use-quote.ts`);
+- Delivery quote: `useDeliveryQuote(region, district, revision, pin?)` (checkout passes the
+  geolocation pin; `/cart?zone=&lat=&lng=` prices the totals the same way) + `optionEta` (`components/cart/use-quote.ts`);
   the cart's region is kept in `sessionStorage` (`fr_region`) and preselected on checkout.
 - Checkout sends `Idempotency-Key` (uuid kept while the payload is unchanged, so retries reuse it).
 - Money inside translated sentences: `soum(amount, locale)` from `src/lib/format.ts` (NBSP); in
@@ -87,6 +103,14 @@ should call `setCart` with every `CartDto` they receive so the header stays in s
 - Logos: `<Logo src={staticImport} className="h-5" />` (`src/components/ui/logo.tsx`).
   Product/stock photos always come from the API (S3).
 - Bottom sheets: `Sheet` (`src/components/ui/sheet.tsx`, Radix Dialog). Toasts: `useToast()`.
+
+## Tests
+
+- `pnpm --filter @forest/web test` — Vitest + Testing Library (jsdom) for client islands and pure
+  helpers (`src/**/*.test.ts(x)`; mock `@/i18n/navigation`, cart provider and `clientApi`).
+- Server-rendered states (Telegram-only customer, courier/BTS tracking) are e2e-tested through the
+  dev-only API (`POST /api/dev/telegram-login`, `POST /api/dev/shipment`), not route interception:
+  RSC fetches happen on the Next server. See `e2e/tests/phase2.spec.ts`.
 
 ## Performance rules (Lighthouse mobile ≥ 90, see CLAUDE.md §6)
 

@@ -7,16 +7,21 @@ import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { ClientMessages } from '@/components/client-messages';
+import { BranchCard, CarrierHistory, CourierCard } from '@/components/order/carrier-parts';
 import { ChangeAddress } from '@/components/order/change-address';
 import { logoAlt, logos } from '@/components/ui/brand-logos';
 import { Logo } from '@/components/ui/logo';
 import { ApiError, apiGet } from '@/lib/api';
 import { getHomeContent } from '@/lib/data';
+import { waitingBranch } from '@/lib/carrier';
 import { formatWhen, placeName } from '@/lib/format';
 
 // Per-request page: the [locale] layout's generateStaticParams would otherwise mark it static,
 // and its cookie/searchParams read would fail at runtime (DYNAMIC_SERVER_USAGE).
 export const dynamic = 'force-dynamic';
+
+/** Order states before the parcel leaves the warehouse (address still editable in principle). */
+const PRE_HANDOVER = new Set<TrackingDto['status']>(['NEW', 'CONFIRMED', 'PACKING', 'READY']);
 
 type Props = { params: Promise<{ locale: Locale; token: string }> };
 
@@ -84,6 +89,10 @@ export default async function TrackingPage({ params }: Props) {
           : { label: t('etaPending'), value: t('etaPendingValue') };
 
   const current = o.timeline.findIndex((s) => s.state === 'current');
+  const branch = waitingBranch(o);
+  // The API refuses address changes once the carrier has the address (live claim) or the parcel
+  // left; before hand-over we say why instead of silently dropping the button.
+  const addressLocked = !o.canChangeAddress && PRE_HANDOVER.has(o.status);
   const video = home?.howTo?.videoUrl ? home.howTo : null;
 
   return (
@@ -117,8 +126,10 @@ export default async function TrackingPage({ params }: Props) {
                 className={carrier === 'YANDEX' ? 'h-[18px]' : 'h-7'}
               />
               {o.carrierRef ? (
-                <span className="text-[13px] text-on-dark-muted">
-                  {t('carrierRef', { ref: o.carrierRef })}
+                <span className="text-[13px] text-on-dark-muted" data-testid="carrier-ref">
+                  {carrier === 'BTS'
+                    ? t('trackNumber', { ref: o.carrierRef })
+                    : t('carrierRef', { ref: o.carrierRef })}
                 </span>
               ) : null}
             </span>
@@ -183,66 +194,16 @@ export default async function TrackingPage({ params }: Props) {
       <section className="flex flex-wrap items-stretch gap-2.5 lg:gap-4">
         <div className="flex min-w-0 flex-[3_1_560px] flex-col gap-3 rounded-lg bg-panel p-4 lg:rounded-[32px]">
           {o.courier ? (
-            <div className="flex flex-wrap items-center gap-3.5 px-3 pt-2 pb-1.5">
-              <span
-                aria-hidden
-                className="grid size-12 place-items-center rounded-pill bg-sage font-bold"
-              >
-                {o.courier.name.slice(0, 1)}
-              </span>
-              <span className="flex flex-[1_1_200px] flex-col gap-0.5">
-                <b className="text-[15px] font-semibold">
-                  {t('courier', { name: o.courier.name })}
-                </b>
-                {o.courier.car ? (
-                  <span className="text-[13px] text-muted">
-                    {o.courier.plate
-                      ? t('courierCar', { car: o.courier.car, plate: o.courier.plate })
-                      : o.courier.car}
-                  </span>
-                ) : null}
-              </span>
-              {o.courier.distanceKm !== null ? (
-                <span className="rounded-pill bg-canvas px-3.5 py-2 text-[13px] font-semibold">
-                  {t('distance', {
-                    km: o.courier.distanceKm.toLocaleString(locale === 'ru' ? 'ru-RU' : 'uz-UZ', {
-                      maximumFractionDigits: 1,
-                    }),
-                  })}
-                </span>
-              ) : null}
-            </div>
+            <CourierCard
+              courier={o.courier}
+              carrier={o.carrier}
+              locale={locale}
+              loginNext={`/t/${token}`}
+            />
           ) : null}
-          {o.history.length ? (
-            <div className="flex flex-col gap-1 px-5 py-4">
-              <h2 className="mb-2 text-[22px] font-semibold">{t('historyTitle')}</h2>
-              <ol>
-                {[...o.history].reverse().map((h, i) => (
-                  <li
-                    key={`${h.at}-${i}`}
-                    className="grid grid-cols-[110px_14px_minmax(0,1fr)] items-start gap-3.5 py-2.5"
-                  >
-                    <span className="tabular text-[13px] text-muted">
-                      {formatTashkentDate(new Date(h.at)).slice(0, 5)}{' '}
-                      {formatTashkentHm(new Date(h.at))}
-                    </span>
-                    <span
-                      aria-hidden
-                      className={cn(
-                        'mt-1 size-3.5 rounded-pill',
-                        i === 0 ? 'bg-forest shadow-[0_0_0_4px_var(--color-sage)]' : 'bg-[#C9CDC2]',
-                      )}
-                    />
-                    <span className="flex flex-col gap-0.5">
-                      <b className="text-[15px] font-semibold">{h.place}</b>
-                      <span className="text-[13px] text-muted">{h.note}</span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
-          {!o.courier && !o.history.length ? (
+          {branch ? <BranchCard branch={branch} /> : null}
+          <CarrierHistory history={o.history} carrier={o.carrier} />
+          {!o.courier && !o.history.length && !branch ? (
             <p className="flex flex-1 items-center rounded-[24px] bg-canvas p-6 text-[15px] leading-relaxed text-muted">
               {t('noCourier')}
             </p>
@@ -320,7 +281,7 @@ export default async function TrackingPage({ params }: Props) {
               </a>
             </div>
           ) : null}
-          {o.telegramDeepLink || o.canChangeAddress ? (
+          {o.telegramDeepLink || o.canChangeAddress || addressLocked ? (
             <div className="flex flex-wrap gap-2.5 rounded-lg bg-panel px-6 py-5 lg:rounded-[32px]">
               {o.telegramDeepLink ? (
                 <a
@@ -341,6 +302,21 @@ export default async function TrackingPage({ params }: Props) {
                     line={o.address.line}
                   />
                 </ClientMessages>
+              ) : addressLocked ? (
+                <div className="flex flex-[1_1_220px] flex-col gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    aria-describedby="address-locked"
+                    data-testid="change-address-locked"
+                    className="inline-flex h-12 items-center justify-center rounded-pill border border-line text-sm font-semibold text-subtle"
+                  >
+                    {t('changeAddress')}
+                  </button>
+                  <p id="address-locked" className="text-[13px] leading-snug text-muted">
+                    {t('addressLocked')}
+                  </p>
+                </div>
               ) : null}
             </div>
           ) : null}
