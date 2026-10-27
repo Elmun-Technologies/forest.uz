@@ -85,6 +85,8 @@ export interface YandexShipmentData {
   claimCreatedAt: string | null;
   /** Staff accept in flight (see `acceptClaim`). */
   acceptRequest: AcceptRequest | null;
+  /** Staff cancel in flight / last attempted (see `cancelClaim`): who, when, which claim. */
+  cancelRequest: AcceptRequest | null;
 }
 
 function readData(raw: unknown): YandexShipmentData {
@@ -100,6 +102,11 @@ function readData(raw: unknown): YandexShipmentData {
     errors: Array.isArray(d.errors) ? d.errors : [],
     claimCreatedAt: typeof d.claimCreatedAt === 'string' ? d.claimCreatedAt : null,
     acceptRequest: readAcceptRequest(raw),
+    cancelRequest: readAcceptRequest(
+      raw && typeof raw === 'object'
+        ? { acceptRequest: (raw as Record<string, unknown>).cancelRequest }
+        : null,
+    ),
   };
 }
 
@@ -483,7 +490,10 @@ export class YandexShipmentService {
 
   /**
    * Cancels the claim (free by default; `allowPaid` after staff saw the fee). Only before the
-   * parcel is handed over — afterwards Yandex support must be contacted (docs).
+   * parcel is handed over — afterwards Yandex support must be contacted (docs). Three steps like
+   * `acceptClaim`: record `cancelRequest` under the locks, call Yandex outside any transaction,
+   * record DELIVERY_CANCELLED (+ `audit`) in a second short transaction. A crash between (2) and
+   * (3) leaves `cancelRequest` set; the poll still applies Yandex's cancelled state.
    */
   async cancelClaim(
     shipmentId: string,
@@ -492,38 +502,54 @@ export class YandexShipmentService {
     audit?: TxHook,
   ): Promise<ShipmentSummary> {
     const provider = await this.provider();
-    await this.prisma.$transaction(
-      async (tx) => {
+    // (1) Under the order → shipment locks: is there a live claim; record who asked (CLAUDE.md §6:
+    // no HTTP inside a lock-holding transaction).
+    const claimId = await this.prisma.$transaction(async (tx) => {
+      const s = await this.lockBoth(tx, shipmentId);
+      if (s.carrier !== 'YANDEX' || !s.externalId || yandexClaimDead(s)) return null;
+      const data = readData(s.providerData);
+      data.cancelRequest = {
+        by: actor.id ?? null,
+        at: new Date().toISOString(),
+        claimId: s.externalId,
+      };
+      await tx.shipment.update({ where: { id: s.id }, data: { providerData: json(data) } });
+      return s.externalId;
+    });
+    if (claimId) {
+      // (2) Yandex, outside any transaction. A failed call whose claim is terminal anyway
+      // (cancelled meanwhile, here or in the cabinet) counts as done.
+      try {
+        await provider.cancel(claimId, opts);
+      } catch (e) {
+        if (e instanceof YandexApiError && e.code === 'cancel_unavailable')
+          throw new DomainError('DELIVERY_CANCEL_UNAVAILABLE');
+        if (e instanceof YandexApiError && e.code === 'cancel_paid')
+          throw new DomainError('DELIVERY_CANCEL_PAID');
+        const after = await provider.getState(claimId).catch(() => null);
+        if (!after?.terminal) throw toDomainError(e);
+      }
+      // (3) Record the outcome (+ the caller's audit row) in a second short transaction.
+      await this.prisma.$transaction(async (tx) => {
         const s = await this.lockBoth(tx, shipmentId);
-        if (s.carrier !== 'YANDEX' || !s.externalId || yandexClaimDead(s)) return;
-        try {
-          await provider.cancel(s.externalId, opts);
-        } catch (e) {
-          if (e instanceof YandexApiError && e.code === 'cancel_unavailable')
-            throw new DomainError('DELIVERY_CANCEL_UNAVAILABLE');
-          if (e instanceof YandexApiError && e.code === 'cancel_paid')
-            throw new DomainError('DELIVERY_CANCEL_PAID');
-          const after = await provider.getState(s.externalId).catch(() => null);
-          if (!after?.terminal) throw toDomainError(e);
-        }
-        await tx.shipment.update({ where: { id: s.id }, data: { nextSyncAt: new Date() } });
+        const data = readData(s.providerData);
+        if (data.cancelRequest?.claimId === claimId) data.cancelRequest = null;
+        await tx.shipment.update({
+          where: { id: s.id },
+          data: { providerData: json(data), nextSyncAt: new Date() },
+        });
         await tx.orderEvent.create({
           data: {
             orderId: s.orderId,
             type: 'DELIVERY_CANCELLED',
             actorType: actor.type,
             actorId: actor.id ?? null,
-            data: {
-              carrier: 'YANDEX',
-              claimId: s.externalId,
-              paidAllowed: Boolean(opts.allowPaid),
-            },
+            data: { carrier: 'YANDEX', claimId, paidAllowed: Boolean(opts.allowPaid) },
           },
         });
         await audit?.(tx);
-      },
-      { timeout: 30_000 },
-    );
+      });
+    }
     await this.refresh(shipmentId).catch((e: unknown) =>
       this.logger.warn(`refresh after cancel ${shipmentId} failed: ${String(e)}`),
     );

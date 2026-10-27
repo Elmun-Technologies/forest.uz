@@ -160,6 +160,27 @@ describe('admin auth (integration)', () => {
       );
     });
 
+    it('a correct password does not reset the counter while TOTP is pending', async () => {
+      const { client, email, password, id, secret } = await signedIn(app, 'MANAGER');
+      await client.post('/v1/admin/auth/logout');
+      const now = totpStep(Date.now());
+      const valid = new Set([-1, 0, 1, 2].map((d) => hotp(base32Decode(secret!), now + d)));
+      let n = 0;
+      let bad = '000000';
+      while (valid.has(bad)) bad = String(++n).padStart(6, '0');
+      // Password holder: 6 wrong codes, log in again, 4 more → the 10th failure locks.
+      for (const tries of [6, 4]) {
+        const c = new AdminClient(app);
+        expect((await c.login(email, password)).body.stage).toBe('totp');
+        for (let i = 0; i < tries; i++)
+          expect((await c.post('/v1/admin/auth/totp/verify', { code: bad })).status).toBe(400);
+      }
+      const row = await prisma.staff.findUniqueOrThrow({ where: { id } });
+      expect(row.lockedUntil!.getTime()).toBeGreaterThan(Date.now() + 14 * 60_000);
+      const after = await new AdminClient(app).login(email, password);
+      expect(after.body.error.code).toBe('ADMIN_LOGIN_FAILED');
+    });
+
     it(`rate-limits ${ADMIN_AUTH_POLICY.ipLimit} attempts per IP`, async () => {
       const client = new AdminClient(app);
       const statuses: number[] = [];

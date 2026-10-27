@@ -7,6 +7,8 @@ import {
   type AdminOrderReceiptInput,
   type AdminOrderRefundInput,
   type AdminRefundResultDto,
+  assertDeliveryTransition,
+  type DeliveryStatus,
   DomainError,
   type OrderStatus,
   type Permission,
@@ -171,14 +173,50 @@ export class AdminOrderActionsService {
       );
       if (steps.length === 0)
         throw new DomainError('ORDER_INVALID_TRANSITION', { from: o.status, to: 'DELIVERED' });
-      await tx.shipment.updateMany({
-        where: { orderId: o.id, carrier: 'PICKUP' },
-        data: { status: 'DELIVERED' },
-      });
+      await this.pickupShipmentDelivered(tx, o.id, actor);
       await this.hook(actor, 'order.delivered', o.id, { carrier: 'PICKUP', steps })(tx);
     });
     await this.notifications.orderStatus(o.id, 'order_delivered');
     return done();
+  }
+
+  /**
+   * PICKUP shipment through the delivery state machine (NOT_CREATED → CREATED → DELIVERED, the
+   * same first-entry walk as BTS manual mode) with history entries and a DELIVERY_STATUS event.
+   * Caller holds the order lock (advanceForDelivery took it).
+   */
+  private async pickupShipmentDelivered(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    actor: AuditActor,
+  ): Promise<void> {
+    const shipment = await tx.shipment.findFirst({ where: { orderId, carrier: 'PICKUP' } });
+    if (!shipment || shipment.status === 'DELIVERED') return;
+    const path: DeliveryStatus[] = [];
+    let cur: DeliveryStatus = shipment.status;
+    if (cur === 'NOT_CREATED') path.push((cur = 'CREATED'));
+    assertDeliveryTransition(cur, 'DELIVERED');
+    path.push('DELIVERED');
+    const at = new Date().toISOString();
+    const history = [
+      ...((Array.isArray(shipment.history) ? shipment.history : []) as Prisma.JsonArray),
+      ...path.map((status) => ({ at, status, note: 'Mijoz olib ketdi' })),
+    ];
+    await tx.shipment.update({
+      where: { id: shipment.id },
+      data: { status: 'DELIVERED', history },
+    });
+    await tx.orderEvent.create({
+      data: {
+        orderId,
+        type: 'DELIVERY_STATUS',
+        from: shipment.status,
+        to: 'DELIVERED',
+        actorType: 'STAFF',
+        actorId: actor.staffId,
+        data: { carrier: 'PICKUP', mode: 'manual' },
+      },
+    });
   }
 
   async complete(actor: AuditActor, number: string): Promise<AdminOrderActionResultDto> {
@@ -268,23 +306,39 @@ export class AdminOrderActionsService {
     }
     try {
       const amountTiyin = soumToTiyin(input.amountSoum);
+      const audit = this.hook(actor, 'order.refund_recorded', o.id, {
+        paymentId: payment.id,
+        amountSoum: input.amountSoum,
+        reason: input.reason,
+      });
       const result = await this.lifecycle.recordManualRefund(
         payment.id,
         { amountTiyin, reason: input.reason, staffId: actor.staffId },
-        this.hook(actor, 'order.refund_recorded', o.id, {
-          paymentId: payment.id,
-          amountSoum: input.amountSoum,
-          reason: input.reason,
-        }),
+        async (tx) => {
+          await audit(tx);
+          // The stored response commits with the refund (same transaction): a retry after a lost
+          // answer replays it instead of refunding twice.
+          const refund = await tx.refund.findFirstOrThrow({
+            where: { paymentId: payment.id },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, payment: { select: { status: true } } },
+          });
+          await tx.idempotencyKey.update({
+            where: { key },
+            data: {
+              status: 200,
+              response: { refundId: refund.id, full: refund.payment.status === 'REFUNDED' },
+            },
+          });
+        },
       );
-      await this.prisma.idempotencyKey.update({
-        where: { key },
-        data: { status: 200, response: { refundId: result.refundId, full: result.full } },
-      });
       return { refundId: result.refundId, full: result.full };
     } catch (e) {
-      // A refused refund may be retried with the same key (e.g. after correcting the amount).
-      await this.prisma.idempotencyKey.delete({ where: { key } }).catch(() => undefined);
+      // A refused refund may be retried with the same key (e.g. after correcting the amount);
+      // one that committed (response stored) never is.
+      const row = await this.prisma.idempotencyKey.findUnique({ where: { key } }).catch(() => null);
+      if (!row?.response)
+        await this.prisma.idempotencyKey.delete({ where: { key } }).catch(() => undefined);
       throw e;
     }
   }

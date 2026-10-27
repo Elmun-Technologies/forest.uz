@@ -273,6 +273,17 @@ describe('admin orders (integration)', () => {
     // Bad cursor: a validation error, never a 500.
     const bad = await as.OPERATOR.client.get('/v1/admin/orders?cursor=bm9wZQ');
     expect(bad.body.error.code).toBe('VALIDATION_FAILED');
+    // Phone digits: > 4 only with customers.pii (Warehouse can't confirm a masked number).
+    const digits = a.phone.slice(4);
+    const byPhone = async (role: StaffRole, q: string) =>
+      ((await as[role].client.get(`/v1/admin/orders?q=${q}`)).body as AdminOrderPageDto).items.map(
+        (i) => i.number,
+      );
+    expect(await byPhone('OPERATOR', digits)).toEqual([a.number]);
+    expect(await byPhone('WAREHOUSE', digits)).toEqual([]);
+    expect(await byPhone('WAREHOUSE', digits.slice(-4))).toContain(a.number);
+    const whExport = await post('WAREHOUSE', '/v1/admin/orders/export', { q: digits });
+    expect(whExport.text).not.toContain(a.number);
     const badge = await as.WAREHOUSE.client.get('/v1/admin/orders/badge');
     expect(badge.body.count).toBeGreaterThanOrEqual(3);
   });
@@ -471,6 +482,8 @@ describe('admin orders (integration)', () => {
     expect(owner.actions.find((a) => a.key === 'refund')?.blockedBy).toBe(
       'REFUND_VIA_PROVIDER_CABINET',
     );
+    // Customer card LTV = paid payments minus refunds (A4/A5 definition).
+    expect(owner.customer?.ltvSoum).toBe(owner.totals.totalSoum);
     const res = await postKeyed(
       'OWNER',
       url(o.number, '/refunds'),
@@ -483,6 +496,25 @@ describe('admin orders (integration)', () => {
     expect(keys).not.toContain('refund');
     expect(keys).not.toContain('cancel');
     expect(keys).toContain('start_packing');
+  });
+
+  it('PICKUP: mark delivered walks order and shipment state machines with history', async () => {
+    const o = await place('BTS');
+    await post('OPERATOR', url(o.number, '/confirm'));
+    await prisma.order.update({ where: { id: o.id }, data: { carrier: 'PICKUP' } });
+    await prisma.shipment.updateMany({ where: { orderId: o.id }, data: { carrier: 'PICKUP' } });
+    const res = await post('WAREHOUSE', url(o.number, '/delivered'));
+    expect(res.body).toEqual({ ok: true, noop: false });
+    expect((await orderOf(o.id)).status).toBe('DELIVERED');
+    const s = await prisma.shipment.findFirstOrThrow({ where: { orderId: o.id } });
+    expect(s.status).toBe('DELIVERED');
+    expect((s.history as { status: string }[]).map((h) => h.status)).toEqual([
+      'CREATED',
+      'DELIVERED',
+    ]);
+    expect(await events(o.id, 'DELIVERY_STATUS')).toHaveLength(1);
+    expect(await audits(o.id, 'order.delivered')).toHaveLength(1);
+    expect((await post('WAREHOUSE', url(o.number, '/delivered'))).body.noop).toBe(true);
   });
 
   it('PII: detail is masked; reveal is permission-scoped and audited', async () => {

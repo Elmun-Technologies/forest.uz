@@ -54,7 +54,11 @@ export type AdminOrderNoteInput = z.infer<typeof adminOrderNoteSchema>;
 export const adminOrderReceiptSchema = z
   .object({
     receiptNumber: z.string().trim().max(64).optional().nullable(),
-    receiptUrl: z.string().trim().max(500).optional().nullable(),
+    // https only: the link is rendered for staff and customers (no javascript:/data: URLs).
+    receiptUrl: z
+      .union([z.literal('').transform(() => null), z.url({ protocol: /^https$/ }).max(500)])
+      .optional()
+      .nullable(),
   })
   .refine((v) => Boolean(v.receiptNumber || v.receiptUrl), { path: ['receiptNumber'] });
 export type AdminOrderReceiptInput = z.infer<typeof adminOrderReceiptSchema>;

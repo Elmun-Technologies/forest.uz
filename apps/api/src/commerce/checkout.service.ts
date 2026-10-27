@@ -180,15 +180,25 @@ export class CheckoutService {
         },
         input.locale,
         null,
-        { source: 'phone', staffId, audit },
+        {
+          source: 'phone',
+          staffId,
+          // The stored response commits with the order: a retry after a lost answer replays it.
+          audit: async (tx, order) => {
+            await audit?.(tx, order);
+            await tx.idempotencyKey.update({
+              where: { key },
+              data: { status: 201, response: { orderNumber: order.number } },
+            });
+          },
+        },
       );
-      await this.prisma.idempotencyKey.update({
-        where: { key },
-        data: { status: 201, response: { orderNumber: result.orderNumber } },
-      });
       return { orderNumber: result.orderNumber, replayed: false };
     } catch (e) {
-      await this.prisma.idempotencyKey.delete({ where: { key } }).catch(() => undefined);
+      // Only an attempt that created nothing may be retried with the same key.
+      const row = await this.prisma.idempotencyKey.findUnique({ where: { key } }).catch(() => null);
+      if (!row?.response)
+        await this.prisma.idempotencyKey.delete({ where: { key } }).catch(() => undefined);
       // The detached cart is only an input carrier: never leave it behind unconverted.
       if (cartId)
         await this.prisma.cart

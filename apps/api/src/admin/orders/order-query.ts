@@ -17,8 +17,19 @@ const SETTLED = ['PAID', 'PARTIALLY_REFUNDED'] as const;
 
 const dayStart = (iso: string) => new Date(`${iso}T00:00:00+05:00`);
 
+/**
+ * Phone-digit searches longer than this need `customers.pii`: otherwise a search could confirm a
+ * full number the list shows masked (docs/02).
+ */
+export const MASKED_PHONE_SEARCH_DIGITS = 4;
+
+export interface SearchScope {
+  /** The staff member may see full phones (`customers.pii`). */
+  phones: boolean;
+}
+
 /** Search: order number, customer name, phone digits, carrier track number. */
-function searchWhere(raw: string): Prisma.OrderWhereInput | null {
+function searchWhere(raw: string, scope: SearchScope): Prisma.OrderWhereInput | null {
   const q = raw.trim();
   if (!q) return null;
   const number = /^f-?(\d{3,})$/i.exec(q);
@@ -27,7 +38,9 @@ function searchWhere(raw: string): Prisma.OrderWhereInput | null {
   if (/^\d{3,}$/.test(digits))
     return {
       OR: [
-        { contactPhone: { contains: digits } },
+        ...(scope.phones || digits.length <= MASKED_PHONE_SEARCH_DIGITS
+          ? [{ contactPhone: { contains: digits } }]
+          : []),
         { number: { contains: digits } },
         { shipments: { some: { trackNumber: { contains: digits, mode: 'insensitive' } } } },
       ],
@@ -41,9 +54,9 @@ function searchWhere(raw: string): Prisma.OrderWhereInput | null {
 }
 
 /** Every filter except the tab (tab counts are computed over this). */
-export function baseWhere(f: AdminOrderFilter): Prisma.OrderWhereInput {
+export function baseWhere(f: AdminOrderFilter, scope: SearchScope): Prisma.OrderWhereInput {
   const and: Prisma.OrderWhereInput[] = [];
-  const search = f.q ? searchWhere(f.q) : null;
+  const search = f.q ? searchWhere(f.q, scope) : null;
   if (search) and.push(search);
   if (f.paymentMethod) and.push({ paymentMethod: f.paymentMethod });
   if (f.carrier) and.push({ carrier: f.carrier });
@@ -76,8 +89,12 @@ export function tabWhere(tab: AdminOrderTab, now: Date): Prisma.OrderWhereInput 
   }
 }
 
-export function listWhere(f: AdminOrderFilter, now: Date): Prisma.OrderWhereInput {
-  return { AND: [baseWhere(f), tabWhere(f.tab, now)] };
+export function listWhere(
+  f: AdminOrderFilter,
+  scope: SearchScope,
+  now: Date,
+): Prisma.OrderWhereInput {
+  return { AND: [baseWhere(f, scope), tabWhere(f.tab, now)] };
 }
 
 // ───────── keyset cursor over the chosen sort ─────────

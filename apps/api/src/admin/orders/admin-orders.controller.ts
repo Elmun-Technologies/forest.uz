@@ -79,8 +79,11 @@ export class AdminOrdersController {
   @Get()
   @Header('Cache-Control', 'no-store')
   @RequirePermissions('orders.view')
-  list(@Query(new ZodPipe(adminOrderQuerySchema)) q: AdminOrderQuery): Promise<AdminOrderPageDto> {
-    return this.orders.list(q);
+  list(
+    @Query(new ZodPipe(adminOrderQuerySchema)) q: AdminOrderQuery,
+    @Admin() admin: AdminContext,
+  ): Promise<AdminOrderPageDto> {
+    return this.orders.list(q, admin.permissions);
   }
 
   @Get('badge')

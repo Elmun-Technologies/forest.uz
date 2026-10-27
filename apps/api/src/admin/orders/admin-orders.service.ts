@@ -51,6 +51,7 @@ import {
   encodeCursor,
   listWhere,
   orderBy,
+  type SearchScope,
   tabWhere,
 } from './order-query';
 
@@ -98,6 +99,8 @@ const detailInclude = {
 
 /** Payment states that settle what staff see, whatever later attempts did (as the storefront). */
 const SETTLED: readonly PaymentStatus[] = ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'];
+/** Payments that count as a purchase for LTV (same as the customers module). */
+const PURCHASE_PAYMENT = ['PAID', 'PARTIALLY_REFUNDED'] as const;
 /** Fulfilment path shown as the A7 stepper. */
 const STEPS: readonly OrderStepKey[] = [
   'NEW',
@@ -140,6 +143,10 @@ export function displayPaymentStatus(
   payments: readonly { status: PaymentStatus }[],
 ): PaymentStatus | null {
   return (payments.find((p) => SETTLED.includes(p.status)) ?? payments[0])?.status ?? null;
+}
+
+function searchScope(permissions: readonly Permission[]): SearchScope {
+  return { phones: permissions.includes('customers.pii') };
 }
 
 function regionLabel(code: string | undefined): string {
@@ -188,10 +195,15 @@ export class AdminOrdersService {
     return o.id;
   }
 
-  async list(q: AdminOrderQuery, now = new Date()): Promise<AdminOrderPageDto> {
+  async list(
+    q: AdminOrderQuery,
+    permissions: readonly Permission[],
+    now = new Date(),
+  ): Promise<AdminOrderPageDto> {
+    const scope = searchScope(permissions);
     const where: Prisma.OrderWhereInput = q.cursor
-      ? { AND: [listWhere(q, now), afterCursor(q.sort, decodeCursor(q.cursor))] }
-      : listWhere(q, now);
+      ? { AND: [listWhere(q, scope, now), afterCursor(q.sort, decodeCursor(q.cursor))] }
+      : listWhere(q, scope, now);
     const [rows, counts] = await Promise.all([
       this.prisma.order.findMany({
         where,
@@ -199,7 +211,7 @@ export class AdminOrdersService {
         take: q.limit + 1,
         select: listSelect,
       }),
-      this.counts(q, now),
+      this.counts(q, scope, now),
     ]);
     const page = rows.slice(0, q.limit);
     const last = page.at(-1);
@@ -246,9 +258,10 @@ export class AdminOrdersService {
   /** Tab counts honour every other filter; in-transit split by carrier for the KPI tiles. */
   private async counts(
     f: AdminOrderFilter,
+    scope: SearchScope,
     now: Date,
   ): Promise<Pick<AdminOrderPageDto, 'counts' | 'inTransitByCarrier'>> {
-    const base = baseWhere(f);
+    const base = baseWhere(f, scope);
     const [groups, slaRisk] = await Promise.all([
       this.prisma.order.groupBy({
         by: ['status', 'paymentMethod', 'carrier'],
@@ -526,9 +539,12 @@ export class AdminOrdersService {
     };
   }
 
-  /** Customer card: simple aggregates over the customer's orders (no cached counters). */
+  /**
+   * Customer card: aggregates over the customer's orders (no cached counters). LTV = PAID /
+   * PARTIALLY_REFUNDED payments minus their refunds — the A4/A5 definition (CLAUDE.md §6).
+   */
   private async customerCard(customerId: string, createdAt: Date, orderId: string) {
-    const [customer, live, before, ltv] = await Promise.all([
+    const [customer, live, before, paid, refunded] = await Promise.all([
       this.prisma.customer.findUnique({
         where: { id: customerId },
         select: { id: true, publicId: true, name: true, tags: true },
@@ -540,9 +556,13 @@ export class AdminOrdersService {
           OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: orderId } }],
         },
       }),
-      this.prisma.order.aggregate({
-        where: { customerId, status: { in: ['DELIVERED', 'COMPLETED'] } },
-        _sum: { totalTiyin: true },
+      this.prisma.payment.aggregate({
+        where: { status: { in: [...PURCHASE_PAYMENT] }, order: { customerId } },
+        _sum: { amountTiyin: true },
+      }),
+      this.prisma.refund.aggregate({
+        where: { payment: { status: { in: [...PURCHASE_PAYMENT] }, order: { customerId } } },
+        _sum: { amountTiyin: true },
       }),
     ]);
     if (!customer) return null;
@@ -551,7 +571,7 @@ export class AdminOrdersService {
       publicId: customer.publicId,
       name: customer.name,
       ordersCount: live,
-      ltvSoum: tiyinToSoumInt(ltv._sum.totalTiyin ?? 0n),
+      ltvSoum: tiyinToSoumInt((paid._sum.amountTiyin ?? 0n) - (refunded._sum.amountTiyin ?? 0n)),
       nth: before + 1,
       tags: customer.tags,
     };
@@ -601,7 +621,7 @@ export class AdminOrdersService {
   ): Promise<{ csv: string; rows: number }> {
     const full = permissions.includes('customers.export');
     const rows = await this.prisma.order.findMany({
-      where: listWhere(f, now),
+      where: listWhere(f, searchScope(permissions), now),
       orderBy: orderBy(f.sort),
       take: EXPORT_MAX_ROWS,
       select: listSelect,

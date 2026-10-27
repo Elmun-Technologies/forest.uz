@@ -85,13 +85,20 @@ export class AdminAuthService {
       !isLocked(staff.lockedUntil);
     if (!staff || !usable || !passwordOk) {
       if (staff && usable) await this.recordFailure(staff.id, actor);
+      // Same write cost for unknown / unusable accounts: no timing hint that the email exists.
+      else await this.prisma.staff.updateMany({ where: { id: '' }, data: { failedLogins: 0 } });
       throw new DomainError('ADMIN_LOGIN_FAILED');
     }
-    await this.prisma.staff.update({
-      where: { id: staff.id },
-      data: { failedLogins: 0, lockedUntil: null },
-    });
-    return this.startSession(toStaffRow(staff), false, actor, req, res, 'password');
+    const row = toStaffRow(staff);
+    // The failure counter covers password *and* TOTP: it resets only when the login is complete
+    // (here when no TOTP step follows, else in verifyTotp) — a password holder must not get a
+    // fresh set of TOTP guesses by logging in again.
+    if (sessionStage(row, false) === 'full')
+      await this.prisma.staff.update({
+        where: { id: staff.id },
+        data: { failedLogins: 0, lockedUntil: null },
+      });
+    return this.startSession(row, false, actor, req, res, 'password');
   }
 
   // ───────── TOTP ─────────
