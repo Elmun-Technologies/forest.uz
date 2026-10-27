@@ -111,7 +111,10 @@ services:
     build:
       context: ..
       dockerfile: infra/docker/next.Dockerfile
-      args: { APP: admin }
+      # The /api rewrite is baked at build time (CLAUDE.md §17), like web.
+      args:
+        APP: admin
+        API_INTERNAL_URL: http://api:4000
     ports: ['127.0.0.1:3001:3001']
     environment:
       PORT: 3001
