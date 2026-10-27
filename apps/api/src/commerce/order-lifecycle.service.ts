@@ -3,6 +3,7 @@ import {
   assertOrderTransition,
   assertPaymentTransition,
   computeDeliveryPromise,
+  type DeliveryStatus,
   DomainError,
   type OrderStatus,
   type PaymentMethod,
@@ -13,6 +14,7 @@ import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { fiscalEvidence } from './fiscal.service';
 import { orderPageUrl } from './ids';
 import { NotificationsService } from './notifications.service';
 import { ReservationsService } from './reservations.service';
@@ -42,6 +44,51 @@ const CANCEL_ON_FULL_REFUND: readonly OrderStatus[] = ['NEW', 'CONFIRMED', 'PACK
 
 export function orderAllowsRefund(status: OrderStatus): boolean {
   return REFUNDABLE_ORDER.includes(status);
+}
+
+/** Fulfilment path a delivery status pushes the order along (docs/02). */
+const FULFILMENT_PATH: readonly OrderStatus[] = [
+  'CONFIRMED',
+  'PACKING',
+  'READY',
+  'HANDED_TO_COURIER',
+  'DELIVERED',
+];
+
+/** Order status a carrier status implies; null = no fulfilment change. */
+export function orderTargetForDelivery(delivery: DeliveryStatus): OrderStatus | null {
+  switch (delivery) {
+    case 'PICKED_UP':
+    case 'IN_TRANSIT':
+    case 'AT_BRANCH':
+      return 'HANDED_TO_COURIER';
+    case 'DELIVERED':
+      return 'DELIVERED';
+    case 'RETURNED':
+      return 'RETURNED';
+    default:
+      // NOT_CREATED / CREATED / COURIER_ASSIGNED: still in the warehouse. FAILED: the parcel is
+      // with the carrier (retry or return follows) — the order status doesn't change.
+      return null;
+  }
+}
+
+/**
+ * Steps from `from` to the order status implied by `delivery`, or [] when there is nothing to do:
+ * already there or beyond, unconfirmed (NEW — a carrier never confirms an order), or a closed /
+ * return branch (CANCELLED, COMPLETED, RETURN_REQUESTED, RETURNED).
+ */
+export function deliveryOrderSteps(from: OrderStatus, delivery: DeliveryStatus): OrderStatus[] {
+  const target = orderTargetForDelivery(delivery);
+  const at = FULFILMENT_PATH.indexOf(from);
+  if (!target || at < 0) return [];
+  if (target === 'RETURNED') {
+    if (from === 'DELIVERED') return [];
+    const handed = FULFILMENT_PATH.indexOf('HANDED_TO_COURIER');
+    return [...FULFILMENT_PATH.slice(at + 1, handed + 1), 'RETURNED'];
+  }
+  const to = FULFILMENT_PATH.indexOf(target);
+  return to > at ? FULFILMENT_PATH.slice(at + 1, to + 1) : [];
 }
 
 export interface ProviderTxnData {
@@ -83,6 +130,9 @@ export class OrderLifecycleService {
       select: { status: true },
     });
     assertOrderTransition(order.status, to);
+    // Closing the order needs fiscal evidence of the sale (docs/06 Fiscal, CLAUDE.md §6).
+    if (to === 'COMPLETED' && !(await fiscalEvidence(tx, orderId)))
+      throw new DomainError('FISCAL_RECEIPT_REQUIRED');
     await tx.order.update({
       where: { id: orderId },
       data: {
@@ -101,6 +151,36 @@ export class OrderLifecycleService {
         data: (data ?? undefined) as Prisma.InputJsonValue | undefined,
       },
     });
+  }
+
+  /**
+   * Moves the order along its fulfilment path as far as a carrier status implies (one transition
+   * and OrderEvent per step, `data.cause = 'delivery'`). Caller holds the order lock (re-locking
+   * is harmless) and sends notifications after commit. Returns the statuses entered, in order.
+   */
+  async advanceForDelivery(
+    tx: Tx,
+    orderId: string,
+    delivery: DeliveryStatus,
+    actor: Actor,
+  ): Promise<OrderStatus[]> {
+    await this.lockOrder(tx, orderId);
+    const { status } = await tx.order.findUniqueOrThrow({
+      where: { id: orderId },
+      select: { status: true },
+    });
+    const steps = deliveryOrderSteps(status, delivery);
+    for (const to of steps)
+      await this.transition(tx, orderId, to, actor, { cause: 'delivery', delivery });
+    return steps;
+  }
+
+  /**
+   * DELIVERED (or a rejected return request) → COMPLETED. Throws FISCAL_RECEIPT_REQUIRED without a
+   * receipt for the sale. RBAC comes with the admin controller (Phase 3).
+   */
+  async completeOrder(orderId: string, actor: Actor): Promise<void> {
+    await this.prisma.$transaction((tx) => this.transition(tx, orderId, 'COMPLETED', actor));
   }
 
   private async setPaymentStatus(

@@ -3,9 +3,11 @@ import { BullModule } from '@nestjs/bullmq';
 import { Injectable, Module, type OnApplicationBootstrap } from '@nestjs/common';
 import type { Job, Queue } from 'bullmq';
 import { CustomerCommonModule } from '../customer/common/customer-common.module';
+import { DeliveryQuoteModule } from '../delivery/delivery-quote.service';
 import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
 import { CheckoutService } from './checkout.service';
+import { FiscalService } from './fiscal.service';
 import { NotificationsService } from './notifications.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import { FakePayController, OrdersController } from './orders.controller';
@@ -44,7 +46,11 @@ export class OrdersScheduler implements OnApplicationBootstrap {
 
 /** Cart, delivery quote, checkout, orders, tracking, reservations. */
 @Module({
-  imports: [BullModule.registerQueue({ name: ORDERS_QUEUE }), CustomerCommonModule],
+  imports: [
+    BullModule.registerQueue({ name: ORDERS_QUEUE }),
+    CustomerCommonModule,
+    DeliveryQuoteModule,
+  ],
   controllers: [CartController, OrdersController, FakePayController],
   providers: [
     CartService,
@@ -52,11 +58,12 @@ export class OrdersScheduler implements OnApplicationBootstrap {
     ReservationsService,
     NotificationsService,
     OrderLifecycleService,
+    FiscalService,
     CheckoutService,
     OrdersService,
     OrdersProcessor,
     OrdersScheduler,
   ],
-  exports: [CartService, OrdersService, OrderLifecycleService, NotificationsService],
+  exports: [CartService, OrdersService, OrderLifecycleService, NotificationsService, FiscalService],
 })
 export class CommerceModule {}

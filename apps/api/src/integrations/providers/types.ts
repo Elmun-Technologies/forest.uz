@@ -50,6 +50,15 @@ export interface ShipmentInput {
   itemsCount: number;
   codAmountTiyin: bigint | null;
   comment?: string | null;
+  /** Provider idempotency token (Yandex `request_id`): same key → same shipment on retry. */
+  idempotencyKey?: string;
+  items?: {
+    title: string;
+    sku: string;
+    qty: number;
+    unitPriceTiyin: bigint;
+    weightGrams: number | null;
+  }[];
 }
 
 export interface CourierInfo {
@@ -59,6 +68,10 @@ export interface CourierInfo {
   plate: string | null;
   etaAt: Date | null;
   distanceKm: number | null;
+  /** Forwarded numbers (Yandex) come with an extension and expire. */
+  phoneExt?: string | null;
+  phoneExpiresAt?: Date | null;
+  transport?: string | null;
 }
 
 export interface ShipmentState {
@@ -66,6 +79,16 @@ export interface ShipmentState {
   courier: CourierInfo | null;
   trackNumber: string | null;
   history: { at: Date; status: DeliveryStatus; note: string }[];
+  /** Raw carrier status (e.g. Yandex `pickuped`) and whether our mapping knows it. */
+  providerStatus?: string;
+  knownStatus?: boolean;
+  /** Carrier's last-change time: older answers than the stored one are ignored. */
+  updatedAt?: Date | null;
+  version?: number;
+  /** The carrier will never change this shipment again (polling stops). */
+  terminal?: boolean;
+  carrierPriceTiyin?: bigint | null;
+  errors?: string[];
 }
 
 export interface DeliveryProvider {
@@ -75,8 +98,10 @@ export interface DeliveryProvider {
     weightGrams: number,
   ): Promise<{ priceTiyin: bigint; etaMinutes: number } | null>;
   createShipment(input: ShipmentInput): Promise<{ externalId: string; trackNumber: string | null }>;
-  getState(externalId: string): Promise<ShipmentState>;
-  cancel(externalId: string): Promise<void>;
+  getState(externalId: string, opts?: { withPhone?: boolean }): Promise<ShipmentState>;
+  /** Two-step carriers (Yandex): confirm the estimated shipment — dispatches the courier. */
+  accept?(externalId: string, version?: number): Promise<void>;
+  cancel(externalId: string, opts?: { allowPaid?: boolean }): Promise<void>;
 }
 
 // ── Messaging ──
@@ -123,7 +148,10 @@ export interface FiscalReceiptInput {
 
 export interface FiscalProvider {
   readonly key: 'fiscal_ofd' | 'manual';
-  issueReceipt(input: FiscalReceiptInput): Promise<{ receiptId: string; url: string | null }>;
+  /** Null: no automatic receipt — the operator records it (`manual` provider). */
+  issueReceipt(
+    input: FiscalReceiptInput,
+  ): Promise<{ receiptId: string; url: string | null } | null>;
 }
 
 // ── Inventory (MoySklad) ──

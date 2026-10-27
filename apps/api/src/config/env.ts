@@ -48,6 +48,13 @@ export const envSchema = z.object({
   GEOIP_DB_PATH: z.string().optional().default(''),
   ANTHROPIC_API_KEY: z.string().optional().default(''),
   ANTHROPIC_MODEL: z.string().optional().default(''),
+  /**
+   * Yandex Delivery API root. Only tests (local stub server) override it — the OAuth token from the
+   * integration credentials is sent to this host.
+   */
+  YANDEX_DELIVERY_API_URL: z.url().default('https://b2b.taxi.yandex.net'),
+  /** Eskiz SMS API root (same reason: only tests point it at a stub; the password goes there). */
+  ESKIZ_API_URL: z.url().default('https://notify.eskiz.uz/api'),
 });
 
 export type Env = z.infer<typeof envSchema>;

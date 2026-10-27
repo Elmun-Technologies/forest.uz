@@ -4,6 +4,7 @@ import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { redact } from '../common/redact';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.module';
 import { maskSecret, parseKey, SecretBox } from './crypto/secret-box';
 import {
   FakeAdSignalProvider,
@@ -17,7 +18,18 @@ import {
   FakeSmsProvider,
 } from './providers/fake';
 import { ClickPaymentProvider } from './providers/click';
+import {
+  EskizSmsProvider,
+  EskizTokenCache,
+  newEskizCallbackToken,
+  redisTokenKv,
+} from './providers/eskiz';
+import { BtsManualDeliveryProvider } from './providers/bts-manual';
+import { ManualFiscalProvider } from './providers/manual-fiscal';
+import { normalizeBotUsername, telegramGetMe } from './providers/telegram';
 import { paymeAuthKey, PaymePaymentProvider } from './providers/payme';
+import { yandexCallbackUrl, YandexDeliveryProvider } from './providers/yandex-delivery';
+import { HttpClient } from './http-client';
 import type {
   AdSignalProvider,
   AiProvider,
@@ -47,11 +59,17 @@ export class IntegrationsService {
   private readonly box: SecretBox;
   readonly outbox = new FakeOutbox();
   private readonly fakes;
+  /** One client per integration, so its circuit breaker sees every call. */
+  private readonly httpClients = new Map<string, HttpClient>();
+  /** Eskiz bearer tokens shared via Redis by every API process (single-flight login). */
+  private readonly eskizTokens: EskizTokenCache;
 
   constructor(
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
+    redis: RedisService,
   ) {
+    this.eskizTokens = new EskizTokenCache(redisTokenKv(redis));
     this.box = new SecretBox({ current: parseKey(env.APP_ENCRYPTION_KEY) });
     this.fakes = {
       payme: new FakePaymentProvider('payme', env.APP_URL),
@@ -96,11 +114,40 @@ export class IntegrationsService {
 
   async delivery(key: 'yandex_delivery' | 'bts'): Promise<DeliveryProvider> {
     if (this.fakeMode) return key === 'yandex_delivery' ? this.fakes.yandex : this.fakes.bts;
-    return this.real<DeliveryProvider>(key, () => null);
+    // BTS has no API yet (docs/13 q.11): manual mode is the real provider, connected or not.
+    if (key === 'bts') return new BtsManualDeliveryProvider();
+    return this.real<DeliveryProvider>(key, (c) =>
+      key === 'yandex_delivery' ? this.yandexDelivery(c) : null,
+    );
   }
 
   async sms(): Promise<SmsProvider> {
-    return this.fakeMode ? this.fakes.sms : this.real<SmsProvider>('eskiz', () => null);
+    return this.fakeMode ? this.fakes.sms : this.real<SmsProvider>('eskiz', (c) => this.eskiz(c));
+  }
+
+  private eskiz(c: Record<string, string>): EskizSmsProvider | null {
+    if (!c.email || !c.password || !c.from) return null;
+    return new EskizSmsProvider(
+      { email: c.email, password: c.password, from: c.from, callbackToken: c.callbackToken },
+      {
+        http: this.httpClient('eskiz'),
+        tokens: this.eskizTokens,
+        apiUrl: this.env.ESKIZ_API_URL,
+        callbackUrl: c.callbackToken
+          ? `${this.env.API_URL.replace(/\/+$/, '')}/v1/webhooks/eskiz/${c.callbackToken}`
+          : null,
+      },
+    );
+  }
+
+  /**
+   * Bot used by the Telegram Login Widget, from the CONNECTED `telegram` integration in every
+   * PROVIDERS_MODE (inbound auth, like webhooks); null → the widget is unavailable.
+   */
+  async telegramLogin(): Promise<{ botToken: string; botUsername: string } | null> {
+    const c = await this.connectedCredentials('telegram');
+    const botUsername = normalizeBotUsername(c?.botUsername ?? '');
+    return c?.botToken && botUsername ? { botToken: c.botToken, botUsername } : null;
   }
 
   async messenger(): Promise<MessengerProvider> {
@@ -109,9 +156,12 @@ export class IntegrationsService {
       : this.real<MessengerProvider>('telegram', () => null);
   }
 
-  /** COD receipts fall back to the manual provider (operator enters the receipt) when no OFD is connected. */
+  /**
+   * COD receipts fall back to the manual provider (operator enters the receipt) while no OFD
+   * adapter exists — the documented MVP fallback (docs/06 Fiscal), not a fake.
+   */
   async fiscal(): Promise<FiscalProvider> {
-    return this.fakes.fiscal;
+    return this.fakeMode ? this.fakes.fiscal : new ManualFiscalProvider();
   }
 
   async inventory(): Promise<InventoryProvider> {
@@ -128,6 +178,28 @@ export class IntegrationsService {
     return this.fakeMode
       ? new FakeAdSignalProvider(key)
       : this.real<AdSignalProvider>(key, () => null);
+  }
+
+  httpClient(key: string): HttpClient {
+    let client = this.httpClients.get(key);
+    if (!client) {
+      client = new HttpClient(key, { maxRetries: 2 });
+      this.httpClients.set(key, client);
+    }
+    return client;
+  }
+
+  /** Real Yandex adapter; mutating calls and failures land in IntegrationLog (summaries only). */
+  private yandexDelivery(credentials: Record<string, string>): YandexDeliveryProvider {
+    return new YandexDeliveryProvider(credentials, {
+      http: this.httpClient('yandex_delivery'),
+      baseUrl: this.env.YANDEX_DELIVERY_API_URL,
+      callbackUrl: yandexCallbackUrl(this.env.API_URL, this.env.APP_ENCRYPTION_KEY),
+      log: (e) =>
+        void this.log('yandex_delivery', { direction: 'OUT', ...e }).catch((err: unknown) =>
+          this.logger.warn(`integration log failed: ${String(err)}`),
+        ),
+    });
   }
 
   async list(): Promise<IntegrationView[]> {
@@ -171,6 +243,8 @@ export class IntegrationsService {
     }
     const missing = def.fields.filter((f) => f.required && !merged[f.key]).map((f) => f.key);
     if (missing.length) throw new DomainError('VALIDATION_FAILED', { missing }, missing[0]);
+    // Eskiz callbacks are unsigned: the secret lives in the callback URL (CLAUDE.md §6).
+    if (key === 'eskiz' && !merged.callbackToken) merged.callbackToken = newEskizCallbackToken();
 
     const health = await this.test(key, merged);
     await this.prisma.$transaction([
@@ -244,6 +318,13 @@ export class IntegrationsService {
         ? { ok: true, message: `ready: set ${def.webhookPath}/prepare and /complete in Click` }
         : { ok: false, message: 'serviceId, merchantId and secretKey are required' };
     }
+    if (key === 'yandex_delivery') return this.yandexDelivery(creds).test();
+    if (key === 'eskiz') {
+      const eskiz = this.eskiz(creds);
+      return eskiz ? eskiz.test() : { ok: false, message: 'email, password and from are required' };
+    }
+    if (key === 'telegram')
+      return telegramGetMe(this.httpClient('telegram'), creds.botToken ?? '', creds.botUsername);
     return { ok: false, message: 'adapter not implemented yet' };
   }
 

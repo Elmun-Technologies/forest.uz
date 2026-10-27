@@ -217,13 +217,38 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     fields: [
       secret('oauthToken', 'OAuth token', 'OAuth-токен'),
       text('sourceAddress', 'Ombor manzili', 'Адрес склада'),
-      text('sourceLat', 'Ombor lat', 'Широта склада', false),
-      text('sourceLng', 'Ombor lng', 'Долгота склада', false),
+      // Coordinates are required: claims and live quotes are built from them (no geocoding).
+      text('sourceLat', 'Ombor kengligi (lat)', 'Широта склада (lat)'),
+      text('sourceLng', 'Ombor uzunligi (lng)', 'Долгота склада (lng)'),
+      text('sourceContactName', "Ombor bo'yicha mas'ul", 'Контакт на складе'),
+      text('sourceContactPhone', 'Ombor telefoni', 'Телефон склада'),
+      {
+        key: 'taxiClass',
+        label: L('Tarif', 'Тариф'),
+        type: 'select',
+        required: false,
+        options: ['express', 'courier', 'cargo'],
+      },
+      {
+        key: 'callbacks',
+        label: L('Status callback', 'Callback статусов'),
+        type: 'select',
+        required: false,
+        options: ['off', 'on'],
+      },
+      {
+        key: 'allowCod',
+        label: L("Naqd to'lovli buyurtmalar", 'Заказы с оплатой при получении'),
+        type: 'select',
+        required: false,
+        options: ['off', 'on'],
+      },
+      // test: quotes and claims only — accepting (which dispatches a real courier) is blocked.
       mode,
     ],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
     webhookPath: '/v1/webhooks/yandex-delivery',
     docsUrl: 'https://yandex.ru/support/delivery-profile/ru/api/express/',
   },
@@ -232,9 +257,11 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     name: 'BTS Express',
     category: 'delivery',
     icon: 'bts',
+    // Manual mode until BTS shares its partner API docs (docs/13 q.11): the operator enters the
+    // waybill and statuses in the order (ManualShipmentService); no credentials are used yet.
     description: L(
-      "Respublika bo'ylab 24 soatda. Trek raqam mijozga botda boradi.",
-      'По республике за 24 часа. Трек-номер клиенту приходит в бот.',
+      "Respublika bo'ylab 24 soatda. API hujjatlari kelguncha qo'lda rejim: trek raqam va holatni operator kiritadi.",
+      'По республике за 24 часа. Ручной режим до получения API: трек-номер и статусы вносит оператор.',
     ),
     fields: [
       text('login', 'Login', 'Логин', false),
@@ -243,7 +270,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     ],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
     webhookPath: '/v1/webhooks/bts',
   },
   {
@@ -477,10 +504,12 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
     fields: [
       secret('botToken', 'Bot token', 'Токен бота'),
       text('botUsername', 'Bot username', 'Username бота'),
-      text('adminChatId', 'Admin guruh chat ID', 'Chat ID админ-группы'),
+      // Needed for admin alerts (Phase 5), not for the login widget.
+      text('adminChatId', 'Admin guruh chat ID', 'Chat ID админ-группы', false),
     ],
     launchKit: true,
     availability: 'available',
+    // Login widget verification + getMe health check are implemented; bot messaging is Phase 5.
     implemented: false,
     webhookPath: '/v1/webhooks/telegram',
     docsUrl: 'https://core.telegram.org/bots/api',
@@ -494,14 +523,16 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       "Telegram'i yo'q mijozga kod va holat SMS'i.",
       'Коды и статусы по SMS клиентам без Telegram.',
     ),
+    // `password` = the secret key from my.eskiz.uz (API settings); `from` = approved nickname
+    // (4546 until one is approved). The callback URL (with its secret) is sent with every SMS.
     fields: [
       text('email', 'Email', 'Email'),
-      secret('password', 'Parol', 'Пароль'),
-      text('from', "Jo'natuvchi nomi", 'Имя отправителя'),
+      secret('password', 'Maxfiy kalit (parol)', 'Секретный ключ (пароль)'),
+      text('from', "Jo'natuvchi nomi (nik)", 'Имя отправителя (ник)'),
     ],
     launchKit: true,
     availability: 'available',
-    implemented: false,
+    implemented: true,
     webhookPath: '/v1/webhooks/eskiz',
     docsUrl: 'https://documenter.getpostman.com/view/663428/RzfmES4z',
   },

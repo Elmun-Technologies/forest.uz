@@ -70,6 +70,7 @@ export class MeService {
       publicId: c.publicId,
       name: c.name,
       phone: c.phone,
+      telegram: c.telegramId !== null ? { username: c.telegramUsername } : null,
       locale: c.locale,
       customerSince: c.createdAt.toISOString(),
       consents: await this.consents.current(c.id),

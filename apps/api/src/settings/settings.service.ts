@@ -5,6 +5,7 @@ import {
   type SettingValue,
   settingSchemas,
 } from '@forest/contracts';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const CACHE_MS = 15_000;
@@ -17,7 +18,10 @@ const CACHE_MS = 15_000;
 export class SettingsService {
   private cache = new Map<SettingKey, { value: unknown; at: number }>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly integrations: IntegrationsService,
+  ) {}
 
   async get<K extends SettingKey>(key: K): Promise<SettingValue<K>> {
     const hit = this.cache.get(key);
@@ -44,13 +48,14 @@ export class SettingsService {
   }
 
   async publicSettings(): Promise<PublicSettingsDto> {
-    const [store, zones, rules, seo, flags, returns] = await Promise.all([
+    const [store, zones, rules, seo, flags, returns, telegram] = await Promise.all([
       this.get('store.info'),
       this.get('delivery.zones'),
       this.get('delivery.rules'),
       this.get('seo.verification'),
       this.get('flags'),
       this.get('returns.rules'),
+      this.integrations.telegramLogin(),
     ]);
     const legalComplete = Object.values(store.legal).every(
       (v) => typeof v === 'string' && v.length > 0,
@@ -87,6 +92,8 @@ export class SettingsService {
       seo,
       returns: { returnDays: returns.returnDays },
       flags,
+      // The widget only works with the bot whose token verifies it — not `store.telegramBot`.
+      auth: { telegramBot: telegram?.botUsername ?? null },
     };
   }
 }

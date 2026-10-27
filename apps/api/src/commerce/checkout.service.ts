@@ -16,6 +16,7 @@ import type { Request } from 'express';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { ConsentsService } from '../customer/common/consents';
+import { cartWeightGrams, DeliveryQuoteService } from '../delivery/delivery-quote.service';
 import { RateLimiter } from '../customer/common/rate-limit';
 import { IntegrationsService } from '../integrations/integrations.service';
 import type { PaymentProvider } from '../integrations/providers/types';
@@ -53,6 +54,7 @@ export class CheckoutService {
     private readonly lifecycle: OrderLifecycleService,
     private readonly limiter: RateLimiter,
     private readonly consents: ConsentsService,
+    private readonly quotes: DeliveryQuoteService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -123,8 +125,22 @@ export class CheckoutService {
       this.settings.get('flags'),
       this.settings.get('promo.rules'),
     ]);
-    const zone = pickZone(zones, input.region, input.district).find((z) => z.key === input.zoneKey);
-    if (!zone) throw new DomainError('DELIVERY_UNAVAILABLE', undefined, 'zoneKey');
+    const pickedZone = pickZone(zones, input.region, input.district).find(
+      (z) => z.key === input.zoneKey,
+    );
+    if (!pickedZone) throw new DomainError('DELIVERY_UNAVAILABLE', undefined, 'zoneKey');
+    // Live carrier price where the zone has it on (same cached quote the cart showed).
+    const zone = await this.quotes.priceZone(
+      pickedZone,
+      {
+        region: input.region,
+        district: input.district ?? null,
+        line: input.addressLine,
+        lat: input.lat ?? null,
+        lng: input.lng ?? null,
+      },
+      cartWeightGrams(cart.items.map((i) => ({ qty: i.qty, weightGrams: i.variant.weightGrams }))),
+    );
     if (input.paymentMethod === 'COD' && !flags.cod)
       throw new DomainError('COD_DISABLED', undefined, 'paymentMethod');
     // Before anything is written: an order we can't take payment for would hold stock and burn

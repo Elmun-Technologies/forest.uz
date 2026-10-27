@@ -333,6 +333,8 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       expect(p.order.slaDueAt).not.toBeNull();
       expect(p.order.events.filter((e) => e.type === 'PAYMENT_PAID')).toHaveLength(1);
       expect(p.order.reservations.every((r) => r.expiresAt === null)).toBe(true);
+      // Receipt detail was sent (fiscalDetail on): Payme fiscalizes → fiscal evidence for closing.
+      expect(p.providerData).toMatchObject({ fiscalDetail: true });
 
       const check2 = await rpc('CheckTransaction', { id });
       expect(check2.result).toMatchObject({

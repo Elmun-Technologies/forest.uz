@@ -132,6 +132,13 @@ export class CartController {
     @Query(new ZodPipe(quoteQuerySchema)) q: z.infer<typeof quoteQuerySchema>,
     @ReqLocale() locale: Locale,
   ): Promise<DeliveryOptionDto[]> {
-    return this.carts.quote(await this.carts.current(req), q.region, q.district ?? null, locale);
+    return this.carts.quote(
+      await this.carts.current(req),
+      q.region,
+      q.district ?? null,
+      locale,
+      new Date(),
+      q.lat !== undefined && q.lng !== undefined ? { lat: q.lat, lng: q.lng } : null,
+    );
   }
 }

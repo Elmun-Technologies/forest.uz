@@ -123,6 +123,11 @@ interface PaymeTxnData {
   time: number;
   /** When we created the transaction (ms) — basis of the 12 h timeout. */
   createTime: number;
+  /**
+   * The receipt `detail` was sent for this order (cashbox `fiscalDetail` on and the lines add
+   * up), so Payme fiscalizes the payment — fiscal evidence for closing the order (CLAUDE.md §6).
+   */
+  fiscalDetail?: boolean;
 }
 
 const orderInclude = {
@@ -202,7 +207,7 @@ export class PaymeMerchantService {
       case 'CheckPerformTransaction':
         return this.checkPerformTransaction(p, credentials);
       case 'CreateTransaction':
-        return this.createTransaction(p);
+        return this.createTransaction(p, credentials);
       case 'PerformTransaction':
         return this.performTransaction(p);
       case 'CancelTransaction':
@@ -231,7 +236,7 @@ export class PaymeMerchantService {
     return detail ? { allow: true, detail } : { allow: true };
   }
 
-  private async createTransaction(p: Params) {
+  private async createTransaction(p: Params, credentials: Record<string, string>) {
     const amount = parseAmount(p);
     const txnId = requireString(p, 'id');
     const time = toMs(requireNumber(p, 'time'));
@@ -266,7 +271,9 @@ export class PaymeMerchantService {
       }
       if (isPaymeCreateTimeTooOld(time, now))
         throw new PaymeRpcError(PaymeError.INVALID_ACCOUNT, M.createTimeout, 'time');
-      const data: PaymeTxnData = { time, createTime: now };
+      // Same detail CheckPerformTransaction returned for this order (both derive from its rows).
+      const fiscalDetail = credentials.fiscalDetail !== 'off' && this.receiptDetail(order) !== null;
+      const data: PaymeTxnData = { time, createTime: now, fiscalDetail };
       const paymentId = await this.lifecycle.attachProviderTxnInTx(
         tx,
         order.id,

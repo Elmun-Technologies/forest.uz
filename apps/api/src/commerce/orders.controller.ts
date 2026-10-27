@@ -115,7 +115,13 @@ export class OrdersController {
     @ReqLocale() locale: Locale,
   ): Promise<TrackingDto> {
     const viewer = await viewerFor(req, this.sessions);
-    return this.orders.tracking(token, locale, viewer.customerId);
+    const placed = (req.signedCookies as Record<string, unknown> | undefined)?.[ORDER_COOKIE];
+    return this.orders.tracking(
+      token,
+      locale,
+      viewer.customerId,
+      typeof placed === 'string' ? placed : null,
+    );
   }
 
   @Patch('track/:token/address')

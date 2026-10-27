@@ -20,6 +20,7 @@ import {
 import type { Prisma } from '@forest/db';
 import type { Request, Response } from 'express';
 import { cartIdFromCookie, SessionService } from '../common/session';
+import { cartWeightGrams, DeliveryQuoteService } from '../delivery/delivery-quote.service';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
@@ -67,6 +68,7 @@ export class CartService {
     private readonly settings: SettingsService,
     private readonly files: FilesService,
     private readonly promos: PromoService,
+    private readonly quotes: DeliveryQuoteService,
   ) {}
 
   /** Customer cart when logged in, else the anonymous cookie cart. Never creates rows. */
@@ -416,11 +418,20 @@ export class CartService {
     district: string | null,
     locale: Locale,
     now = new Date(),
+    pin: { lat: number; lng: number } | null = null,
   ): Promise<DeliveryOptionDto[]> {
     const zones = pickZone(await this.settings.get('delivery.zones'), region, district);
     const { maxDiscountPct } = await this.settings.get('promo.rules');
+    const weight = cartWeightGrams(
+      (cart?.items ?? []).map((i) => ({ qty: i.qty, weightGrams: i.variant.weightGrams })),
+    );
     const out: DeliveryOptionDto[] = [];
-    for (const zone of zones) {
+    for (const pickedZone of zones) {
+      const zone = await this.quotes.priceZone(
+        pickedZone,
+        { region, district, line: '', lat: pin?.lat ?? null, lng: pin?.lng ?? null },
+        weight,
+      );
       let shipping = soumToTiyin(zone.priceSoum);
       if (cart && cart.items.length) {
         let promo: PricingInput['promo'] = null;

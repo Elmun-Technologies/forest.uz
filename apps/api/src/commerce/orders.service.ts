@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   canChangeAddress,
+  type DeliveryStatus,
   DomainError,
   formatUzPhone,
   type Locale,
@@ -71,6 +72,54 @@ const RANK: Record<string, number> = {
   DELIVERED: 4,
   COMPLETED: 4,
 };
+
+/** Courier contact is offered only while a courier is on the claim. */
+const COURIER_CONTACT_STATUSES: readonly DeliveryStatus[] = [
+  'COURIER_ASSIGNED',
+  'PICKED_UP',
+  'IN_TRANSIT',
+];
+
+const DELIVERY_LABELS: Record<Locale, Record<DeliveryStatus, string>> = {
+  uz: {
+    NOT_CREATED: '',
+    CREATED: 'Kuryer chaqirildi',
+    COURIER_ASSIGNED: 'Kuryer biriktirildi',
+    PICKED_UP: 'Kuryer buyurtmani oldi',
+    IN_TRANSIT: "Kuryer yo'lda",
+    AT_BRANCH: 'Filialda',
+    DELIVERED: 'Yetkazildi',
+    FAILED: "Yetkazib bo'lmadi",
+    RETURNED: 'Omborga qaytarildi',
+  },
+  ru: {
+    NOT_CREATED: '',
+    CREATED: 'Курьер вызван',
+    COURIER_ASSIGNED: 'Курьер назначен',
+    PICKED_UP: 'Курьер забрал заказ',
+    IN_TRANSIT: 'Курьер в пути',
+    AT_BRANCH: 'В отделении',
+    DELIVERED: 'Доставлен',
+    FAILED: 'Не удалось доставить',
+    RETURNED: 'Возвращён на склад',
+  },
+};
+
+/** A carrier claim that is alive (Yandex claim not dead): the address can no longer change. */
+function hasLiveClaim(
+  shipments: { carrier: string; externalId: string | null; status: DeliveryStatus }[],
+): boolean {
+  return shipments.some(
+    (s) => s.carrier === 'YANDEX' && s.externalId !== null && s.status !== 'FAILED',
+  );
+}
+
+/** Masks every digit except the last two (forwarded numbers may be foreign: +7…). */
+export function maskAnyPhone(phone: string): string {
+  if (phone.startsWith('+998')) return maskUzPhone(phone);
+  const digits = phone.replace(/\D/g, '');
+  return `+${digits.slice(0, 1)} *** *** ${digits.slice(-2)}`;
+}
 
 @Injectable()
 export class OrdersService {
@@ -217,23 +266,37 @@ export class OrdersService {
     token: string,
     locale: Locale,
     viewerCustomerId: string | null,
+    /** publicId from the signed `fr_ord` cookie: this browser placed the order. */
+    placedPublicId: string | null = null,
   ): Promise<TrackingDto> {
     const o = await this.prisma.order.findUnique({
       where: { trackingToken: token },
       include: orderInclude,
     });
     if (!o) throw new DomainError('ORDER_NOT_FOUND');
-    const base = await this.toDto(o, locale, viewerCustomerId === o.customerId);
+    const isOwner =
+      (viewerCustomerId !== null && viewerCustomerId === o.customerId) ||
+      (placedPublicId !== null && placedPublicId === o.publicId);
+    const base = await this.toDto(o, locale, isOwner);
     const shipment = o.shipments[0];
     const courier = shipment?.courier as {
       name?: string;
+      phone?: string | null;
+      phoneExt?: string | null;
+      phoneExpiresAt?: string | null;
       car?: string | null;
       plate?: string | null;
       etaAt?: string | null;
       distanceKm?: number | null;
     } | null;
     const history =
-      (shipment?.history as { at: string; place?: string; note?: string }[] | null) ?? [];
+      (shipment?.history as
+        { at: string; place?: string; note?: string; status?: DeliveryStatus }[] | null) ?? [];
+    // A forwarded courier number is only useful (and only shown) while the courier is on the way.
+    const phoneLive =
+      Boolean(courier?.phone) &&
+      COURIER_CONTACT_STATUSES.includes(shipment?.status ?? 'NOT_CREATED') &&
+      (!courier?.phoneExpiresAt || new Date(courier.phoneExpiresAt).getTime() > Date.now());
     return {
       ...base,
       courier: courier?.name
@@ -247,11 +310,18 @@ export class OrdersService {
               ? new Date(new Date(courier.etaAt).getTime() + 30 * 60_000).toISOString()
               : null,
             distanceKm: courier.distanceKm ?? null,
+            phone: phoneLive ? (isOwner ? courier.phone! : maskAnyPhone(courier.phone!)) : null,
+            phoneExt: phoneLive && isOwner ? (courier.phoneExt ?? null) : null,
           }
         : null,
       carrierRef: shipment?.trackNumber ?? shipment?.externalId ?? null,
-      history: history.map((h) => ({ at: h.at, place: h.place ?? '', note: h.note ?? '' })),
-      canChangeAddress: canChangeAddress(o.status),
+      history: history.map((h) => ({
+        at: h.at,
+        place: h.place ?? '',
+        note: h.note || (h.status ? DELIVERY_LABELS[locale][h.status] : ''),
+        ...(h.status ? { status: h.status } : {}),
+      })),
+      canChangeAddress: canChangeAddress(o.status) && !hasLiveClaim(o.shipments),
     };
   }
 
@@ -261,12 +331,17 @@ export class OrdersService {
     addressLine: string,
     district: string | null,
   ): Promise<void> {
-    const o = await this.prisma.order.findUnique({ where: { trackingToken: token } });
+    const o = await this.prisma.order.findUnique({
+      where: { trackingToken: token },
+      include: { shipments: true },
+    });
     if (!o) throw new DomainError('ORDER_NOT_FOUND');
     // Only the signed-in owner may change the address (the link alone is not proof of identity).
     if (!viewerCustomerId || viewerCustomerId !== o.customerId)
       throw new DomainError('UNAUTHORIZED');
-    if (!canChangeAddress(o.status)) throw new DomainError('ADDRESS_LOCKED');
+    // Once a carrier claim exists the carrier already has the address (CLAUDE.md §6).
+    if (!canChangeAddress(o.status) || hasLiveClaim(o.shipments))
+      throw new DomainError('ADDRESS_LOCKED');
     const prev = o.address as Record<string, unknown>;
     await this.prisma.$transaction([
       this.prisma.order.update({
