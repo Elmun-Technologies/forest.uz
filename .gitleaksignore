@@ -1,0 +1,3 @@
+# Known false positives, by exact gitleaks fingerprint (commit:file:rule:line). Never add patterns here.
+# Throwaway Testcontainers password in an admin test helper (since replaced by a per-run random value).
+b1267c761f5638b2522d365ea2aa0ffefd917ca5:apps/api/test/admin-helpers.ts:generic-api-key:46

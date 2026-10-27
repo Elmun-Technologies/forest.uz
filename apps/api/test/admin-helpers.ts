@@ -43,7 +43,8 @@ export async function createAdminTestApp(
   return app;
 }
 
-export const STRONG_PASSWORD = 'yashil-bog-2026-kuz';
+/** Per-run throwaway password (no credential-like literal in the repo for secret scanners). */
+export const STRONG_PASSWORD = `test-${randomBytes(9).toString('hex')}-pass`;
 
 let seq = 0;
 export const uniqueEmail = (tag: string) =>
