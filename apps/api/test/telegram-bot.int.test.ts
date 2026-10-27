@@ -538,6 +538,23 @@ describe('Telegram bot flows 1–5 with the fake transport (integration)', () =>
       expect(again?.granted).toBe(true);
     });
 
+    it('/start of an already linked chat opts in to reminders once (q.90)', async () => {
+      const chatId = chat();
+      const c = await prisma.customer.create({
+        data: { telegramId: BigInt(chatId), name: 'Aziz', leadSource: 'telegram_login' },
+      });
+      customerIds.push(c.id);
+      await post(fakeUpdates.text(chatId, '/start')).expect(200);
+      const rows = await prisma.consent.findMany({
+        where: { customerId: c.id, channel: 'TELEGRAM' },
+      });
+      expect(rows.map((r) => [r.granted, r.source])).toEqual([[true, 'bot']]);
+      await post(fakeUpdates.text(chatId, '/start')).expect(200);
+      expect(await prisma.consent.count({ where: { customerId: c.id, channel: 'TELEGRAM' } })).toBe(
+        1,
+      );
+    });
+
     it('blocking the bot (my_chat_member) marks the subscriber', async () => {
       const chatId = chat();
       await post(fakeUpdates.text(chatId, '/start')).expect(200);

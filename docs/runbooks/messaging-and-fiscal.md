@@ -145,6 +145,34 @@ templates for every text (q.19, pitfall in CLAUDE.md §17).
   once per shipment (`DELIVERY_NOTICE` marker). A first entry straight to DELIVERED / RETURNED never
   sends "shipped". In-transit scans are silent. RETURNED releases the stock hold.
 
+## Telegram bot (5A, docs/09, CLAUDE.md §6 "Telegram bot")
+
+Code: `apps/api/src/bot/*` (grammY **1.46.0**, exact pin), admin `apps/api/src/admin/bot/*`, UI
+`apps/admin/src/app/(panel)/bot/*`, storefront `/c/<token>` + `/tg`. Tests: `test/telegram-bot.int.test.ts`
+(fake transport, flows 1–5, webhook secret, cart restore, commands, inbox RBAC), unit `bot/cart-link.test.ts`,
+`packages/contracts/src/bot.test.ts`, e2e `tests/bot-cart-restore.spec.ts`, `tests/admin-bot.spec.ts`.
+
+Sources (core.telegram.org is blocked from dev; cross-checked):
+| Point | grammY 1.46.0 / `@grammyjs/types` 5.0.0 | python-telegram-bot 21.6 / 22.0 | telegraf 4.16.3 |
+|---|---|---|---|
+| Webhook auth header `X-Telegram-Bot-Api-Secret-Token`, `secret_token` 1–256 chars `[A-Za-z0-9_-]` | `methods.d.ts setWebhook`, `convenience/frameworks.js` | `Bot.set_webhook`, `ext/_utils/webhookhandler.py` | `lib/telegraf.js` (`TOKEN_HEADER`) |
+| File download `https://api.telegram.org/file/bot<token>/<file_path>` after `getFile`, ≤ 20 MB | `methods.d.ts getFile` | `Bot(base_file_url=…)` | — |
+| `contact.user_id` (own number check) | `message.d.ts Contact` | `_files/contact.py` | — |
+| 403 = bot blocked by the user | `GrammyError.error_code` | `request/_baserequest.py` → `Forbidden` | — |
+| `copy_text` inline button | `markup.d.ts InlineKeyboardButton` | 22.0 `inlinekeyboardbutton.py` | — |
+
+Operation:
+- Connect in A10 (Owner): bot token, username, optional admin group chat id. Connect generates
+  `webhookSecret` (encrypted with the credentials) and calls `setWebhook` (`allowed_updates`
+  message, callback_query, my_chat_member); a failure is logged as IntegrationLog `webhook.set`
+  (ok=false) and raises an admin alert. Reconnect after a disconnect = new secret + new webhook.
+- Updates: `POST /v1/webhooks/telegram/<secret>` + header; deduped per `update_id` (Redis 24 h),
+  handled in-request (per-chat order), always 200 once authenticated.
+- Fake mode: every Bot API call goes to `FakeTelegramTransport` (no network); dev endpoints
+  `POST /v1/dev/bot/update {chatId, text|callback}`, `GET /v1/dev/bot/sent?chatId=`,
+  `POST /v1/dev/bot/cart-link` simulate the bot locally; sent texts also show in `/v1/dev/outbox`.
+- Unverified / owner decisions: open questions 98–102.
+
 ## Before go-live checklist
 - [ ] Eskiz account activated, nickname approved, all templates approved (q.19, 48–49); connect in
       admin (login test green); send one OTP and one order SMS to a staff phone; see `DELIVERED`
