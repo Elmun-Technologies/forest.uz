@@ -13,7 +13,7 @@ import { catalogLocks } from '../src/moysklad/source-of-truth';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.module';
 import { signedIn } from './admin-helpers';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 import { MoyskladStub, type StubRow } from './moysklad-stub';
 
 /**
@@ -80,6 +80,7 @@ describe('MoySklad sync', () => {
     await agent.post('/v1/cart/items').send({ variantId, qty }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `ms-${run}-${++phoneSeq}-abcdefgh`)
       .send({
         name: 'Malika Karimova',

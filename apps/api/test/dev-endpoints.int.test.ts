@@ -3,7 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 
 /** Dev/e2e helpers: real behaviour behind them, and invisible outside fake mode. */
 describe('dev endpoints (integration)', () => {
@@ -37,6 +37,7 @@ describe('dev endpoints (integration)', () => {
     await owner.post('/v1/cart/items').send({ variantId: v.id, qty: 1 }).expect(201);
     const placed = await owner
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`)
       .send({
         name: 'Dilnoza',

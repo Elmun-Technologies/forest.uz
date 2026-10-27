@@ -75,11 +75,13 @@ describe('IntegrationsService (integration)', () => {
       direction: 'OUT',
       kind: 'order.push',
       ok: true,
-      message: 'ok',
+      message: 'redaction-check',
       payload: { phone: '+998901234567', name: 'x' },
     });
+    // Shared DB: other suites write moysklad logs too — read back this row only.
     const log = await prisma.integrationLog.findFirstOrThrow({
-      where: { integrationKey: 'moysklad' },
+      where: { integrationKey: 'moysklad', message: 'redaction-check' },
+      orderBy: { createdAt: 'desc' },
     });
     expect(log.payload).toEqual({ phone: '[redacted]', name: 'x' });
   });
