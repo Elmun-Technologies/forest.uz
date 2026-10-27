@@ -10,6 +10,7 @@ import {
 import { Badge, buttonClasses, cn, Panel } from '@forest/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
   regionLabel,
   SEGMENT_BADGE,
@@ -21,7 +22,7 @@ import {
 } from '../../../components/customers/copy';
 import { ExportCsvButton } from '../../../components/customers/export-csv-button';
 import { NoAccess, PageHeader } from '../../../components/page';
-import { adminGet, requireFullSession } from '../../../lib/api';
+import { AdminApiError, adminGet, requireFullSession } from '../../../lib/api';
 import { formatLastSeen, initials } from '../../../lib/format';
 
 export const metadata: Metadata = { title: 'Mijozlar · Forest Admin' };
@@ -70,7 +71,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   if (cursor) query.set('cursor', cursor);
 
   const [page, options] = await Promise.all([
-    adminGet<CustomerListDto>(`/admin/customers?${query.toString()}`),
+    adminGet<CustomerListDto>(`/admin/customers?${query.toString()}`).catch((e: unknown) => {
+      // A stale cursor or a garbage filter value (400): reload without it instead of failing.
+      if (e instanceof AdminApiError && e.status === 400)
+        redirect(cursor ? `/customers?${filterQuery.toString()}` : '/customers');
+      throw e;
+    }),
     adminGet<CustomerFilterOptionsDto>('/admin/customers/filters'),
   ]);
 

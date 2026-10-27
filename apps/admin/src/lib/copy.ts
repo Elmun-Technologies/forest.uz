@@ -127,3 +127,12 @@ export const AUDIT_ENTITY_LABEL: Record<string, string> = {
 };
 
 export const SYSTEM_ACTOR = 'Tizim';
+
+/** Panel error boundary (`app/(panel)/error.tsx`): an API failure while rendering a page. */
+export const PAGE_ERROR = {
+  title: "Sahifani ochib bo'lmadi",
+  text: "Server so'rovga javob bermadi yoki manzildagi filtr eskirgan. Qayta urinib ko'ring yoki bo'lim boshiga qayting.",
+  retry: 'Qayta urinish',
+  back: 'Dashboardga qaytish',
+  code: 'Xato kodi',
+} as const;

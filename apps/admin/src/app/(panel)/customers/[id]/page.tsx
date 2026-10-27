@@ -120,6 +120,12 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         <Panel tone="warn" radius="md" className="p-4 text-[13px]" role="status">
           Ma&apos;lumotlar {date(c.erasedAt!)} da o&apos;chirilgan (anonimlashtirilgan). Buyurtmalar
           qonun bo&apos;yicha kontaktlarsiz saqlanadi.
+          {c.external.length ? (
+            <span className="mt-1 block font-semibold" data-testid="erase-external">
+              MoySklad&apos;dagi kontragentni qo&apos;lda o&apos;chiring:{' '}
+              {c.external.map((x) => x.counterpartyId).join(', ')}
+            </span>
+          ) : null}
         </Panel>
       ) : c.erasureRequest ? (
         <Panel tone="warn" radius="md" className="p-4 text-[13px]" role="status">
@@ -146,6 +152,11 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
         <Card title="Mijoz yo'li">
           <CustomerTimeline items={c.timeline} />
+          {c.timelineTruncated ? (
+            <p className="text-xs text-muted">
+              Faqat oxirgi voqealar ko&apos;rsatilgan; eskilari buyurtma sahifalarida.
+            </p>
+          ) : null}
           <p className="pt-1 text-xs text-muted">
             Sayt tashriflari va reklama bosishlari analitika ishga tushgach ko&apos;rinadi.
           </p>
@@ -177,9 +188,14 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
           <Card
             title="Buyurtmalar"
-            aside={<span className="text-xs text-muted">{c.orders.length} ta</span>}
+            aside={<span className="text-xs text-muted">{c.kpis.ordersTotal} ta</span>}
           >
             {c.orders.length === 0 ? <p className="text-muted">Buyurtmalar yo&apos;q.</p> : null}
+            {c.ordersTruncated ? (
+              <p className="text-xs text-muted">
+                Oxirgi {c.orders.length} ta buyurtma ko&apos;rsatilgan.
+              </p>
+            ) : null}
             <ul className="flex flex-col" data-testid="customer-orders">
               {c.orders.map((o) => (
                 <li
@@ -189,7 +205,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   <span className="flex flex-col">
                     {canOrders ? (
                       <Link
-                        href={`/orders?q=${encodeURIComponent(o.number)}`}
+                        href={`/orders/${encodeURIComponent(o.number)}`}
                         prefetch={false}
                         className="font-semibold underline-offset-2 hover:underline"
                       >

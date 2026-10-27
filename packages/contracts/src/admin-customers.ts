@@ -164,7 +164,11 @@ export interface CustomerDetailDto {
   /** Pending cabinet erasure request (docs/02: within `deletionSlaDays`). */
   erasureRequest: { requestedAt: string; dueBy: string } | null;
   kpis: { ltvSoum: number; purchases: number; aovSoum: number | null; ordersTotal: number };
+  /** Latest orders only (50); `kpis.ordersTotal` counts all. */
   orders: CustomerOrderRowDto[];
+  ordersTruncated: boolean;
+  /** Copies in external systems (MoySklad counterparties) — erased by hand after an erasure. */
+  external: CustomerEraseResultDto['external'];
   consents: {
     current: { smsMarketing: boolean; telegram: boolean; adsMatching: boolean };
     history: CustomerConsentEntryDto[];
@@ -173,6 +177,8 @@ export interface CustomerDetailDto {
   openOrders: number;
   notes: CustomerNoteDto[];
   timeline: CustomerTimelineItemDto[];
+  /** Older events exist beyond the shown window (orders/events/messages are capped). */
+  timelineTruncated: boolean;
 }
 
 /** Unmasked data (`POST /admin/customers/:id/reveal`, audited). */
@@ -192,6 +198,13 @@ export interface CustomerPiiDto {
 export interface CustomerEraseResultDto {
   erasedAt: string;
   ordersKept: number;
+  /** Customer review photos detached (files deleted when nothing else uses them). */
+  photosRemoved: number;
+  /**
+   * Copies in external systems that are NOT erased automatically — staff erase them by hand
+   * (docs/runbooks/moysklad.md).
+   */
+  external: { system: 'moysklad'; counterpartyId: string }[];
 }
 
 /** CSV cell: quoted, formula-injection safe (`= + - @` → `'` prefix). */

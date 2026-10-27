@@ -10,6 +10,7 @@ import { SessionService } from '../../common/session';
 import { ConsentsService } from '../../customer/common/consents';
 import { PrismaService } from '../../prisma/prisma.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
+import { AdminUploadService } from '../files/upload.service';
 
 const ERASED_NAME = '—';
 
@@ -27,10 +28,11 @@ export class CustomerEraseService {
     private readonly audit: AuditService,
     private readonly consents: ConsentsService,
     private readonly sessions: SessionService,
+    private readonly uploads: AdminUploadService,
   ) {}
 
   async erase(actor: AuditActor, id: string, confirm: string): Promise<CustomerEraseResultDto> {
-    const result = await this.prisma.$transaction(async (tx) => {
+    const { result, photoIds } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${id} FOR UPDATE`;
       const c = await tx.customer.findUnique({ where: { id } });
       if (!c) throw new DomainError('NOT_FOUND');
@@ -63,12 +65,53 @@ export class CustomerEraseService {
         data: { text: null, fileIds: [] },
       });
       await tx.segmentMember.deleteMany({ where: { customerId: id } });
+      // Telegram chat id identifies the person; the column is NOT NULL, 0 = erased (no real chat).
+      await tx.conversation.updateMany({ where: { customerId: id }, data: { telegramChatId: 0n } });
+
+      // Review photos may show the person or their home: detach them (text/rating stay, now
+      // anonymous). A staff-uploaded "before" image is not the customer's and stays.
+      const reviews = await tx.review.findMany({
+        where: { customerId: id },
+        select: { id: true, photoFileIds: true, beforeFileId: true },
+      });
+      const photoIds: string[] = [];
+      for (const r of reviews) {
+        const own = r.beforeFileId !== null && r.photoFileIds.includes(r.beforeFileId);
+        if (r.photoFileIds.length === 0) continue;
+        photoIds.push(...r.photoFileIds);
+        await tx.review.update({
+          where: { id: r.id },
+          data: {
+            photoFileIds: [],
+            photoConsent: false,
+            inGallery: false,
+            gallerySort: null,
+            ...(own ? { beforeFileId: null } : {}),
+          },
+        });
+      }
+
+      // External copies are not erased automatically: listed in the result and the audit row.
+      const links = await tx.moyskladOrderLink.findMany({
+        where: { order: { customerId: id }, counterpartyId: { not: null } },
+        select: { counterpartyId: true },
+      });
+      const external = [...new Set(links.map((l) => l.counterpartyId!))].map((counterpartyId) => ({
+        system: 'moysklad' as const,
+        counterpartyId,
+      }));
 
       // Orders stay (tax/fiscal retention) without contact details; the region remains for stats.
       const orders = await tx.order.findMany({
         where: { customerId: id },
         select: { id: true, address: true },
       });
+      // Staff notes on the orders may quote the customer: keep the rows, drop the text.
+      if (orders.length)
+        await tx.$executeRaw`
+          UPDATE "OrderEvent" SET "data" = jsonb_set("data", '{text}', '"—"'::jsonb)
+          WHERE "type" = 'NOTE' AND "data" ? 'text'
+            AND "orderId" IN (${Prisma.join(orders.map((o) => o.id))})`;
       for (const o of orders) {
         const a = (o.address ?? {}) as { region?: unknown; district?: unknown };
         await tx.order.update({
@@ -113,11 +156,23 @@ export class CustomerEraseService {
             addressesDeleted: addresses.count,
             notesDeleted: notes.count,
             cartsDeleted: carts.count,
+            photosRemoved: photoIds.length,
+            external,
           },
         },
         tx,
       );
-      return { erasedAt: now.toISOString(), ordersKept: orders.length };
+      const done: CustomerEraseResultDto = {
+        erasedAt: now.toISOString(),
+        ordersKept: orders.length,
+        photosRemoved: photoIds.length,
+        external,
+      };
+      return { result: done, photoIds };
+    });
+    // After commit: photo files nothing else references go (rows + objects; best effort).
+    await this.uploads.discardUnreferenced([...new Set(photoIds)]).catch((e: unknown) => {
+      this.logger.error(`photo cleanup failed after erasure: ${String(e)}`);
     });
     // After commit: any live storefront session of this customer ends.
     await this.sessions.revokeCustomer(id).catch((e: unknown) => {

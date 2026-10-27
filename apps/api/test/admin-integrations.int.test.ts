@@ -230,4 +230,21 @@ describe('admin integrations hub A10 (integration)', () => {
       }),
     ).toBeGreaterThan(0);
   });
+
+  it('blank non-secret field clears it; blank secret keeps the stored one', async () => {
+    const owner = clients.get('OWNER')!;
+    const apiKey = `sk-${randomBytes(10).toString('hex')}`;
+    expect(
+      (await put(owner, '/v1/admin/integrations/claude', { fields: { apiKey, model: 'claude-x' } }))
+        .status,
+    ).toBe(200);
+    const res = await put(owner, '/v1/admin/integrations/claude', {
+      fields: { apiKey: '', model: '' },
+    });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    const d = (await owner.get('/v1/admin/integrations/claude')).body as IntegrationDetailDto;
+    const f = Object.fromEntries(d.fields.map((x) => [x.key, x.value]));
+    expect(f.model).toBeNull();
+    expect(f.apiKey).toBe(`•••• •••• ${apiKey.slice(-4)}`);
+  });
 });

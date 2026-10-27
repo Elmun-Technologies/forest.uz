@@ -326,7 +326,10 @@ describe('admin customers A4/A5 (integration)', () => {
     expect(text).not.toContain(phones.B);
     expect(text).toContain('*** **');
     const full = await owner.post('/v1/admin/customers/export', { q: tag, reveal: true });
-    expect(full.text).toContain(phones.B);
+    // Digits without '+': no formula-guard apostrophe in Excel/CRM imports.
+    expect(full.text).toContain(`,${phones.B!.slice(1)},`);
+    expect(full.text).not.toContain(`'+998`);
+    expect(masked.text).not.toContain(`'+998`);
     const audits = await prisma.auditLog.findMany({
       where: { action: 'customer.export' },
       orderBy: { createdAt: 'desc' },
@@ -352,9 +355,68 @@ describe('admin customers A4/A5 (integration)', () => {
     expect(wrong.status).toBe(400);
     expect(wrong.body.error.code).toBe('ADMIN_CONFIRM_MISMATCH');
 
+    // Identifying data beyond the profile: review photos, staff notes, Telegram chat, MoySklad copy.
+    const bOrders = await prisma.order.findMany({
+      where: { customerId: ids.B },
+      select: { id: true },
+    });
+    const photo = await prisma.file.create({
+      data: { key: `reviews/test-${run}/a.jpg`, mime: 'image/jpeg', size: 10 },
+    });
+    const review = await prisma.review.create({
+      data: {
+        productId: variant.productId,
+        customerId: ids.B!,
+        orderId: bOrders[0]!.id,
+        rating: 5,
+        text: 'Zo‘r',
+        locale: 'uz',
+        source: 'web',
+        status: 'APPROVED',
+        photoFileIds: [photo.id],
+        beforeFileId: photo.id,
+        photoConsent: true,
+        inGallery: true,
+        gallerySort: 1,
+      },
+    });
+    const note = await prisma.orderEvent.create({
+      data: {
+        orderId: bOrders[0]!.id,
+        type: 'NOTE',
+        actorType: 'STAFF',
+        data: { text: 'Mijoz Dilnoza, uyi Chilonzorda' },
+      },
+    });
+    const chat = await prisma.conversation.create({
+      data: { customerId: ids.B!, telegramChatId: 777000111n, topic: 'advice' },
+    });
+    const counterpartyId = `cp-${run}`;
+    await prisma.moyskladOrderLink.create({
+      data: { orderId: bOrders[0]!.id, externalId: `ms-${run}`, counterpartyId },
+    });
+
     const ok = await owner.post(`/v1/admin/customers/${ids.B}/erase`, { confirm: b.publicId });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body.ordersKept).toBe(2);
+    expect(ok.body.photosRemoved).toBe(1);
+    expect(ok.body.external).toEqual([{ system: 'moysklad', counterpartyId }]);
+    const reviewAfter = await prisma.review.findUniqueOrThrow({ where: { id: review.id } });
+    expect(reviewAfter).toMatchObject({
+      photoFileIds: [],
+      beforeFileId: null,
+      inGallery: false,
+      photoConsent: false,
+      rating: 5,
+    });
+    expect(await prisma.file.findUnique({ where: { id: photo.id } })).toBeNull();
+    const noteAfter = await prisma.orderEvent.findUniqueOrThrow({ where: { id: note.id } });
+    expect(noteAfter.data).toEqual({ text: '—' });
+    const chatAfter = await prisma.conversation.findUniqueOrThrow({ where: { id: chat.id } });
+    expect(chatAfter.telegramChatId).toBe(0n);
+    // Shared DB: an approved review on a seeded product would show up in other suites' ratings.
+    await prisma.review.delete({ where: { id: review.id } });
+    await prisma.conversation.delete({ where: { id: chat.id } });
 
     const after = await prisma.customer.findUniqueOrThrow({
       where: { id: ids.B },
@@ -373,6 +435,9 @@ describe('admin customers A4/A5 (integration)', () => {
     const audit = await prisma.auditLog.findFirstOrThrow({
       where: { action: 'customer.erase', entityId: ids.B },
     });
+    expect((audit.after as { external: unknown }).external).toEqual([
+      { system: 'moysklad', counterpartyId },
+    ]);
     expect(JSON.stringify(audit)).not.toContain(phones.B);
 
     expect(names((await list(`q=${tag}`)).items)).not.toContain('B');
@@ -381,5 +446,6 @@ describe('admin customers A4/A5 (integration)', () => {
     const detail = (await owner.get(`/v1/admin/customers/${ids.B}`)).body as CustomerDetailDto;
     expect(detail.erasedAt).not.toBeNull();
     expect(detail.kpis.purchases).toBe(2);
+    expect(detail.external).toEqual([{ system: 'moysklad', counterpartyId }]);
   });
 });

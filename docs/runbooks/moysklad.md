@@ -27,12 +27,20 @@ copies in the session scratchpad, cross-checked:
 ## What the code relies on
 | Area | Request | Fields |
 |---|---|---|
-| Health | `GET entity/organization?limit=1`, `GET context/companysettings/pricetype` | 401/403 = bad token; price type name present |
+| Health | `GET entity/organization?limit=1`, `GET entity/currency`, `GET context/companysettings/pricetype` | 401/403 = bad token; the `default: true` currency's `isoCode` must be `UZS` (else the check fails); price type name present |
+| Currencies | `GET entity/currency` (with every pull) | `id`, `isoCode` (`UZS`; numeric `code` 860 as fallback) — a price whose `salePrices[].currency` isn't UZS is skipped (error row) |
 | Catalog | `GET entity/product`, `entity/variant`, `entity/bundle?expand=components` (limit 1000 / 100), follow `meta.nextHref` | `id`, `meta.type`, `name`, `article` (product/bundle SKU), `code` (variant SKU), `archived`, `variantsCount`, `product.meta.href` (variant parent), `characteristics[].value` (variant label), `salePrices[].priceType.name/value`, `attributes[].name/value` (IKPU), `components.rows[].quantity/assortment.meta.href` |
 | Targeted refresh | `GET entity/{product\|variant\|bundle}/{id}`, `GET entity/variant?filter=productid={id}` | 404 = deleted |
 | Stock | `GET report/stock/bystore/current?stockType=freeStock&include=zeroLines` (store set) or `report/stock/all/current?…` | `assortmentId`, `storeId`, `freeStock` (= stock − reserve) |
 | Orders | `GET entity/customerorder?filter=name=F-…` (idempotency), `GET/POST entity/counterparty` (`filter=phone=+998…`, `{name, phone, companyType:"individual"}`), `GET entity/customerorder/metadata` (`states[]`), `GET …/metadata/attributes`, `POST entity/customerorder {name, organization, agent, store, state, description, attributes, positions[{quantity, price, discount, reserve, assortment}]}`, `PUT entity/customerorder/{id} {state}`, `GET …/{id}/positions` + `PUT …/positions/{pid} {reserve:0}` | references are `{meta:{href,type,mediaType}}`; state href `entity/customerorder/metadata/states/{id}` |
 | Webhooks | `GET/POST entity/webhook {url, action CREATE\|UPDATE\|DELETE, entityType product\|variant\|bundle, method POST}`, `GET/POST entity/webhookstock {url, enabled, stockType "stock", reportType}` | url ≤ 255 chars |
+
+Safety rules: a `salePrices` value ≤ 0 is "no price" (MoySklad sends 0 when unset) — never written,
+an error row instead, and a new item without a usable price arrives as an inactive variant. A stock
+report that is empty or misses more than half of the expected ids changes nothing (error row); an id
+missing individually keeps its stock. Stock holds: hand-over to the MoySklad reserve only while the
+stock flow is on; holds end at HANDED_TO_COURIER (released with the stock flow on, consumed otherwise);
+a cancelled order's MoySklad reserve is always set to 0 (CLAUDE.md §6).
 
 Mapping (A13 table): name → only for new DRAFT products (content is ours afterwards); SKU ↔ `article` /
 variant `code`; IKPU ↔ attribute (default `ikpu`, 17 digits, never cleared); price ↔
@@ -52,6 +60,10 @@ number, payment method, zone/carrier, shipping, discount/promo and total — no 
 - Admin API: `GET /v1/admin/moysklad/status`, `GET …/log?cursor&limit&kind&ok`, `POST …/sync {scope}`
   (`moysklad.sync`); `PATCH …/settings`, `POST …/webhooks/register` (`moysklad.edit`);
   `POST …/webhook-url` (`moysklad.edit` + `integrations.keys`). Every mutation is audited.
+
+- Customer erasure (admin A5 "O'chirish") does not touch MoySklad: the erase result and its audit row
+  (`customer.erase`, `after.external`) list the customer's MoySklad counterparty ids — **erase the
+  counterparty in MoySklad manually** (or anonymise its name/phone there) after an erasure.
 
 ## Go-live checklist (what the Owner provides)
 1. A MoySklad user **with administrator rights** (the short stock report is admin-only) → Settings →

@@ -14,6 +14,7 @@ import {
   DomainError,
   formatUzPhone,
   maskUzPhone,
+  phoneDigitsForHash,
   OPEN_ORDER_STATUSES,
   type OrderStatus,
   type PaymentMethod,
@@ -42,6 +43,11 @@ import {
 /** Payment states that settle what the customer sees (same rule as the order page). */
 const SETTLED: readonly string[] = ['PAID', 'PARTIALLY_REFUNDED', 'REFUNDED'];
 const TIMELINE_LIMIT = 120;
+/** 360° view bounds: latest orders shown (KPIs still count all), events per order. */
+const ORDERS_LIMIT = 50;
+const EVENTS_PER_ORDER = 10;
+const MESSAGES_LIMIT = 60;
+const REVIEWS_LIMIT = 30;
 
 function listItem(r: StatsRow): CustomerListItemDto {
   return {
@@ -159,17 +165,18 @@ export class AdminCustomersService {
       where: { id },
       include: {
         _count: { select: { addresses: true } },
-        consents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }] },
+        consents: { orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 100 },
         notes: { orderBy: { createdAt: 'desc' }, take: 100 },
         orders: {
           orderBy: { createdAt: 'desc' },
+          take: ORDERS_LIMIT + 1,
           include: {
-            payments: { orderBy: { createdAt: 'desc' } },
-            events: { orderBy: { createdAt: 'desc' }, take: 40 },
+            payments: { orderBy: { createdAt: 'desc' }, take: 10 },
+            events: { orderBy: { createdAt: 'desc' }, take: EVENTS_PER_ORDER + 1 },
           },
         },
-        reviews: { orderBy: { createdAt: 'desc' }, take: 30 },
-        messages: { orderBy: { createdAt: 'desc' }, take: 60 },
+        reviews: { orderBy: { createdAt: 'desc' }, take: REVIEWS_LIMIT + 1 },
+        messages: { orderBy: { createdAt: 'desc' }, take: MESSAGES_LIMIT + 1 },
       },
     });
     const staffIds = [...new Set(c.notes.map((n) => n.staffId))];
@@ -185,7 +192,9 @@ export class AdminCustomersService {
       createdAt: n.createdAt.toISOString(),
     }));
 
-    const orders = c.orders.map((o) => {
+    const ordersTruncated = c.orders.length > ORDERS_LIMIT;
+    const shownOrders = c.orders.slice(0, ORDERS_LIMIT);
+    const orders = shownOrders.map((o) => {
       const payment = o.payments.find((p) => SETTLED.includes(p.status)) ?? o.payments[0];
       return {
         id: o.id,
@@ -199,12 +208,12 @@ export class AdminCustomersService {
       };
     });
 
-    const timeline: CustomerTimelineItemDto[] = [
+    const allEvents: CustomerTimelineItemDto[] = [
       { kind: 'created' as const, at: c.createdAt.toISOString() },
       ...(c.leadAt
         ? [{ kind: 'lead' as const, at: c.leadAt.toISOString(), source: c.leadSource }]
         : []),
-      ...c.orders.flatMap((o): CustomerTimelineItemDto[] => [
+      ...shownOrders.flatMap((o): CustomerTimelineItemDto[] => [
         {
           kind: 'order_created',
           at: o.createdAt.toISOString(),
@@ -212,7 +221,7 @@ export class AdminCustomersService {
           totalSoum: tiyinToSoumInt(o.totalTiyin),
           paymentMethod: o.paymentMethod as PaymentMethod,
         },
-        ...o.events.map((e): CustomerTimelineItemDto => ({
+        ...o.events.slice(0, EVENTS_PER_ORDER).map((e): CustomerTimelineItemDto => ({
           kind: 'order_event',
           at: e.createdAt.toISOString(),
           orderNumber: o.number,
@@ -222,7 +231,7 @@ export class AdminCustomersService {
           actorType: e.actorType,
         })),
       ]),
-      ...c.messages.map((m): CustomerTimelineItemDto => ({
+      ...c.messages.slice(0, MESSAGES_LIMIT).map((m): CustomerTimelineItemDto => ({
         kind: 'message',
         at: m.createdAt.toISOString(),
         channel: m.channel,
@@ -237,7 +246,7 @@ export class AdminCustomersService {
         granted: x.granted,
         source: x.source,
       })),
-      ...c.reviews.map((r): CustomerTimelineItemDto => ({
+      ...c.reviews.slice(0, REVIEWS_LIMIT).map((r): CustomerTimelineItemDto => ({
         kind: 'review',
         at: r.createdAt.toISOString(),
         rating: r.rating,
@@ -248,9 +257,14 @@ export class AdminCustomersService {
         at: n.createdAt,
         staffName: n.staffName,
       })),
-    ]
-      .sort((a, b) => b.at.localeCompare(a.at))
-      .slice(0, TIMELINE_LIMIT);
+    ].sort((a, b) => b.at.localeCompare(a.at));
+    const timelineTruncated =
+      ordersTruncated ||
+      allEvents.length > TIMELINE_LIMIT ||
+      c.messages.length > MESSAGES_LIMIT ||
+      c.reviews.length > REVIEWS_LIMIT ||
+      shownOrders.some((o) => o.events.length > EVENTS_PER_ORDER);
+    const timeline = allEvents.slice(0, TIMELINE_LIMIT);
 
     const request = await this.erasureRequest(c.id);
     const source = touchField(c.firstTouch, 'source');
@@ -294,11 +308,27 @@ export class AdminCustomersService {
         })),
       },
       addressesCount: c._count.addresses,
-      openOrders: c.orders.filter((o) => OPEN_ORDER_STATUSES.includes(o.status as OrderStatus))
-        .length,
+      openOrders: await this.prisma.order.count({
+        where: { customerId: c.id, status: { in: [...OPEN_ORDER_STATUSES] } },
+      }),
+      ordersTruncated,
+      external: await this.externalCopies(c.id),
       notes,
       timeline,
+      timelineTruncated,
     };
+  }
+
+  /** MoySklad counterparties created for this customer's orders (not erased automatically). */
+  private async externalCopies(id: string): Promise<CustomerDetailDto['external']> {
+    const links = await this.prisma.moyskladOrderLink.findMany({
+      where: { order: { customerId: id }, counterpartyId: { not: null } },
+      select: { counterpartyId: true },
+    });
+    return [...new Set(links.map((l) => l.counterpartyId!))].map((counterpartyId) => ({
+      system: 'moysklad' as const,
+      counterpartyId,
+    }));
   }
 
   /** Latest cabinet erasure request (written by `MeService.requestDeletion`). */
@@ -438,7 +468,13 @@ export class AdminCustomersService {
     ];
     const lines = rows.map((r) => {
       const item = listItem(r);
-      const phone = r.phone ? (reveal ? r.phone : maskUzPhone(r.phone)) : '';
+      // Digits without '+' (998901234567): a leading '+' would trip the formula guard and land
+      // in Excel/CRM imports as "'+998…".
+      const phone = r.phone
+        ? reveal
+          ? phoneDigitsForHash(r.phone)
+          : maskUzPhone(r.phone).replace(/^\+/, '')
+        : '';
       return [
         item.publicId,
         item.name,

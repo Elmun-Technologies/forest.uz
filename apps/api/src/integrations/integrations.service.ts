@@ -252,11 +252,15 @@ export class IntegrationsService {
     if (!def || def.availability === 'coming_soon') throw new DomainError('NOT_FOUND');
     const existing = await this.prisma.integration.findUnique({ where: { key } });
     const previous = existing?.credentials ? this.decrypt(key, existing.credentials) : {};
-    // Empty secret inputs keep the stored value (admin form shows masked values only).
+    // Fields not sent stay as stored. A blank secret keeps the stored value (the admin form shows
+    // masked values only); a blank non-secret field clears it (e.g. optional coordinates).
     const merged: Record<string, string> = { ...previous };
     for (const f of def.fields) {
       const v = input[f.key];
-      if (typeof v === 'string' && v.trim() !== '') merged[f.key] = v.trim();
+      if (typeof v !== 'string') continue;
+      const value = v.trim();
+      if (value !== '') merged[f.key] = value;
+      else if (f.type !== 'secret') delete merged[f.key];
     }
     const missing = def.fields.filter((f) => f.required && !merged[f.key]).map((f) => f.key);
     if (missing.length) throw new DomainError('VALIDATION_FAILED', { missing }, missing[0]);
