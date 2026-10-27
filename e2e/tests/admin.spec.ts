@@ -80,9 +80,9 @@ test('invited Manager: password → mandatory TOTP enrolment → panel', async (
   const nav = page.getByRole('navigation', { name: 'Admin menyusi' });
   await expect(nav).toBeVisible();
   await expect(nav.getByText(`E2E Menejer ${run}`)).toBeVisible();
-  // Manager: audit yes, staff management no.
+  // Manager: delivery settings + audit yes, staff management no (first permitted tab opens).
   await nav.getByRole('link', { name: 'Sozlamalar' }).click();
-  await expect(page).toHaveURL(/\/settings\/audit$/);
+  await expect(page).toHaveURL(/\/settings\/delivery$/);
   await page.goto('/settings/staff');
   await expect(page.getByText("Bu bo'lim uchun huquq yo'q")).toBeVisible();
 });

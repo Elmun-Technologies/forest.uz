@@ -8,7 +8,7 @@ export function SettingsHeader({ me, active }: { me: AdminMeDto; active: string 
   return (
     <PageHeader
       title="Sozlamalar"
-      subtitle="Xodimlar, rollar va faoliyat jurnali"
+      subtitle="Do'kon, xodimlar va yetkazish qoidalari"
       actions={tabs.length > 1 ? <TabLinks tabs={tabs} active={active} label="Bo'limlar" /> : null}
     />
   );

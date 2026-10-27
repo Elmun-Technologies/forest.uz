@@ -62,8 +62,12 @@ export async function devTotp(request: APIRequestContext, email: string): Promis
 /** Enrolment screen: get the QR, check it renders, confirm with the current code. */
 export async function enrolTotp(page: Page, email: string) {
   await expect(page).toHaveURL(/\/totp\/setup$/);
-  await page.getByRole('button', { name: 'QR kodni olish' }).click();
-  await expect(page.getByTestId('totp-qr')).toBeVisible();
+  // Dev servers may still be hydrating after the client-side redirect: retry until the QR shows
+  // (a repeated setup call just issues a fresh secret, which devTotp reads from the DB).
+  await expect(async () => {
+    await page.getByRole('button', { name: 'QR kodni olish' }).click();
+    await expect(page.getByTestId('totp-qr')).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
   await expect(page.getByTestId('totp-secret')).toHaveText(/^([A-Z2-7]{4} ){7}[A-Z2-7]{4}$/);
   await page.getByLabel('Ilovadagi 6 xonali kod').fill(await devTotp(page.request, email));
   await page.getByRole('button', { name: '2FA ni yoqish' }).click();

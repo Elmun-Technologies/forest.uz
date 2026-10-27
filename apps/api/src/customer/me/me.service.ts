@@ -206,6 +206,19 @@ export class MeService {
 
   /** Everything we hold about the customer that they can see (docs/14 data subject requests). */
   async exportData(customerId: string, ip: string | null): Promise<Record<string, unknown>> {
+    const data = await this.collectExport(customerId);
+    if (!data) throw new DomainError('UNAUTHORIZED');
+    await this.prisma.auditLog.create({
+      data: { action: 'customer.data_export', entity: 'Customer', entityId: customerId, ip },
+    });
+    return data;
+  }
+
+  /**
+   * The export document without side effects (shared with the admin A5 "download data" action,
+   * which audits it with the staff actor). Null when the customer is missing or erased.
+   */
+  async collectExport(customerId: string): Promise<Record<string, unknown> | null> {
     const c = await this.prisma.customer.findUnique({
       where: { id: customerId },
       include: {
@@ -217,16 +230,13 @@ export class MeService {
         messages: { orderBy: { createdAt: 'asc' } },
       },
     });
-    if (!c || c.deletedAt) throw new DomainError('UNAUTHORIZED');
+    if (!c || c.deletedAt) return null;
     const products = await this.prisma.product.findMany({
       where: { id: { in: c.favorites.map((f) => f.productId) } },
       select: { id: true, slug: true },
     });
     const slugOf = new Map(products.map((p) => [p.id, p.slug]));
     const locale = c.locale;
-    await this.prisma.auditLog.create({
-      data: { action: 'customer.data_export', entity: 'Customer', entityId: c.id, ip },
-    });
     return {
       exportedAt: new Date().toISOString(),
       profile: {
