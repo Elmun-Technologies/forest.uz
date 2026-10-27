@@ -30,6 +30,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { distributeSpend } from './ad-spend-match';
 import {
+  eventInSession,
   isPurchase,
   num,
   platformOf,
@@ -163,7 +164,11 @@ export class ReportsService {
     }));
   }
 
-  /** Open funnel: sessions in the range that did each step; grouped by device/channel or not. */
+  /**
+   * Open funnel over the sessions started in the range: a step counts when the session did it
+   * within its own span (`eventInSession`), purchase = a purchase whose `Order.sessionId` is the
+   * session (whenever the order was placed). Grouped by device/channel or not.
+   */
   private async funnelRows(r: Range, f: SessionFilters, group: 'all' | 'device' | 'channel') {
     const g = Prisma.raw(group === 'all' ? `'all'` : `ss.${group}`);
     return this.prisma.$queryRaw<StepCounts[]>`
@@ -173,10 +178,8 @@ export class ReportsService {
                bool_or(e.name = 'view_item') AS vi,
                bool_or(e.name = 'add_to_cart') AS atc,
                bool_or(e.name = 'begin_checkout') AS bc
-        FROM "Event" e
-        WHERE e.ts >= ${r.from} AND e.ts < ${r.to}
-          AND e.name IN ('view_item', 'add_to_cart', 'begin_checkout')
-          AND e."sessionId" IN (SELECT id FROM ss)
+        FROM "Event" e JOIN ss ON ${eventInSession(r)}
+        WHERE e.name IN ('view_item', 'add_to_cart', 'begin_checkout')
         GROUP BY e."sessionId"),
       pu AS (
         SELECT DISTINCT o."sessionId" FROM "Order" o
@@ -309,9 +312,8 @@ export class ReportsService {
   private async leadSessions(r: Range, f: SessionFilters): Promise<number> {
     const [row] = await this.prisma.$queryRaw<{ n: bigint }[]>`
       WITH ss AS (${this.sessionsCte(r, f)})
-      SELECT count(DISTINCT e."sessionId") AS n FROM "Event" e
-      WHERE e.ts >= ${r.from} AND e.ts < ${r.to} AND e.name = 'lead'
-        AND e."sessionId" IN (SELECT id FROM ss)`;
+      SELECT count(DISTINCT e."sessionId") AS n FROM "Event" e JOIN ss ON ${eventInSession(r)}
+      WHERE e.name = 'lead'`;
     return num(row?.n);
   }
 
@@ -337,9 +339,8 @@ export class ReportsService {
         >`
           WITH ss AS (${this.sessionsCte(r, f)}),
           ld AS (
-            SELECT DISTINCT e."sessionId" FROM "Event" e
-            WHERE e.ts >= ${r.from} AND e.ts < ${r.to} AND e.name = 'lead'
-              AND e."sessionId" IN (SELECT id FROM ss)),
+            SELECT DISTINCT e."sessionId" FROM "Event" e JOIN ss ON ${eventInSession(r)}
+            WHERE e.name = 'lead'),
           sk AS (
             SELECT ss.id, ss.channel, ss.bounced, ss."durationSec",
                    ${src} AS source, ${sessionMedium('ss')} AS medium,
@@ -510,9 +511,8 @@ export class ReportsService {
           SELECT ss."exitPath" AS path, count(*) AS exits FROM ss
           WHERE ss."exitPath" IS NOT NULL GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 20),
         pv AS (
-          SELECT e.path, count(*) AS pageviews FROM "Event" e
-          WHERE e.ts >= ${r.from} AND e.ts < ${r.to} AND e.name = 'page_view'
-            AND e.path IN (SELECT path FROM ex) AND e."sessionId" IN (SELECT id FROM ss)
+          SELECT e.path, count(*) AS pageviews FROM "Event" e JOIN ss ON ${eventInSession(r)}
+          WHERE e.name = 'page_view' AND e.path IN (SELECT path FROM ex)
           GROUP BY 1)
         SELECT ex.path, ex.exits, COALESCE(pv.pageviews, 0) AS pageviews
         FROM ex LEFT JOIN pv ON pv.path = ex.path ORDER BY ex.exits DESC, ex.path`,
@@ -550,9 +550,8 @@ export class ReportsService {
         WITH ${base}
         SELECT e.name, count(*) AS cnt, count(DISTINCT e."sessionId") AS sessions,
                count(DISTINCT e."sessionId") FILTER (WHERE pu.id IS NOT NULL) AS purchasing
-        FROM "Event" e JOIN ss ON ss.id = e."sessionId" LEFT JOIN pu ON pu.id = e."sessionId"
-        WHERE e.ts >= ${r.from} AND e.ts < ${r.to}
-          AND e.name NOT IN (${Prisma.join(TECHNICAL_EVENTS)})
+        FROM "Event" e JOIN ss ON ${eventInSession(r)} LEFT JOIN pu ON pu.id = e."sessionId"
+        WHERE e.name NOT IN (${Prisma.join(TECHNICAL_EVENTS)})
         GROUP BY e.name ORDER BY count(DISTINCT e."sessionId") DESC, e.name LIMIT 30`,
       this.prisma.$queryRaw<{ sessions: bigint; purchasing: bigint }[]>`
         WITH ${base}

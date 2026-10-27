@@ -102,6 +102,28 @@ export function purchaseSessionFilter(f: SessionFilters, o = 'o'): Prisma.Sql {
   return Prisma.sql`AND EXISTS (SELECT 1 FROM "Session" fs WHERE fs.id = ${a}."sessionId" ${sessionFilter(f, 'fs')})`;
 }
 
+/** Clock slack around a session's own span (client clocks are corrected, not exact). */
+const SESSION_EVENT_SLACK = Prisma.raw(`interval '1 minute'`);
+/** Pruning bound past the period end for sessions still running at midnight. */
+const SESSION_RUNOVER_MS = 86_400_000;
+
+/**
+ * Event `e` belongs to session `s` (one of the period's sessions) and lies within that session's
+ * own span, ± 1 minute. Session reports (funnel, goals, leads, exit page views) count a session's
+ * events even after the period end — a session started at 23:50 that checks out at 00:10 is one
+ * funnel journey. The outer `ts` bounds only keep partition pruning (sessions are selected by
+ * start time in [from, to)).
+ */
+export function eventInSession(r: { from: Date; to: Date }, e = 'e', s = 'ss'): Prisma.Sql {
+  const ea = alias(e);
+  const sa = alias(s);
+  return Prisma.sql`${ea}."sessionId" = ${sa}.id
+    AND ${ea}.ts >= ${new Date(r.from.getTime() - 60_000)}
+    AND ${ea}.ts < ${new Date(r.to.getTime() + SESSION_RUNOVER_MS)}
+    AND ${ea}.ts >= ${sa}."startedAt" - ${SESSION_EVENT_SLACK}
+    AND ${ea}.ts <= ${sa}."endedAt" + ${SESSION_EVENT_SLACK}`;
+}
+
 /** True when session `s` led to a purchase (its id is a purchase's `Order.sessionId`). */
 export function sessionPurchased(s = 's'): Prisma.Sql {
   const a = alias(s);

@@ -61,6 +61,8 @@ type SessionSeed = {
   exit: string;
   region: string;
   events: string[];
+  /** Seconds after the start of each event (default: 0, 1, 2…). */
+  offsets?: number[];
 };
 
 const SESSIONS: SessionSeed[] = [
@@ -166,23 +168,25 @@ const SESSIONS: SessionSeed[] = [
   {
     key: 's8',
     anon: 'a5',
+    // Starts 23:45 on the period's last day; everything after the page view happens after
+    // midnight — still this session's journey (funnel/goals/leads count it).
     d: 14,
-    h: 22,
+    h: 23.75,
     channel: 'referral',
     device: 'tablet',
     referrer: 'https://example.uz/post',
     bounced: false,
-    duration: 90,
+    duration: 1220,
+    offsets: [0, 1200, 1210, 1220],
     landing: '/uz/p/chalk-white',
     exit: '/uz/p/chalk-white',
     region: 'Toshkent',
     events: ['page_view', 'view_item', 'selector_used', 'lead'],
   },
-  // previous period: c6 direct → buys o6
+  // previous period: c6 direct → buys o6 (anonymous session, found through Order.sessionId)
   {
     key: 's5',
     anon: 'a6',
-    customer: 'c6',
     d: 3,
     h: 12,
     channel: 'direct',
@@ -193,6 +197,24 @@ const SESSIONS: SessionSeed[] = [
     exit: '/uz/savat',
     region: 'Toshkent',
     events: ['page_view', 'add_to_cart'],
+  },
+  // previous period, shared phone: c5 signed in on c1's device (visitor a1 → c1, latest wins).
+  // Never part of c1's journey or attribution.
+  {
+    key: 's10',
+    anon: 'a1',
+    customer: 'c5',
+    d: 5,
+    h: 12,
+    channel: 'paid_google',
+    device: 'desktop',
+    utm: { source: 'google', medium: 'cpc', campaign: 'brand' },
+    bounced: true,
+    duration: 0,
+    landing: '/uz',
+    exit: '/uz',
+    region: 'Toshkent',
+    events: ['page_view'],
   },
 ];
 
@@ -299,7 +321,7 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
     });
     sellerId = (await prisma.seller.findFirstOrThrow()).id;
 
-    for (const k of ['c1', 'c2', 'c3', 'c4', 'c6']) {
+    for (const k of ['c1', 'c2', 'c3', 'c4', 'c5', 'c6']) {
       const c = await prisma.customer.create({
         data: {
           name: `${run} ${k}`,
@@ -344,7 +366,7 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
         },
       });
       let i = 0;
-      for (const name of s.events) {
+      for (const [idx, name] of s.events.entries()) {
         const eid = randomUUID();
         eventIds.push(eid);
         // page_views walk landing → exit, so exit pages have page views.
@@ -352,7 +374,7 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
         await prisma.event.create({
           data: {
             id: eid,
-            ts: new Date(startedAt.getTime() + eventIds.length * 1000),
+            ts: new Date(startedAt.getTime() + (s.offsets?.[idx] ?? idx) * 1000),
             sessionId: id,
             anonymousId: `${run}-${s.anon}`,
             name,
@@ -504,11 +526,11 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
     });
     // Current: 7 sessions (s1–s4, s6–s8) of 5 visitors; purchases o1, o2, o3.
     expect(d.kpis).toEqual({
-      sessions: { value: 7, previous: 1 },
-      visitors: { value: 5, previous: 1 },
+      sessions: { value: 7, previous: 2 },
+      visitors: { value: 5, previous: 2 },
       orders: { value: 3, previous: 1 },
       revenueSoum: { value: 1_750_000, previous: 200_000 },
-      conversionRate: { value: 3 / 7, previous: 1 },
+      conversionRate: { value: 3 / 7, previous: 0.5 },
       aovSoum: { value: 583_333, previous: 200_000 },
       leads: { value: 2, previous: 1 },
     });
@@ -612,7 +634,7 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
       roas: 1_750_000 / 200_000,
     });
     expect(s.previousTotals).toMatchObject({
-      sessions: 1,
+      sessions: 2,
       orders: 1,
       revenueSoum: 200_000,
       spendSoum: 0,
@@ -676,7 +698,7 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
     expect(dv.regions[0]).toEqual({ region: 'Toshkent', sessions: 5, purchasingSessions: 1 });
 
     const f = await get<FunnelDto>(`/analytics/funnel?${Q}`);
-    expect(f.previous?.map((x) => x.sessions)).toEqual([1, 0, 1, 0, 1]);
+    expect(f.previous?.map((x) => x.sessions)).toEqual([2, 0, 1, 0, 1]);
     expect(f.byDevice.find((x) => x.device === 'mobile')?.steps.map((x) => x.sessions)).toEqual([
       5, 3, 2, 2, 2,
     ]);
@@ -721,6 +743,10 @@ describe('admin analytics A1/A2 + attribution (integration)', () => {
     const j7 = await get<OrderJourneyDto>(`/analytics/orders/${onum.get('o7')}/journey`);
     expect(j7.touches.map((x) => x.channel)).toEqual(['direct']);
     expect(j7.touches[0]!.kind).toBe('order');
+
+    // o6's session is anonymous and its visitor unlinked: found through Order.sessionId.
+    const j6 = await get<OrderJourneyDto>(`/analytics/orders/${onum.get('o6')}/journey`);
+    expect(j6.touches.map((x) => [x.kind, x.sessionId])).toEqual([['session', sid.get('s5')]]);
 
     const j4 = await get<OrderJourneyDto>(`/analytics/orders/${onum.get('o4')}/journey`);
     expect(j4.state).toBe('not_purchase');

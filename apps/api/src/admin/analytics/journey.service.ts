@@ -87,7 +87,7 @@ export class JourneyService {
                  bool_or(e.name = 'lead') AS lead
           FROM "Event" e
           WHERE e."sessionId" = s.id AND e.ts >= s."startedAt" - interval '1 minute'
-            AND e.ts <= s."endedAt" + interval '30 minutes') ev ON true
+            AND e.ts <= s."endedAt" + interval '1 minute') ev ON true
         WHERE ${where}
         ORDER BY s."startedAt" DESC LIMIT ${JOURNEY_SESSIONS}`,
       this.prisma.$queryRaw<{ n: bigint; first: Date | null }[]>`

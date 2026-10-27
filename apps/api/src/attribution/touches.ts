@@ -28,17 +28,25 @@ export interface SessionTouchRow {
   campaign: string | null;
 }
 
-/** Sessions belonging to the customer, newest first (`limit`). */
+/**
+ * Sessions belonging to the customer: stamped with them, or anonymous sessions of a visitor
+ * linked to them / of the order's own visitor, plus the order's own session. A visitor id is a
+ * device: a session stamped with ANOTHER customer (shared phone, latest identity wins) never
+ * counts for this one.
+ */
 export function customerSessionsWhere(scope: {
   customerId: string;
   anonymousId?: string | null;
   sessionId?: string | null;
 }): Prisma.Sql {
+  const mineOrAnonymous = Prisma.sql`(s."customerId" IS NULL OR s."customerId" = ${scope.customerId})`;
   const extra: Prisma.Sql[] = [];
-  if (scope.anonymousId) extra.push(Prisma.sql`OR s."anonymousId" = ${scope.anonymousId}`);
+  if (scope.anonymousId)
+    extra.push(Prisma.sql`OR (s."anonymousId" = ${scope.anonymousId} AND ${mineOrAnonymous})`);
   if (scope.sessionId) extra.push(Prisma.sql`OR s.id = ${scope.sessionId}`);
   return Prisma.sql`(s."customerId" = ${scope.customerId}
-    OR s."anonymousId" IN (SELECT v."anonymousId" FROM "Visitor" v WHERE v."customerId" = ${scope.customerId})
+    OR (s."anonymousId" IN (SELECT v."anonymousId" FROM "Visitor" v WHERE v."customerId" = ${scope.customerId})
+        AND ${mineOrAnonymous})
     ${extra.length ? Prisma.join(extra, ' ') : Prisma.empty})`;
 }
 

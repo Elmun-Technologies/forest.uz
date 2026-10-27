@@ -69,9 +69,10 @@ function truth(): Truth {
     pu AS (SELECT o.id, o."sessionId", o."totalTiyin" - COALESCE((SELECT SUM(r."amountTiyin")
              FROM "Refund" r JOIN "Payment" p ON p.id = r."paymentId" WHERE p."orderId" = o.id), 0) AS rev
            FROM "Order" o WHERE o."createdAt" >= ${FROM} AND o."createdAt" < ${TO} AND ${PURCHASE}),
-    ev AS (SELECT name, "sessionId" FROM "Event" WHERE ts >= ${FROM} AND ts < ${TO}
-             AND name IN ('view_item','add_to_cart','begin_checkout')
-             AND "sessionId" IN (SELECT id FROM ss))
+    -- a session's events within its own span (±1 min), even after the period end
+    ev AS (SELECT e.name, e."sessionId" FROM "Event" e JOIN ss ON ss.id = e."sessionId"
+             WHERE e.ts BETWEEN ss."startedAt" - interval '1 minute' AND ss."endedAt" + interval '1 minute'
+               AND e.name IN ('view_item','add_to_cart','begin_checkout'))
     SELECT (SELECT count(*) FROM ss), (SELECT count(DISTINCT "anonymousId") FROM ss),
            (SELECT count(*) FROM pu), (SELECT round(COALESCE(SUM(rev), 0) / 100.0) FROM pu),
            (SELECT count(*) FROM "Customer" WHERE "leadAt" >= ${FROM} AND "leadAt" < ${TO}),
