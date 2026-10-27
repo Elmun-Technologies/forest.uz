@@ -412,6 +412,22 @@ export class CartService {
   }
 
   /** Delivery options for a destination, priced against this cart (free thresholds applied). */
+  /** A zone priced by the carrier's live quote for this cart and pin (zone price on any miss). */
+  async pricedZone(
+    zone: DeliveryZone,
+    cart: CartWithItems | null,
+    pin: { lat: number; lng: number },
+  ): Promise<DeliveryZone> {
+    const weight = cartWeightGrams(
+      (cart?.items ?? []).map((i) => ({ qty: i.qty, weightGrams: i.variant.weightGrams })),
+    );
+    return this.quotes.priceZone(
+      zone,
+      { region: '', district: null, line: '', lat: pin.lat, lng: pin.lng },
+      weight,
+    );
+  }
+
   async quote(
     cart: CartWithItems | null,
     region: string,

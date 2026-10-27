@@ -16,6 +16,7 @@ import { CommerceModule } from '../commerce/commerce.module';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { yandexCallbackKey } from '../integrations/providers/yandex-delivery';
+import { DevShipmentController } from './dev-shipment.controller';
 import { ManualShipmentService } from './manual-shipment.service';
 import { YandexShipmentService } from './yandex-shipment.service';
 
@@ -90,7 +91,7 @@ export class YandexDeliveryWebhookController {
 /** Yandex claims (create/accept/sync/cancel) and the delivery queue. */
 @Module({
   imports: [BullModule.registerQueue({ name: DELIVERY_QUEUE }), CommerceModule],
-  controllers: [YandexDeliveryWebhookController],
+  controllers: [YandexDeliveryWebhookController, DevShipmentController],
   providers: [YandexShipmentService, ManualShipmentService, DeliveryProcessor, DeliveryScheduler],
   exports: [YandexShipmentService, ManualShipmentService],
 })

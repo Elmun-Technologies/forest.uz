@@ -128,7 +128,7 @@ export const legalPages: { slug: string; title: L; subtitle: L; body: LB }[] = [
           items: [
             {
               term: "Nimani yig'amiz",
-              desc: 'Ism, telefon, yetkazish manzili, buyurtmalar tarixi, saytdagi harakatlar (sahifalar, bosishlar), qurilma turi.',
+              desc: "Ism, telefon, yetkazish manzili, buyurtmalar tarixi, saytdagi harakatlar (sahifalar, bosishlar), qurilma turi. Telegram orqali kirsangiz — Telegram ID, ism va username (Telegram bizga yuboradigan ma'lumotlar).",
             },
             {
               term: "Nimani yig'maymiz",
@@ -165,7 +165,7 @@ export const legalPages: { slug: string; title: L; subtitle: L; body: LB }[] = [
           items: [
             {
               term: 'Что собираем',
-              desc: 'Имя, телефон, адрес доставки, историю заказов, действия на сайте (страницы, клики), тип устройства.',
+              desc: 'Имя, телефон, адрес доставки, историю заказов, действия на сайте (страницы, клики), тип устройства. При входе через Telegram — Telegram ID, имя и username (данные, которые передаёт Telegram).',
             },
             {
               term: 'Что не собираем',

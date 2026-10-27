@@ -6,10 +6,10 @@ import {
   Inject,
   Logger,
   Module,
-  NotFoundException,
   type OnApplicationBootstrap,
   Query,
 } from '@nestjs/common';
+import { assertDevEndpoints } from '../common/dev-endpoints';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
 import { IntegrationsService } from './integrations.service';
@@ -27,9 +27,7 @@ export class DevOutboxController {
   ) {}
 
   private guard(): void {
-    // Double guard: the flag must be set explicitly AND providers must be fake (no real SMS exists).
-    if (!this.env.DEV_ENDPOINTS || this.env.PROVIDERS_MODE !== 'fake')
-      throw new NotFoundException();
+    assertDevEndpoints(this.env);
   }
 
   @Get()

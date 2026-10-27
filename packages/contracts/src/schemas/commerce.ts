@@ -79,6 +79,13 @@ export const quoteQuerySchema = z.object({
   lng: z.coerce.number().min(-180).max(180).optional(),
 });
 
+/** GET /cart: optional zone (checkout's chosen delivery) and map pin for its live quote. */
+export const cartQuerySchema = z.object({
+  zone: z.string().min(1).max(64).optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+});
+
 export interface DeliveryOptionDto {
   zoneKey: string;
   carrier: 'YANDEX' | 'BTS' | 'PICKUP';

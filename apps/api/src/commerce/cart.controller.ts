@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import {
   addCartItemSchema,
+  cartQuerySchema,
   applyPromoSchema,
   type CartDto,
   type DeliveryOptionDto,
@@ -54,11 +55,16 @@ export class CartController {
   async get(
     @Req() req: Request,
     @ReqLocale() locale: Locale,
-    @Query('zone') zoneKey?: string,
+    @Query(new ZodPipe(cartQuerySchema)) q: z.infer<typeof cartQuerySchema>,
   ): Promise<CartDto> {
     const cart = await this.carts.current(req);
-    const zone = zoneKey ? await this.carts.zoneByKey(zoneKey) : undefined;
-    return this.carts.toDto(cart, locale, zone);
+    const zone = q.zone ? await this.carts.zoneByKey(q.zone) : undefined;
+    // With a map pin the checkout totals use the same live price as /cart/quote and the order.
+    const priced =
+      zone && q.lat !== undefined && q.lng !== undefined
+        ? await this.carts.pricedZone(zone, cart, { lat: q.lat, lng: q.lng })
+        : zone;
+    return this.carts.toDto(cart, locale, priced);
   }
 
   @Post('items')

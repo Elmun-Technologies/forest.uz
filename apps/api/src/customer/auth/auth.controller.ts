@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  Inject,
-  Logger,
-  Post,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
 import {
   type Locale,
   type MeDto,
@@ -20,25 +10,22 @@ import {
 import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { ReqLocale, ZodPipe } from '../../common/http';
-import { SessionService, cartIdFromCookie, sessionId } from '../../common/session';
+import { SessionService } from '../../common/session';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CART_MERGER, type CartMerger } from '../cart-merger';
 import { MeService } from '../me/me.service';
+import { CustomerSignIn } from './customer-sign-in.service';
 import { CustomerGuard, CustomerId } from './customer.guard';
 import { type OtpSendResult, OtpService } from './otp.service';
 import { TelegramAuthService } from './telegram-auth.service';
 
 @Controller('auth')
 export class AuthController {
-  private readonly logger = new Logger('CustomerAuth');
-
   constructor(
     private readonly otp: OtpService,
     private readonly sessions: SessionService,
     private readonly prisma: PrismaService,
-    private readonly me: MeService,
     private readonly telegram: TelegramAuthService,
-    @Inject(CART_MERGER) private readonly carts: CartMerger,
+    private readonly signer: CustomerSignIn,
   ) {}
 
   @Post('otp/send')
@@ -82,16 +69,8 @@ export class AuthController {
     return this.signIn(req, res, await this.telegram.findOrCreate(user, locale));
   }
 
-  private async signIn(req: Request, res: Response, customerId: string): Promise<MeDto> {
-    // Rotate: a pre-login session id (possibly planted) never becomes an authenticated one.
-    await this.sessions.create(res, customerId, sessionId(req));
-    try {
-      await this.carts.mergeAnonymousCart(cartIdFromCookie(req), customerId);
-    } catch (e) {
-      // Login must not fail because of the cart; the anonymous cart stays usable.
-      this.logger.warn(`cart merge failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-    return this.me.me(customerId);
+  private signIn(req: Request, res: Response, customerId: string): Promise<MeDto> {
+    return this.signer.signIn(req, res, customerId);
   }
 
   @Post('logout')
