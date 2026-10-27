@@ -32,6 +32,8 @@ export class TemplateSms {
   ): Promise<string> {
     const tpl = await this.prisma.messageTemplate.findUnique({ where: { key } });
     if (!tpl?.active) throw new Error(`message template "${key}" is missing or inactive`);
+    // Eskiz delivers only approved texts (CLAUDE.md §6 messaging engine).
+    if (!tpl.smsApproved) throw new Error(`SMS text "${key}" is not marked Eskiz-approved`);
     const text = fillTemplate(t(tpl.body, locale), vars);
     if (text === null) throw new Error(`message template "${key}" has unresolved variables`);
     return text;
