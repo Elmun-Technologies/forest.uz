@@ -922,19 +922,38 @@ model Setting {
 }
 
 model Staff {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  phone        String?
-  passwordHash String
-  role         StaffRole
-  totpSecret   Bytes? // encrypted
-  totpEnabled  Boolean   @default(false)
-  failedLogins Int       @default(0)
-  lockedUntil  DateTime? @db.Timestamptz(3)
-  active       Boolean   @default(true)
-  lastLoginAt  DateTime? @db.Timestamptz(3)
-  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  id               String        @id @default(cuid())
+  name             String
+  email            String        @unique
+  phone            String?
+  /// null = invite not accepted yet (no password set).
+  passwordHash     String?
+  role             StaffRole
+  totpSecret       Bytes? // encrypted
+  totpEnabled      Boolean       @default(false)
+  /// Last accepted TOTP time step (replay protection: only newer steps are accepted).
+  totpLastUsedStep Int?
+  failedLogins     Int           @default(0)
+  lockedUntil      DateTime?     @db.Timestamptz(3)
+  active           Boolean       @default(true)
+  lastLoginAt      DateTime?     @db.Timestamptz(3)
+  createdAt        DateTime      @default(now()) @db.Timestamptz(3)
+  invites          StaffInvite[] @relation("StaffInvites")
+}
+
+/// One-time invite link (only the sha256 of the token is stored).
+model StaffInvite {
+  id          String    @id @default(cuid())
+  staffId     String
+  staff       Staff     @relation("StaffInvites", fields: [staffId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime  @db.Timestamptz(3)
+  usedAt      DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdById String?
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([staffId])
 }
 
 model AuditLog {
@@ -946,10 +965,12 @@ model AuditLog {
   before    Json?
   after     Json?
   ip        String?
+  userAgent String?
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([staffId, createdAt])
 }
 
 model File {

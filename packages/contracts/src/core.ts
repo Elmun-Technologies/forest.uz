@@ -14,3 +14,4 @@ export * from './pricing';
 export * from './calculator';
 export * from './regions';
 export * from './catalog';
+export * from './admin';

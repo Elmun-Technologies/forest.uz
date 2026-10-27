@@ -1,3 +1,4 @@
+import { ADMIN_ERROR_MESSAGES } from './admin-errors';
 import type { Locale } from './locale';
 
 /**
@@ -276,6 +277,7 @@ export const ERROR_MESSAGES = {
     uz: "Yetkazish xizmati javob bermadi. Birozdan keyin qayta urinib ko'ring.",
     ru: 'Служба доставки не ответила. Попробуйте чуть позже.',
   },
+  ...ADMIN_ERROR_MESSAGES,
   INTERNAL: {
     http: 500,
     uz: "Nimadir xato ketdi. Bir daqiqadan keyin qayta urinib ko'ring.",
