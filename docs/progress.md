@@ -1,6 +1,6 @@
 # Progress
 
-Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — done** (MoySklad verified only against a fake server — open questions 60–69) · **Phase 4 — next**.
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — done** (MoySklad verified only against a fake server — open questions 60–69) · **Phases 4–5 — done** (external platforms only against fakes — open questions 70–103) · **Phase 6 — in progress**.
 
 | Phase | Status | Notes |
 |---|---|---|
@@ -8,9 +8,47 @@ Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthous
 | 1 Storefront | done | see report below; Product perf 89 (target 90) |
 | 2 Payments/delivery/SMS/auth | done | see report below; real provider runs need owner credentials + sandbox |
 | 3 Admin core | done | see report below; MoySklad needs owner token + account setup |
-| 4 Analytics/heatmaps/audiences/SEO | pending | |
-| 5 Bot/automations/content | pending | |
+| 4 Analytics/heatmaps/audiences/SEO | done | see report below; ad/search platforms need owner credentials |
+| 5 Bot/automations/content | done | see report below; bot token, Claude key, Eskiz re-approval |
 | 6 Hardening & launch | pending | |
+
+## Phase 5 — Bot, automations, content (done, 2026-10-27)
+
+### Built
+- **Telegram bot** (grammY, webhook mode, secret path + header): `/start` deep links (lead, signed single-use visitor reference, order tracking), phone sharing via `request_contact` only (Telegram-verified → account link, SALOM10), order status, advice with operator hours, review flow (stars → text/photos → RAHMAT5 + photo consent; ≤ 3★ → complaint), `/til`, `/stop`; admin alerts group (new order, ≤ 3★, complaint, failed payment, SLA risk, integration errors). Fake transport in fake mode.
+- **A12 bot admin + inbox**: KPIs, scenario switches with 30-day metrics, complaint keywords; operator inbox (status tabs, signed photo URLs, replies with product cards → cart-restore links, assign, close/reopen).
+- **Messaging engine** (one dispatcher for every customer message): service / requested / marketing kinds, consent per channel, ≤ 1 marketing message per day, quiet hours (deferred, never dropped), Telegram → SMS fallback, opt-out on every marketing message (`/obuna/<token>`), unapproved SMS texts never sent. Automations: abandoned cart (Telegram 2 h / SMS 24 h), review request, waitlist back-in-stock, audience auto-messages. A12 templates editor (`/bot/messages`) with test send to the staff member's own phone.
+- **A10 outbound webhooks** (signed, outbox with 8 attempts + auto-disable, SSRF guard checked inside the connection) and **partner API keys** (read-only products/stock, per-key rate limit).
+- **CMS**: Ilhom articles (blocks, cover, video, related products, per-locale publishing, SEO, 301 on slug change) and the Brend page; storefront `/ilhom`, `/ilhom/[slug]`, `/brend`.
+- **AI drafts** (Claude via the official SDK; fake in fake mode): product description, SEO meta, operator reply (off by default, Owner switch, PII scrubbed) — drafts only, never saved automatically; audited, rate limited.
+
+### Verified
+- Integration tests: bot (synthetic updates through the real webhook route), messaging policy/automations, webhooks-out (signing, retries, SSRF), partner API, CMS, AI (fake); admin e2e for bot inbox, messages, content; `bot-cart-restore.spec.ts` (Phase 5 acceptance: abandoned-cart message → link restores the cart → checkout).
+- Totals at the end of Phases 4–5: API integration 411/411, all unit suites green, Playwright desktop + mobile green in CI.
+
+### Independent review — fixed
+Webhook SSRF via DNS rebinding (vetted address handed to the socket), SMS marketing templates without an opt-out slot refused, bot `/start` no longer re-grants consent after an opt-out elsewhere, cart-restore GET only for top-level navigation, deep links never attach accounts, erasure covers the Telegram chat and replays.
+
+### Not verified / owner input
+- Telegram Bot API, Eskiz and Claude were exercised only through fakes (official doc hosts unreachable from dev): see open questions 70–103. Needs: bot token (BotFather) + admin group chat id, Claude API key, Eskiz re-approval of the new SMS texts with `{stop}` (`cart_abandoned_24h_sms`, `review_request_sms`, waitlist), lawyer review of q.85, 93, 101.
+
+## Phase 4 — Analytics, heatmaps, audiences, SEO (done, 2026-10-27)
+
+### Built
+- **Tracker** `/t.js` (4.7 KB gz, budget 6 KB): sessions, page views, clicks/rage/dead clicks, scroll depth, web vitals, commerce events; consent-aware, PII scrubbed in the browser and again in the API; ingest `POST /v1/t` (bots dropped, GeoIP in-repo, channel classifier, realtime keys); identity stitching only after a verified login; server-side `purchase`/`lead` events.
+- **A1 dashboard / A2 analytics**: KPIs, visits, funnel, sources/channels, pages, events & goals, devices, cohorts, realtime; attribution (first touch, last non-direct, linear) stored per order; ad spend CSV import + adapter, ROAS/CAC; customer and order journeys (A5/A7).
+- **A3 heatmaps & replay**: hourly aggregates (click/rage/dead cells, elements, scroll, LCP), problem list, backdrop = sanitized live storefront page; rrweb replay (`/r.js`, consent + sampling, inputs masked, URLs scrubbed, 30-day retention), audited replay open.
+- **A8 audiences**: rule builder compiled to one SQL query (preview = refresh), hourly refresh with membership history and 30-day results, preset segments, hashed-phone uploads to Meta/Google/TikTok/Yandex (consent-gated, diff sync), server-side ad signals (CAPI, Google Ads, TikTok Events).
+- **A9 SEO center**: health score, per-page meta overrides read by the storefront, redirects (no chains/loops), 404 log with suggestions, verification codes, robots/sitemaps/IndexNow served by the API, schema toggles, search queries (GSC/Yandex Webmaster), CWV field data + PageSpeed; on-demand storefront revalidation (signed).
+
+### Verified
+- Acceptance (docs/12): synthetic traffic (`e2e/synthetic`) → dashboard numbers equal psql truth (`admin-analytics.spec.ts`); replay plays with masked inputs (`replay.spec.ts`); audience preview equals hand-written SQL (integration); tracker < 6 KB gz (`size.test.ts`); no PII in the events table (integration test).
+
+### Independent review — fixed
+`/sf` asset proxy path traversal, identity stitching on unverified checkout/lead phones removed, signed 404 reports (no planted "broken links"), redirect slash-variant loop, replay upload checks (session owner, consent, caps), scrubbing of capability paths (`/obuna`, `/c`) incl. a data migration; worker shutdown order (orphaned idle transactions locking `Event`).
+
+### Not verified / owner input
+- Ad platforms, GSC/Yandex Webmaster, PageSpeed run only against fakes: see open questions 70–103. Needs: Meta/Google/TikTok/Yandex credentials + consent texts, GSC service account / YWM OAuth token, verification codes, lawyer review of q.85 (analytics banner copy).
 
 ## Phase 3 — Admin core (done, 2026-10-27)
 
