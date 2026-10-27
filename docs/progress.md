@@ -1,6 +1,6 @@
 # Progress
 
-Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — done** (MoySklad verified only against a fake server — open questions 60–69) · **Phases 4–5 — done** (external platforms only against fakes — open questions 70–103) · **Phase 6 — in progress**.
+Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthouse perf median 89 in the sandbox) · **Phase 2 — done** (providers unverified against live sandboxes — see open questions 28–59) · **Phase 3 — done** (MoySklad verified only against a fake server — open questions 60–69) · **Phases 4–5 — done** (external platforms only against fakes — open questions 70–103) · **Phase 6 — done** (go-live: `docs/launch-checklist.md`).
 
 | Phase | Status | Notes |
 |---|---|---|
@@ -10,7 +10,25 @@ Current phase: **Phase 1 — done** (one acceptance item open: Product Lighthous
 | 3 Admin core | done | see report below; MoySklad needs owner token + account setup |
 | 4 Analytics/heatmaps/audiences/SEO | done | see report below; ad/search platforms need owner credentials |
 | 5 Bot/automations/content | done | see report below; bot token, Claude key, Eskiz re-approval |
-| 6 Hardening & launch | pending | |
+| 6 Hardening & launch | done | see report below; go-live needs the UZ VPS, staging drills and owner credentials |
+
+## Phase 6 — Hardening & launch kit (done, 2026-10-27)
+
+### Built
+- **Production deploy** `infra/deploy/deploy.sh` (preflight → build/pull by git sha → pre-migration dump → migrate as owner → `db-roles.sql` → up → health → automatic rollback), `compose.prod.yml` (only Caddy publishes ports, internal network for Redis, limits, log rotation), API as `forest_app` with append-only AuditLog, storefront × `WEB_REPLICAS`.
+- **Security**: static CSP via Caddy (storefront) + admin CSP in `next.config.ts`, HSTS/nosniff/COOP; ASVS L2 review (`docs/security/asvs-l2.md`); fixed from it: image metadata (EXIF/GPS) stripped on every stored image, master key rotation (`APP_ENCRYPTION_KEY_PREVIOUS` + `rotate-keys`), raw event 13-month and IntegrationLog retention job, failed admin logins audited.
+- **Backups**: pgBackRest full/diff + WAL (PITR), nightly `pg_dump`, encrypted object backup (replays excluded), monthly restore drill, systemd timers.
+- **Monitoring**: GlitchTip (in-repo Sentry-protocol reporter for api/web/admin servers) + Uptime Kuma on a second UZ host, alerts to the Telegram admin group.
+- **Load tests** (k6, `loadtest/`), **launch checklist** (`docs/launch-checklist.md`) and runbooks: deploy-and-rollback, restore-db, payment-incident, moysklad-sync-failure, secret-rotation, monitoring, incident-contacts.
+
+### Verified
+- Prod-like compose on the dev host: first deploy + seed, redeploy 28 s, broken release → automatic rollback, manual rollback 20 s; `csp-check.mjs` 27 storefront + 21 admin pages, 0 violations, enforcement probes pass; restore drill 14/14 sanity checks (also via encrypted S3); `forest_app` can't UPDATE/DELETE AuditLog or run DDL; k6 smoke (results in `loadtest/README.md`).
+- API integration 414+ tests, unit suites, typecheck, lint, format green locally.
+
+### Not verified / owner input
+- PITR drill (pgBackRest image can't be built in this sandbox), Telegram widget without `'unsafe-eval'`, load test on production-sized hardware: run on staging.
+- Owner provides: UZ VPS + UZ S3 backup bucket + second UZ host for monitoring, `.env` / `.env.ops`, incident contacts, firewall/NTP/Cloudflare rules, passphrases and `APP_ENCRYPTION_KEY` in a password manager; then `docs/launch-checklist.md`.
+- Open ASVS items (owner/backlog): 4-digit customer OTP (F-03), TOTP only for Owner/Manager (F-04), admin nonce CSP (F-06), `SESSION_SECRET` rotation (F-07) and the lows F-09–F-15, F-17.
 
 ## Phase 5 — Bot, automations, content (done, 2026-10-27)
 
