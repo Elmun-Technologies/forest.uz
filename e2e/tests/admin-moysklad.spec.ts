@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { ADMIN, adminLogin, ownerCredentials, spreadAdminIp } from './admin-helpers';
+import { ADMIN, OWNER_STATE, spreadAdminIp } from './admin-helpers';
 
 /**
  * Admin A13 MoySklad (desktop, fake providers): the owner opens /moysklad from the sidebar, sees
  * the status and KPIs, runs "sync now" and gets a sync-log row written by the API worker.
  */
-test.use({ baseURL: ADMIN });
-// Owner logins wait for an unused TOTP step (other suites log in as the owner too).
+// Signed in as the owner via the shared session from admin.setup.ts.
+test.use({ baseURL: ADMIN, storageState: OWNER_STATE });
 test.describe.configure({ mode: 'serial', timeout: 150_000 });
 
 test.beforeEach(async ({ context }, testInfo) => {
@@ -15,8 +15,7 @@ test.beforeEach(async ({ context }, testInfo) => {
 });
 
 test('owner: MoySklad page → status, KPIs, flows → sync now → log row', async ({ page }) => {
-  const owner = ownerCredentials();
-  await adminLogin(page, owner.email, owner.password);
+  await page.goto('/');
 
   const nav = page.getByRole('navigation', { name: 'Admin menyusi' });
   await nav.getByRole('link', { name: 'MoySklad' }).click();

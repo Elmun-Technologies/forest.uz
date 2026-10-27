@@ -1,10 +1,20 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test';
+import {
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type BrowserContextOptions,
+  expect,
+  type Page,
+} from '@playwright/test';
 import { API } from './helpers';
 
 /** Admin app origin (Next dev server or production build). */
 export const ADMIN = process.env.ADMIN_URL ?? 'http://localhost:3001';
+
+/** Owner session written by `admin.setup.ts` (gitignored). */
+export const OWNER_STATE = path.resolve(__dirname, '../.auth/owner.json');
 
 /** Bootstrap owner from the environment, else from the repo's local `.env` (dev stack). */
 export function ownerCredentials(): { email: string; password: string } {
@@ -88,6 +98,16 @@ export async function adminLogin(page: Page, email: string, password: string) {
   await expect(page.getByRole('navigation', { name: 'Admin menyusi' })).toBeVisible({
     timeout: 20_000,
   });
+}
+
+/** Browser context already signed in as the owner (session from `admin.setup.ts`). */
+export async function ownerContext(
+  browser: Browser,
+  options: BrowserContextOptions = {},
+): Promise<{ ctx: BrowserContext; page: Page }> {
+  const ctx = await browser.newContext({ baseURL: ADMIN, ...options, storageState: OWNER_STATE });
+  await spreadAdminIp(ctx);
+  return { ctx, page: await ctx.newPage() };
 }
 
 /** Opens an invite link and sets the password. */

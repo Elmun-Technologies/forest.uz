@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
-import { acceptInvite, ADMIN, adminLogin, ownerCredentials, spreadAdminIp } from './admin-helpers';
+import { acceptInvite, ADMIN, ownerContext, spreadAdminIp } from './admin-helpers';
 import { API, quietOverlays } from './helpers';
 
 /**
@@ -28,26 +28,8 @@ const shot = async (page: Page, name: string) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 };
 
-/**
- * One owner login for the whole file (stored session): every login burns a TOTP step, and other
- * suites log the same owner in concurrently.
- */
-let ownerState: string;
-test.beforeAll(async ({ browser }, testInfo) => {
-  if (testInfo.project.name !== 'desktop') return;
-  const ctx = await browser.newContext({ baseURL: ADMIN });
-  await spreadAdminIp(ctx);
-  const page = await ctx.newPage();
-  const owner = ownerCredentials();
-  await adminLogin(page, owner.email, owner.password);
-  ownerState = testInfo.outputPath('owner-state.json');
-  await ctx.storageState({ path: ownerState });
-  await ctx.close();
-});
-
 async function ownerPage(browser: Browser): Promise<{ ctx: BrowserContext; page: Page }> {
-  const ctx = await browser.newContext({ baseURL: ADMIN, storageState: ownerState });
-  return { ctx, page: await ctx.newPage() };
+  return ownerContext(browser);
 }
 
 test('owner creates a product, edits name and price → storefront shows them', async ({

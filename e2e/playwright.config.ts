@@ -18,10 +18,21 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
+    // Owner admin session shared by the admin specs (one TOTP step instead of one per suite).
     {
-      name: 'desktop',
+      name: 'admin-setup',
+      testMatch: /admin\.setup\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
     },
-    { name: 'mobile', use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } } },
+    {
+      name: 'desktop',
+      dependencies: ['admin-setup'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+    },
+    {
+      name: 'mobile',
+      dependencies: ['admin-setup'],
+      use: { ...devices['Pixel 7'], viewport: { width: 390, height: 844 } },
+    },
   ],
 });

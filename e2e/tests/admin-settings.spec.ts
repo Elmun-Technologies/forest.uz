@@ -1,13 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
-import {
-  acceptInvite,
-  ADMIN,
-  adminLogin,
-  enrolTotp,
-  ownerCredentials,
-  spreadAdminIp,
-} from './admin-helpers';
+import { acceptInvite, ADMIN, enrolTotp, ownerContext, spreadAdminIp } from './admin-helpers';
 import { uniquePhone } from './helpers';
 
 /**
@@ -16,7 +9,6 @@ import { uniquePhone } from './helpers';
  * Manager sees the integrations hub but cannot touch keys.
  */
 test.use({ baseURL: ADMIN });
-// Owner logins wait for an unused TOTP step (other suites log in as the owner too).
 test.describe.configure({ mode: 'serial', timeout: 150_000 });
 
 const WEB = process.env.WEB_URL ?? 'http://localhost:3000';
@@ -25,17 +17,16 @@ const managerEmail = `e2e-int-manager-${run}@staff.test`;
 const managerPassword = `kuzgi-${randomBytes(6).toString('hex')}`;
 let managerInvite = '';
 
-/** One owner session for the whole file: each login burns a TOTP step shared with other suites. */
+/** The owner's shared session (admin.setup.ts), one page for the whole file. */
 let ownerCtx: BrowserContext | undefined;
 let ownerPage: Page;
 
 test.beforeAll(async ({ browser }, testInfo) => {
   if (testInfo.project.name !== 'desktop') return;
-  ownerCtx = await browser.newContext({ baseURL: ADMIN, viewport: { width: 1440, height: 900 } });
-  await spreadAdminIp(ownerCtx);
-  ownerPage = await ownerCtx.newPage();
-  const owner = ownerCredentials();
-  await adminLogin(ownerPage, owner.email, owner.password);
+  ({ ctx: ownerCtx, page: ownerPage } = await ownerContext(browser, {
+    viewport: { width: 1440, height: 900 },
+  }));
+  await ownerPage.goto('/');
 });
 test.afterAll(async () => {
   await ownerCtx?.close();

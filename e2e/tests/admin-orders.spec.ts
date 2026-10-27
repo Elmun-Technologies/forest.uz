@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
-import { acceptInvite, ADMIN, adminLogin, ownerCredentials, spreadAdminIp } from './admin-helpers';
+import { acceptInvite, ADMIN, ownerContext, spreadAdminIp } from './admin-helpers';
 import { API, uniquePhone } from './helpers';
 
 /**
@@ -93,7 +93,7 @@ async function dialogSave(
 const orders: { cod?: string; click?: string; warehouseInvite?: string } = {};
 
 test('owner: storefront COD order → confirm → pack → receipt → BTS → delivered → complete', async ({
-  page,
+  browser,
   playwright,
 }) => {
   const shop = await playwright.request.newContext();
@@ -102,8 +102,8 @@ test('owner: storefront COD order → confirm → pack → receipt → BTS → d
   orders.click = (await placeOrder(shop, 'CLICK')).number;
   await shop.dispose();
 
-  const owner = ownerCredentials();
-  await adminLogin(page, owner.email, owner.password);
+  const { page } = await ownerContext(browser);
+  await page.goto('/');
   const nav = page.getByRole('navigation', { name: 'Admin menyusi' });
   await expect(nav.getByTestId('orders-badge')).toBeVisible({ timeout: 15_000 });
   await nav.getByRole('link', { name: /Buyurtmalar/ }).click();
