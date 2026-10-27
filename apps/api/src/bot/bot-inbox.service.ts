@@ -8,7 +8,7 @@ import {
 } from '@forest/contracts';
 import type { Conversation, Prisma } from '@forest/db';
 import { randomBytes } from 'node:crypto';
-import { imageMeta } from '../admin/files/image-meta';
+import { sanitizeImage } from '../admin/files/image-meta';
 import { FilesService } from '../files/files.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.module';
@@ -154,10 +154,12 @@ export class BotInboxService {
   /** Customer photo → private bucket + File row (JPEG/PNG/WebP by magic bytes, ≤ 10 MB). */
   async storePhoto(telegramFileId: string, prefix: string): Promise<string | null> {
     try {
-      const bytes = await this.gateway.download(telegramFileId);
-      if (!bytes || bytes.length > BOT_LIMITS.photoMaxBytes) return null;
-      const meta = imageMeta(bytes);
-      if (!meta) return null;
+      const downloaded = await this.gateway.download(telegramFileId);
+      if (!downloaded || downloaded.length > BOT_LIMITS.photoMaxBytes) return null;
+      // Telegram re-encodes photos but not images sent as files: strip Exif/GPS here.
+      const image = sanitizeImage(downloaded);
+      if (!image) return null;
+      const { bytes, meta } = image;
       const key = `${prefix}/${randomBytes(12).toString('base64url')}.${meta.ext}`;
       await this.files.put(key, bytes, meta.mime, false);
       const file = await this.prisma.file.create({

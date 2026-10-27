@@ -12,7 +12,7 @@ import { catchError, type Observable, throwError } from 'rxjs';
 import { randomBytes } from 'node:crypto';
 import { FilesService } from '../../files/files.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { imageMeta } from './image-meta';
+import { sanitizeImage } from './image-meta';
 
 /** The part of a multer file the admin uses (memory storage). */
 export interface UploadedImage {
@@ -69,12 +69,14 @@ export class AdminUploadService {
     if (!file || file.size === 0) throw new DomainError('FILE_TYPE_UNSUPPORTED', undefined, 'file');
     if (file.size > ADMIN_UPLOAD_MAX_BYTES)
       throw new DomainError('FILE_TOO_LARGE', undefined, 'file');
-    const meta = imageMeta(file.buffer);
-    if (!meta) throw new DomainError('FILE_TYPE_UNSUPPORTED', undefined, 'file');
+    // Metadata (Exif/GPS…) is stripped before anything is stored; unparsable files are refused.
+    const image = sanitizeImage(file.buffer);
+    if (!image) throw new DomainError('FILE_TYPE_UNSUPPORTED', undefined, 'file');
+    const { bytes, meta } = image;
     // Random, unguessable object names: drafts' images are public URLs before the product is.
     const key = `${prefix}/${randomBytes(12).toString('base64url')}.${meta.ext}`;
     try {
-      await this.files.put(key, file.buffer, meta.mime, true);
+      await this.files.put(key, bytes, meta.mime, true);
     } catch (e) {
       this.logger.error(`upload of ${key} failed: ${e instanceof Error ? e.message : String(e)}`);
       throw new DomainError('FILE_STORAGE_FAILED');
@@ -83,7 +85,7 @@ export class AdminUploadService {
       key,
       isPublic: true,
       mime: meta.mime,
-      size: file.size,
+      size: bytes.length,
       width: meta.width,
       height: meta.height,
     };

@@ -1,4 +1,5 @@
 import type { Logger } from '@nestjs/common';
+import { sanitizeImage } from '../admin/files/image-meta';
 import type { FilesService } from '../files/files.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
@@ -28,8 +29,17 @@ export async function publishReviewPhotos(
     try {
       const obj = await files.getPrivate(f.key);
       if (!obj) continue;
-      await files.put(f.key, obj.body, f.mime, true);
-      await prisma.file.update({ where: { id: f.id }, data: { isPublic: true } });
+      // Stripped again on the way out: photos stored before ingest stripping existed.
+      const image = sanitizeImage(obj.body);
+      if (!image) {
+        logger.warn(`review photo ${f.id} is not a parsable image; left private`);
+        continue;
+      }
+      await files.put(f.key, image.bytes, image.meta.mime, true);
+      await prisma.file.update({
+        where: { id: f.id },
+        data: { isPublic: true, size: image.bytes.length },
+      });
       // The private original stays: withdrawn consent / rejection makes it private again.
       published++;
     } catch (e) {
