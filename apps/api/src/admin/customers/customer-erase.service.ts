@@ -1,3 +1,5 @@
+import { botChatRedisKeys } from '../../bot/bot-session';
+import { RedisService } from '../../redis/redis.module';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   type CustomerEraseResultDto,
@@ -31,10 +33,11 @@ export class CustomerEraseService {
     private readonly sessions: SessionService,
     private readonly uploads: AdminUploadService,
     private readonly replays: ReplayRetentionService,
+    private readonly redis: RedisService,
   ) {}
 
   async erase(actor: AuditActor, id: string, confirm: string): Promise<CustomerEraseResultDto> {
-    const { result, photoIds, replayKeys } = await this.prisma.$transaction(async (tx) => {
+    const { result, photoIds, replayKeys, chat } = await this.prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT "id" FROM "Customer" WHERE "id" = ${id} FOR UPDATE`;
       const c = await tx.customer.findUnique({ where: { id } });
       if (!c) throw new DomainError('NOT_FOUND');
@@ -80,22 +83,34 @@ export class CustomerEraseService {
       // erase is a rare Owner action, the scan is acceptable).
       await tx.$executeRaw`UPDATE "Event" SET "customerId" = NULL WHERE "customerId" = ${id}`;
       await tx.message.updateMany({ where: { customerId: id }, data: { body: '' } });
-      // Photos sent to the bot inbox (private bucket) go with the texts (5A).
+      // Bot chat (5A): the customer's conversations and also anything of their Telegram chat
+      // from before the phone was linked; photos (private bucket) go with the texts.
+      const chat = c.telegramId;
+      const chatConvs = {
+        OR: [{ customerId: id }, ...(chat ? [{ telegramChatId: chat }] : [])],
+      };
       const chatFileIds = (
         await tx.conversationMessage.findMany({
-          where: { conversation: { customerId: id }, NOT: { fileIds: { isEmpty: true } } },
+          where: { conversation: chatConvs, NOT: { fileIds: { isEmpty: true } } },
           select: { fileIds: true },
         })
       ).flatMap((m) => m.fileIds);
       await tx.conversationMessage.updateMany({
-        where: { conversation: { customerId: id } },
+        where: { conversation: chatConvs },
         data: { text: null, fileIds: [] },
       });
+      if (chat)
+        await tx.message.updateMany({
+          where: { customerId: null, payload: { path: ['chatId'], equals: String(chat) } },
+          data: { body: '' },
+        });
       // Bot subscriber rows hold the Telegram name/username.
-      await tx.botSubscriber.deleteMany({ where: { customerId: id } });
+      await tx.botSubscriber.deleteMany({
+        where: { OR: [{ customerId: id }, ...(chat ? [{ telegramId: chat }] : [])] },
+      });
       await tx.segmentMember.deleteMany({ where: { customerId: id } });
       // Telegram chat id identifies the person; the column is NOT NULL, 0 = erased (no real chat).
-      await tx.conversation.updateMany({ where: { customerId: id }, data: { telegramChatId: 0n } });
+      await tx.conversation.updateMany({ where: chatConvs, data: { telegramChatId: 0n } });
 
       // Review photos may show the person or their home: detach them (text/rating stay, now
       // anonymous). A staff-uploaded "before" image is not the customer's and stays.
@@ -197,7 +212,7 @@ export class CustomerEraseService {
         photosRemoved: photoIds.length,
         external,
       };
-      return { result: done, photoIds, replayKeys };
+      return { result: done, photoIds, replayKeys, chat };
     });
     // After commit: photo files nothing else references go (rows + objects; best effort).
     await this.uploads.discardUnreferenced([...new Set(photoIds)]).catch((e: unknown) => {
@@ -207,6 +222,11 @@ export class CustomerEraseService {
     await this.replays.removePrefixes(replayKeys).catch((e: unknown) => {
       this.logger.error(`replay cleanup failed after erasure: ${String(e)}`);
     });
+    // After commit: the bot's per-chat state (flow, pending visitor, auto-reply throttle).
+    if (chat)
+      await this.redis.del(...botChatRedisKeys(chat)).catch((e: unknown) => {
+        this.logger.error(`bot state cleanup failed after erasure: ${String(e)}`);
+      });
     // After commit: any live storefront session of this customer ends.
     await this.sessions.revokeCustomer(id).catch((e: unknown) => {
       this.logger.error(`session revoke failed after erasure: ${String(e)}`);

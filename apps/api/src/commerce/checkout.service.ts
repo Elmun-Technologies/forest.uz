@@ -23,7 +23,7 @@ import type { PaymentProvider } from '../integrations/providers/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { BotAlertsService } from '../bot/bot-alerts.service';
-import { IdentityService } from '../tracking/identity.service';
+import { verifiedSessionId } from '../tracking/server-events';
 import { CartService, type CartWithItems } from './cart.service';
 import { orderPageUrl, orderPublicId, trackingToken } from './ids';
 import { NotificationsService } from './notifications.service';
@@ -33,7 +33,7 @@ import { OrderLifecycleService } from './order-lifecycle.service';
 interface PlaceOptions {
   source: 'web' | 'phone';
   staffId: string | null;
-  /** Storefront analytics ids (fr_aid, fr_sid): stored on the order, visitor linked after commit. */
+  /** Storefront analytics ids (fr_aid, fr_sid): stored on the order (attribution only). */
   tracking?: CheckoutTracking;
   /** Runs inside the order transaction (admin audit row). */
   audit?: (tx: Prisma.TransactionClient, order: { id: string; number: string }) => Promise<void>;
@@ -87,7 +87,6 @@ export class CheckoutService {
     private readonly limiter: RateLimiter,
     private readonly consents: ConsentsService,
     private readonly quotes: DeliveryQuoteService,
-    private readonly identity: IdentityService,
     private readonly alerts: BotAlertsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
@@ -134,7 +133,16 @@ export class CheckoutService {
         3600,
         'CHECKOUT_LIMITED',
       );
-      const result = await this.place(cart, input, locale, deviceHash, { ...WEB, tracking });
+      // The checkout phone is unverified: the order records this browser's visitor + session for
+      // attribution, but the visitor is never linked to the phone's customer (CLAUDE.md §6).
+      const analytics = tracking && {
+        anonymousId: tracking.anonymousId,
+        sessionId: await verifiedSessionId(this.prisma, tracking.sessionId, tracking.anonymousId),
+      };
+      const result = await this.place(cart, input, locale, deviceHash, {
+        ...WEB,
+        tracking: analytics,
+      });
       await this.prisma.idempotencyKey.update({
         where: { key },
         data: { status: 201, response: result as unknown as Prisma.InputJsonValue },
@@ -430,7 +438,6 @@ export class CheckoutService {
     await this.notifications.orderStatus(order.id, 'order_created');
     // Admin Telegram group (docs/09); fire-and-forget, after commit.
     this.alerts.orderCreated(order.id);
-    if (opts.tracking) await this.identity.link(opts.tracking.anonymousId, order.customerId);
 
     if (!provider) {
       return { orderNumber: order.number, publicId: order.publicId, next: { type: 'cod' } };

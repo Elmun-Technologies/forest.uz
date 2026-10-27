@@ -1,5 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
-import { addToCart, noPlaceholders, quietOverlays, spreadClientIp, uniquePhone } from './helpers';
+import {
+  addToCart,
+  devHeaders,
+  noPlaceholders,
+  quietOverlays,
+  spreadClientIp,
+  uniquePhone,
+} from './helpers';
 
 /**
  * Phase 2 storefront wiring: Telegram login/link, phone-less (Telegram-only) cabinet, courier
@@ -57,7 +64,7 @@ async function placeOrderViaApi(page: Page, region: 'tashkent_city' | 'samarkand
 }
 
 async function setShipment(page: Page, body: Record<string, unknown>) {
-  const res = await page.request.post('/api/dev/shipment', { data: body });
+  const res = await page.request.post('/api/dev/shipment', { data: body, headers: devHeaders() });
   expect(res.ok(), `dev shipment: ${res.status()} ${await res.text()}`).toBe(true);
 }
 
@@ -88,6 +95,7 @@ test.describe('Telegram-only customer (phone: null)', () => {
     const username = `e2e_${id.slice(-8)}`;
     const login = await page.request.post('/api/dev/telegram-login', {
       data: { id, first_name: 'Dilnoza', username },
+      headers: devHeaders(),
     });
     expect(login.ok(), await login.text()).toBe(true);
     const me = (await login.json()) as { phone: string | null; telegram: { username: string } };

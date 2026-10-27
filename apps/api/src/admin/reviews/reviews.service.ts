@@ -14,7 +14,7 @@ import {
 } from '@forest/contracts';
 import type { Prisma, Review } from '@forest/db';
 import { reviewAuthor } from '../../catalog/catalog.mapper';
-import { publishReviewPhotos } from '../../bot/review-photos';
+import { publishReviewPhotos, unpublishReviewPhotos } from '../../bot/review-photos';
 import { FilesService } from '../../files/files.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SeoEventsService } from '../../seo/seo-events.service';
@@ -111,10 +111,12 @@ export class AdminReviewsService {
     input: ReviewModerateInput,
   ): Promise<AdminReviewDto> {
     const dto = await this.moderateRow(actor, id, input);
-    // Bot photos are private until an approved review has publish consent (5A); after commit.
-    if (input.status !== 'APPROVED') return dto;
-    const published = await publishReviewPhotos(this.prisma, this.files, id, this.logger);
-    if (!published) return dto;
+    // Bot photos are public only while the review is approved with consent (5A); after commit.
+    const changed =
+      input.status === 'APPROVED'
+        ? await publishReviewPhotos(this.prisma, this.files, id, this.logger)
+        : await unpublishReviewPhotos(this.prisma, this.files, id, this.logger);
+    if (!changed) return dto;
     const row = await this.prisma.review.findUniqueOrThrow({
       where: { id },
       include: reviewInclude,

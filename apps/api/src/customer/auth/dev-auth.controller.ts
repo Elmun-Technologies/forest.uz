@@ -1,8 +1,8 @@
-import { Body, Controller, HttpCode, Inject, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Locale, MeDto } from '@forest/contracts';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { assertDevEndpoints } from '../../common/dev-endpoints';
+import { assertDevEndpoints, DevEndpointsGuard } from '../../common/dev-endpoints';
 import { ReqLocale, ZodPipe } from '../../common/http';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
@@ -20,6 +20,7 @@ const devTelegramLoginSchema = z.object({
  * Telegram-only (phone-less) customers. 404 unless DEV_ENDPOINTS=true and PROVIDERS_MODE=fake.
  */
 @Controller('dev')
+@UseGuards(DevEndpointsGuard)
 export class DevAuthController {
   constructor(
     private readonly telegram: TelegramAuthService,

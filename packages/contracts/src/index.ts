@@ -57,3 +57,4 @@ export * from './ai-drafts';
 export * from './schemas/ai-drafts';
 export * from './bot';
 export * from './schemas/admin-bot';
+export * from './error-report';

@@ -15,3 +15,7 @@ test-results
 next-env.d.ts
 /data/
 e2e/.auth
+
+# Production deploy state and generated secrets (infra/deploy/deploy.sh)
+.deploy/
+infra/deploy/.secrets/

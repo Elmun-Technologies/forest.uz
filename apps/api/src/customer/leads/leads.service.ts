@@ -12,8 +12,7 @@ import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../settings/settings.service';
-import { IdentityService } from '../../tracking/identity.service';
-import { recordLeadEvent } from '../../tracking/server-events';
+import { recordLeadEvent, verifiedSessionId } from '../../tracking/server-events';
 import { ConsentsService } from '../common/consents';
 import { TemplateSms } from '../common/messaging';
 import { RateLimiter } from '../common/rate-limit';
@@ -32,7 +31,6 @@ export class LeadsService {
     private readonly consents: ConsentsService,
     private readonly sms: TemplateSms,
     private readonly limiter: RateLimiter,
-    private readonly identity: IdentityService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -94,7 +92,10 @@ export class LeadsService {
     };
   }
 
-  /** docs/07: server-side `lead` event + identity link of this browser (never fails the lead). */
+  /**
+   * docs/07: server-side `lead` event with this browser's visitor + session (never fails the
+   * lead). The phone is unverified, so the visitor is NOT linked to its customer (CLAUDE.md §6).
+   */
   private async trackLead(
     customerId: string,
     source: string,
@@ -106,13 +107,13 @@ export class LeadsService {
         customerId,
         source,
         ...tracking,
+        sessionId: await verifiedSessionId(this.prisma, tracking.sessionId, tracking.anonymousId),
         at: now,
         day: tashkentDayKey(now),
       });
     } catch (e) {
       this.logger.warn(`lead event failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-    await this.identity.link(tracking.anonymousId, customerId);
   }
 
   /** Idempotent per (variant, phone) while the entry is not yet notified. */

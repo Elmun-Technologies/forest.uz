@@ -11,3 +11,5 @@ design/screens
 design/source
 e2e/test-results
 e2e/playwright-report
+.deploy
+infra/deploy/.secrets

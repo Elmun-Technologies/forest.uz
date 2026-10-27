@@ -558,8 +558,8 @@ export const messageTemplates: {
   {
     key: 'cart_abandoned_24h_sms',
     body: {
-      uz: 'Forest: savatingiz saqlangan. {kod} kodi bilan −5%: {link}',
-      ru: 'Forest: ваша корзина сохранена. −5% по коду {kod}: {link}',
+      uz: 'Forest: savatingiz saqlangan. {kod} kodi bilan −5%: {link} Rad etish: {stop}',
+      ru: 'Forest: ваша корзина сохранена. −5% по коду {kod}: {link} Отписаться: {stop}',
     },
     delayMin: 1440,
     smsFallback: true,
@@ -651,8 +651,8 @@ export const messageTemplates: {
     // SMS fallback of flow 5 for customers without Telegram ({link} = tracking page).
     key: 'review_request_sms',
     body: {
-      uz: 'Forest: {ism}, buyurtma {raqam} natijasi qanday chiqdi? Baho qoldiring: {link}',
-      ru: 'Forest: {ism}, как результат по заказу {raqam}? Оставьте оценку: {link}',
+      uz: 'Forest: {ism}, buyurtma {raqam} natijasi qanday chiqdi? Baho qoldiring: {link} Rad etish: {stop}',
+      ru: 'Forest: {ism}, как результат по заказу {raqam}? Оставьте оценку: {link} Отписаться: {stop}',
     },
     delayMin: 4320,
     smsFallback: true,

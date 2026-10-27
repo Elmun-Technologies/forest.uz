@@ -20,7 +20,11 @@ export class MaintenanceService implements OnApplicationBootstrap {
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
-    await this.ensureEventPartitions();
+    // Partitions exist months ahead: a boot that can't get the lock now must not fail or hang.
+    await this.ensureEventPartitions().catch((e: unknown) => {
+      if (!isLockTimeout(e)) throw e;
+      this.logger.warn('Event partitions: lock still busy, left to the daily job');
+    });
     // Daily at 03:10 Tashkent; idempotent upsert, safe with several API replicas.
     await this.queue.upsertJobScheduler(
       ENSURE_PARTITIONS,
@@ -30,7 +34,7 @@ export class MaintenanceService implements OnApplicationBootstrap {
   }
 
   async ensureEventPartitions(monthsAhead = 3): Promise<{ defaultRows: number }> {
-    await this.prisma.$executeRaw`SELECT ensure_event_partitions(${monthsAhead}::int)`;
+    await this.createPartitions(monthsAhead);
     const [row] = await this.prisma.$queryRaw<
       { n: bigint }[]
     >`SELECT event_default_partition_rows() AS n`;
@@ -43,6 +47,38 @@ export class MaintenanceService implements OnApplicationBootstrap {
     }
     return { defaultRows };
   }
+
+  /**
+   * `CREATE TABLE … PARTITION OF "Event"` needs an ACCESS EXCLUSIVE lock on the parent (and the
+   * DEFAULT partition). Queued behind a long reader (heatmap rebuild, analytics), that request would
+   * block every later Event insert/select until the reader ends, so it waits at most
+   * `PARTITION_LOCK_TIMEOUT` per attempt and retries; after the last attempt it throws (the job
+   * retries with backoff, boot just logs).
+   */
+  private async createPartitions(monthsAhead: number): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL lock_timeout = '${PARTITION_LOCK_TIMEOUT}'`);
+          await tx.$executeRaw`SELECT ensure_event_partitions(${monthsAhead}::int)`;
+        });
+        return;
+      } catch (e) {
+        if (!isLockTimeout(e) || attempt >= PARTITION_LOCK_ATTEMPTS) throw e;
+        this.logger.warn(`Event partitions: lock busy (attempt ${attempt}), retrying`);
+        await new Promise((r) => setTimeout(r, attempt * 2_000));
+      }
+    }
+  }
+}
+
+const PARTITION_LOCK_TIMEOUT = '3s';
+const PARTITION_LOCK_ATTEMPTS = 5;
+
+/** Postgres `lock_not_available` (55P03), as Prisma surfaces it from a raw query. */
+function isLockTimeout(e: unknown): boolean {
+  const meta = (e as { meta?: { code?: unknown } } | null)?.meta;
+  return meta?.code === '55P03' || /lock timeout/i.test(String(e));
 }
 
 @Processor(MAINTENANCE_QUEUE)

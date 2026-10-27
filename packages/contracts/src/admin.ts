@@ -30,6 +30,7 @@ export const PERMISSIONS = [
   'reviews.moderate',
   'promo.edit',
   'seo.edit',
+  'seo.canonical_external',
   'content.edit',
   'integrations.view',
   'integrations.keys',
@@ -73,6 +74,8 @@ export const PERMISSION_ROLES: Record<Permission, readonly StaffRole[]> = {
   'reviews.moderate': OMMk,
   'promo.edit': OMMk, // docs/02 "Promo codes"
   'seo.edit': OMMk, // docs/02 "Product content, images, SEO"
+  // A canonical to another host hands the page's ranking away (docs/02 silent → Owner/Manager).
+  'seo.canonical_external': OM,
   'content.edit': OMMk, // Ilhom/Brend CMS — docs/02 "Product content, images, SEO"
   'integrations.view': OM,
   'integrations.keys': O, // docs/02 "Integration keys"

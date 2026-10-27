@@ -80,7 +80,12 @@ jobs:
           cp .env.example .env
           sed -i "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=$(openssl rand -base64 32)|" .env
           sed -i "s|^SESSION_SECRET=.*|SESSION_SECRET=$(openssl rand -hex 32)|" .env
+          sed -i "s|^WEB_REVALIDATE_SECRET=.*|WEB_REVALIDATE_SECRET=$(openssl rand -hex 32)|" .env
           sed -i "s|^ALLOW_FAKE_PROVIDERS=.*|ALLOW_FAKE_PROVIDERS=true|" .env
+          # Dev endpoints need X-Dev-Token (e2e reads it from .env); the admin TOTP helper is
+          # allowed under NODE_ENV=production only here, never on the public demo.
+          sed -i "s|^DEV_ENDPOINTS_TOKEN=.*|DEV_ENDPOINTS_TOKEN=$(openssl rand -hex 32)|" .env
+          sed -i "s|^ALLOW_DEV_ADMIN_TOTP=.*|ALLOW_DEV_ADMIN_TOTP=true|" .env
       # Builds the production images (validates Dockerfiles) and runs migrate → api, web, admin, caddy.
       - run: docker compose -f infra/compose.yml --profile apps up -d --build
       - run: pnpm exec turbo run build --filter=@forest/contracts --filter=@forest/db

@@ -43,6 +43,17 @@ function ensureEnv() {
     set('SESSION_SECRET', randomBytes(32).toString('hex'));
     changed = true;
   }
+  const webSecret = get('WEB_REVALIDATE_SECRET');
+  if (webSecret.length < 32 || webSecret.startsWith('generate')) {
+    set('WEB_REVALIDATE_SECRET', randomBytes(32).toString('hex'));
+    changed = true;
+  }
+  // Dev endpoints (OTP outbox, admin TOTP, fake shipment…) answer only with this X-Dev-Token;
+  // e2e reads it from .env (CLAUDE.md §6).
+  if (get('DEV_ENDPOINTS_TOKEN').length < 32) {
+    set('DEV_ENDPOINTS_TOKEN', randomBytes(32).toString('hex'));
+    changed = true;
+  }
   if (get('TELEGRAM_WEBHOOK_SECRET').startsWith('generate')) {
     set('TELEGRAM_WEBHOOK_SECRET', randomBytes(16).toString('hex'));
     changed = true;

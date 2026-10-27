@@ -3,6 +3,7 @@ import { containsPlaceholder } from '@forest/contracts';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
+import { report404 } from './web-signature';
 import { createTestApp } from './app';
 
 const UNRESOLVED_VAR = /\{[a-zA-Z0-9_.]+\}/;
@@ -281,21 +282,17 @@ describe('search, content, SEO feeds (integration)', () => {
 
   it('logs 404s without query strings and with a sanitized referrer', async () => {
     for (let i = 0; i < 2; i++)
-      await http()
-        .post('/v1/seo/not-found')
-        .send({
-          path: '/ru/p/missing?token=secret#x',
-          referrer: 'https://google.com/search?q=kraska',
-        })
-        .expect(204);
+      await report404(http(), {
+        path: '/ru/p/missing?token=secret#x',
+        referrer: 'https://google.com/search?q=kraska',
+      }).expect(204);
     const row = await prisma.notFoundLog.findUniqueOrThrow({ where: { path: '/ru/p/missing' } });
     expect(row.hits).toBe(2);
     expect(row.referrer).toBe('https://google.com/search');
-    await http().post('/v1/seo/not-found').send({ path: 'no-slash' }).expect(400);
-    const long = await http()
-      .post('/v1/seo/not-found')
-      .send({ path: `/${'a'.repeat(1500)}` })
-      .expect(204);
+    await report404(http(), { path: 'no-slash' }).expect(400);
+    // Only the storefront server may report (signed): anything else is refused.
+    await http().post('/v1/seo/not-found').send({ path: '/uz/fake-broken-link' }).expect(401);
+    const long = await report404(http(), { path: `/${'a'.repeat(1500)}` }).expect(204);
     expect(long.status).toBe(204);
     expect(await prisma.notFoundLog.count({ where: { path: { startsWith: '/aaaa' } } })).toBe(1);
   });

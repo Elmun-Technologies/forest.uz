@@ -1,13 +1,15 @@
-import { Global, Injectable, Module, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Global, Injectable, Module, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@forest/db';
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnApplicationShutdown {
   async onModuleInit(): Promise<void> {
     await this.$connect();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // Last shutdown phase: BullMQ workers stop first (`WorkerShutdown`), so no job loses its
+  // connection mid-transaction.
+  async onApplicationShutdown(): Promise<void> {
     await this.$disconnect();
   }
 }

@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { apiRequest } from './api';
+import { signWebRequest, WEB_CONTEXTS, WEB_SIGNATURE_HEADER } from './web-signature';
 
 /**
  * 404 with SEO hooks (docs/10): first look up an admin-managed redirect for the path (old slugs,
@@ -23,10 +24,14 @@ export async function notFoundWithRedirect(path: string): Promise<never> {
   }
   const referrer = (await headers()).get('referer');
   after(async () => {
+    // Signed: the API accepts 404 reports only from this server (SEO health "broken links").
+    const body = JSON.stringify({ path, referrer });
+    const signature = signWebRequest(WEB_CONTEXTS.notFound, body);
+    if (!signature) return;
     await apiRequest('/seo/not-found', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path, referrer }),
+      headers: { 'Content-Type': 'application/json', [WEB_SIGNATURE_HEADER]: signature },
+      body,
     }).catch(() => undefined);
   });
   notFound();

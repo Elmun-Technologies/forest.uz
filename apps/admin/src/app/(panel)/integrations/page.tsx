@@ -1,4 +1,5 @@
 import {
+  type AiDraftStatusDto,
   type ApiKeyDto,
   hasPermission,
   type IntegrationsHubDto,
@@ -6,6 +7,7 @@ import {
 } from '@forest/contracts/core';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { AiSettingsPanel } from '../../../components/automation/ai-settings-panel';
 import { DeveloperSummary } from '../../../components/automation/developer-summary';
 import { IntegrationsHub } from '../../../components/integrations/integrations-hub';
 import { NoAccess, PageHeader } from '../../../components/page';
@@ -24,11 +26,13 @@ export default async function IntegrationsPage() {
       </>
     );
   }
-  const [hub, hooks, keys] = await Promise.all([
+  const [hub, hooks, keys, ai] = await Promise.all([
     adminGet<IntegrationsHubDto>('/admin/integrations'),
     adminGet<WebhookListDto>('/admin/webhooks'),
     adminGet<ApiKeyDto[]>('/admin/api-keys'),
+    adminGet<AiDraftStatusDto>('/admin/ai/status'),
   ]);
+  const canKeys = hasPermission(me.staff.role, 'integrations.keys');
   return (
     <>
       <PageHeader
@@ -46,8 +50,13 @@ export default async function IntegrationsPage() {
       <Suspense>
         <IntegrationsHub
           hub={hub}
-          canKeys={hasPermission(me.staff.role, 'integrations.keys')}
-          developer={<DeveloperSummary hooks={hooks} keys={keys} />}
+          canKeys={canKeys}
+          developer={
+            <>
+              <DeveloperSummary hooks={hooks} keys={keys} />
+              <AiSettingsPanel status={ai} canKeys={canKeys} />
+            </>
+          }
         />
       </Suspense>
     </>

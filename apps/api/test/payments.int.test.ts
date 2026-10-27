@@ -4,7 +4,7 @@ import request from 'supertest';
 import { OrderLifecycleService } from '../src/commerce/order-lifecycle.service';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 
 /**
  * Contract tests for the Payme Merchant API and the Click SHOP API against the real HTTP
@@ -56,6 +56,8 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
     await agent.post('/v1/cart/items').send({ variantId, qty: 1 }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
+      // Own client IP per order: the checkout limit (10/min per IP) is shared with other suites.
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `pay-${Date.now()}-${++phoneSeq}-abcdefgh`)
       .send({
         name: 'Malika',
