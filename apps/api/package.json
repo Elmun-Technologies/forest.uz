@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src test",
     "test": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "rotate-keys": "node dist/scripts/rotate-keys.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.133.0",

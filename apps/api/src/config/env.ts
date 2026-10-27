@@ -7,6 +7,18 @@ const base64Key = z
     'must be 32 bytes, base64 (openssl rand -base64 32)',
   );
 
+/** Comma-separated base64 keys (empty = none), each 32 bytes; at most 5. */
+const base64KeyList = z
+  .string()
+  .default('')
+  .transform((v) =>
+    v
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean),
+  )
+  .pipe(z.array(base64Key).max(5));
+
 /** An optional ≥ 32-char secret; an empty value (`KEY=` in .env) counts as unset. */
 const optionalSecret = z.preprocess(
   (v) => (v === '' ? undefined : v),
@@ -60,6 +72,11 @@ export const envSchema = z.object({
   S3_SECRET_KEY: z.string().default(''),
   S3_PUBLIC_URL: z.string().default('http://localhost:9000/forest-public'),
   APP_ENCRYPTION_KEY: base64Key,
+  /**
+   * Earlier master keys, kept only for decryption while `rotate-keys` re-seals stored secrets
+   * with APP_ENCRYPTION_KEY (docs/runbooks/secret-rotation.md §1). Remove once it reports 0 left.
+   */
+  APP_ENCRYPTION_KEY_PREVIOUS: base64KeyList,
   SESSION_SECRET: z.string().min(32),
   ADMIN_COOKIE_DOMAIN: z.string().default('localhost'),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),

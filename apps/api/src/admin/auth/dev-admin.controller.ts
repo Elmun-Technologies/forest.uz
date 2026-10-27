@@ -13,7 +13,7 @@ import { assertDevEndpoints, DevEndpointsGuard } from '../../common/dev-endpoint
 import { ZodPipe } from '../../common/http';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
-import { parseKey, SecretBox } from '../../integrations/crypto/secret-box';
+import { keyringFromEnv, SecretBox } from '../../integrations/crypto/secret-box';
 import { PrismaService } from '../../prisma/prisma.service';
 import { totpAad } from './admin-auth.service';
 import { base32Decode, hotp, TOTP_WINDOW, totpStep } from './totp';
@@ -33,7 +33,7 @@ export class DevAdminController {
     private readonly prisma: PrismaService,
     @Inject(ENV) private readonly env: Env,
   ) {
-    this.box = new SecretBox({ current: parseKey(env.APP_ENCRYPTION_KEY) });
+    this.box = new SecretBox(keyringFromEnv(env));
   }
 
   @Post('admin-totp')

@@ -18,7 +18,7 @@ import type { Request, Response } from 'express';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { RateLimiter } from '../../customer/common/rate-limit';
-import { parseKey, SecretBox } from '../../integrations/crypto/secret-box';
+import { keyringFromEnv, SecretBox } from '../../integrations/crypto/secret-box';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AdminContext } from '../admin-access';
 import { type AuditActor, AuditService } from '../audit/audit.service';
@@ -64,7 +64,7 @@ export class AdminAuthService {
     private readonly limiter: RateLimiter,
     @Inject(ENV) env: Env,
   ) {
-    this.box = new SecretBox({ current: parseKey(env.APP_ENCRYPTION_KEY) });
+    this.box = new SecretBox(keyringFromEnv(env));
   }
 
   // ───────── password step ─────────

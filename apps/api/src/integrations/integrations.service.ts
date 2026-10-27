@@ -7,7 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.module';
 import { randomBytes } from 'node:crypto';
 import { parseMoyskladSettings } from '@forest/contracts';
-import { maskSecret, parseKey, SecretBox } from './crypto/secret-box';
+import { keyringFromEnv, maskSecret, SecretBox } from './crypto/secret-box';
 import {
   FakeAiProvider,
   FakeDeliveryProvider,
@@ -79,7 +79,7 @@ export class IntegrationsService {
     redis: RedisService,
   ) {
     this.eskizTokens = new EskizTokenCache(redisTokenKv(redis));
-    this.box = new SecretBox({ current: parseKey(env.APP_ENCRYPTION_KEY) });
+    this.box = new SecretBox(keyringFromEnv(env));
     this.fakes = {
       payme: new FakePaymentProvider('payme', env.APP_URL),
       click: new FakePaymentProvider('click', env.APP_URL),
