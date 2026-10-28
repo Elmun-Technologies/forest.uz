@@ -165,7 +165,7 @@ level) and the **variables at repository level** (the smoke job has no environme
 
 The workflow writes the Vercel environment (Production) itself on every run: both projects get
 `API_INTERNAL_URL` and `API_URL` (= `https://<api app>.fly.dev`), `APP_URL` and
-`EDGE_PROXY_SECRET` (sensitive); web also `S3_PUBLIC_URL` and `WEB_REVALIDATE_SECRET`
+`EDGE_PROXY_SECRET` (sensitive); both `S3_PUBLIC_URL` (web: image pattern, admin: CSP media origin); web also `WEB_REVALIDATE_SECRET`
 (sensitive, set in a web-only step); admin also `WEB_INTERNAL_URL` (heatmap backdrop). Vercel
 never gets `APP_ENCRYPTION_KEY` (a run removes it if an older run stored it; the web reads it only
 as a dev fallback outside production). Build-time values are stored as non-sensitive so `vercel

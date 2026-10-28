@@ -180,11 +180,9 @@ jobs:
           put APP_URL "$DEMO_WEB_URL" --no-sensitive
           # Marks /api/* calls proxied by this app's middleware (client IP trust on the API).
           put EDGE_PROXY_SECRET "$DEMO_EDGE_PROXY_SECRET" --sensitive
-          if [ "$APP" = web ]; then
-            put S3_PUBLIC_URL "$DEMO_S3_PUBLIC_URL" --no-sensitive
-          else
-            put WEB_INTERNAL_URL "$DEMO_WEB_URL" --no-sensitive
-          fi
+          # Web: next/image remote pattern; admin: the media origin of its CSP (both build time).
+          put S3_PUBLIC_URL "$DEMO_S3_PUBLIC_URL" --no-sensitive
+          if [ "$APP" = admin ]; then put WEB_INTERNAL_URL "$DEMO_WEB_URL" --no-sensitive; fi
       # Storefront only: verifies the API's signed calls (POST /api/revalidate, 404 reports).
       - name: Revalidation secret (web)
         if: matrix.app == 'web'
@@ -211,7 +209,7 @@ jobs:
       - name: Build
         run: |
           export API_INTERNAL_URL="https://$FLY_API_APP.fly.dev" API_URL="https://$FLY_API_APP.fly.dev"
-          if [ "$APP" = web ]; then export S3_PUBLIC_URL="$DEMO_S3_PUBLIC_URL"; fi
+          export S3_PUBLIC_URL="$DEMO_S3_PUBLIC_URL"
           vercel build --prod
       # --regions: a prebuilt deploy doesn't reliably pick up the root directory's vercel.json.
       - name: Deploy

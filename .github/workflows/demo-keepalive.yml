@@ -1,0 +1,27 @@
+name: Free demo keep-alive
+
+# Pings the free demo API (Render + Supabase, docs/runbooks/deploy-demo-free.md) so Render's free
+# service doesn't sleep after 15 min idle and Supabase doesn't pause the project after 7 idle days.
+# /ready queries Postgres and Redis. Off until the repository variable FREE_DEMO_API_URL is set.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: demo-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    if: vars.FREE_DEMO_API_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: GET /ready
+        env:
+          API: ${{ vars.FREE_DEMO_API_URL }}
+        # A sleeping free service needs up to ~1 min to wake: generous timeout, a few retries.
+        run: curl -fsS --max-time 120 --retry 3 --retry-delay 20 --retry-all-errors "${API%/}/ready"

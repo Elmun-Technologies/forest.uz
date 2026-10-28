@@ -15,8 +15,8 @@ import { WorkerShutdown } from './worker-shutdown';
         connection: { url: env.REDIS_URL, maxRetriesPerRequest: null },
         prefix: 'forest',
         defaultJobOptions: {
-          removeOnComplete: 1000,
-          removeOnFail: 5000,
+          removeOnComplete: env.JOBS_KEEP_COMPLETED,
+          removeOnFail: env.JOBS_KEEP_FAILED,
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
         },

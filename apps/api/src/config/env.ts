@@ -59,6 +59,12 @@ export const envSchema = z.object({
   WEB_REVALIDATE_SECRET: z.string().min(32).optional(),
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1).default('redis://localhost:6379'),
+  /**
+   * Finished BullMQ jobs kept per queue (inspection/debugging). The free demo's 25 MB in-memory
+   * Redis needs far fewer than the VPS default.
+   */
+  JOBS_KEEP_COMPLETED: z.coerce.number().int().min(0).default(1000),
+  JOBS_KEEP_FAILED: z.coerce.number().int().min(0).default(5000),
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
   /**

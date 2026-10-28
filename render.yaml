@@ -1,0 +1,113 @@
+# Forest FREE demo API on Render (CLAUDE.md §6, docs/runbooks/deploy-demo-free.md).
+# Demo only: fake providers, synthetic data, never real customer PII. Production runs on the UZ VPS.
+#
+# Render Dashboard → New → Blueprint → this repository. Values marked `sync: false` are asked for
+# once in the dashboard (they come from Supabase / Vercel); `generateValue` secrets are created by
+# Render (base64, 256 bit) and copied by hand into Vercel where the web/admin need the same value.
+services:
+  - type: web
+    name: forest-demo-api
+    runtime: docker
+    plan: free
+    # Closest Render region to Tashkent; Vercel functions run in fra1 next to it.
+    region: frankfurt
+    # Free services can't pick a Dockerfile target: Render builds the last stage (`runtime`,
+    # no Prisma CLI). Migrations and the seed run from a laptop (runbook §3).
+    dockerfilePath: ./infra/docker/api.Dockerfile
+    dockerContext: .
+    # /ready checks Postgres and Redis; the keep-alive workflow pings it so neither Render
+    # (15 min idle) nor Supabase (7 days idle) puts the demo to sleep.
+    healthCheckPath: /ready
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/contracts/**
+        - packages/db/**
+        - packages/config/**
+        - infra/docker/api.Dockerfile
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - turbo.json
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: '4000'
+      - key: LOG_LEVEL
+        value: info
+      # Fake Payme/Click/SMS/Telegram/Yandex/MoySklad adapters (no external calls).
+      - key: PROVIDERS_MODE
+        value: fake
+      - key: ALLOW_FAKE_PROVIDERS
+        value: 'true'
+      # No DEV_ENDPOINTS_TOKEN: only the public per-phone OTP lookup answers, so testers can log in.
+      - key: DEV_ENDPOINTS
+        value: 'true'
+      # Browser → Vercel (XFF = client) → web/admin middleware (X-Forest-Edge) → Render proxy
+      # (appends Vercel's IP) → API. Verify after the first deploy (runbook §6).
+      - key: TRUST_PROXY_HOPS
+        value: '2'
+      # 25 MB in-memory Key Value: keep few finished jobs.
+      - key: JOBS_KEEP_COMPLETED
+        value: '50'
+      - key: JOBS_KEEP_FAILED
+        value: '200'
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: forest-demo-redis
+          property: connectionString
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      - key: SESSION_SECRET
+        generateValue: true
+      # Same value in the Vercel web project.
+      - key: WEB_REVALIDATE_SECRET
+        generateValue: true
+      # Same value in both Vercel projects.
+      - key: EDGE_PROXY_SECRET
+        generateValue: true
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      # Supabase session pooler (IPv4), e.g.
+      # postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?connection_limit=5
+      - key: DATABASE_URL
+        sync: false
+      # Supabase Storage S3: https://<ref>.storage.supabase.co/storage/v1/s3, path style.
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: 'true'
+      - key: S3_BUCKET_PUBLIC
+        value: forest-public
+      - key: S3_BUCKET_PRIVATE
+        value: forest-private
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      # https://<ref>.supabase.co/storage/v1/object/public/forest-public
+      - key: S3_PUBLIC_URL
+        sync: false
+      # Vercel production URLs (storefront, admin) and this service's own URL.
+      - key: APP_URL
+        sync: false
+      - key: WEB_INTERNAL_URL
+        sync: false
+      - key: ADMIN_URL
+        sync: false
+      - key: API_URL
+        sync: false
+
+  - type: keyvalue
+    name: forest-demo-redis
+    plan: free
+    region: frankfurt
+    # BullMQ: queued jobs must never be evicted.
+    maxmemoryPolicy: noeviction
+    # Internal connections from Render services only.
+    ipAllowList: []
