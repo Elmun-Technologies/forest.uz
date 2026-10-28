@@ -22,6 +22,7 @@ import { useCart } from '@/components/cart/cart-provider';
 import { AddToCartButton } from '@/components/cart/add-to-cart-button';
 import { ClientApiError, clientApi } from '@/lib/client-api';
 import { type PromiseLine, promiseLine } from '@/lib/delivery';
+import { track } from '@/lib/track';
 import { FavouriteButton } from './favourite-button';
 
 type Zone = PublicSettingsDto['delivery']['zones'][number];
@@ -111,6 +112,12 @@ export function PurchaseProvider({
       cancelAnimationFrame(frame);
     };
   }, []);
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (viewed.current || !initial) return;
+    viewed.current = true;
+    track('view_item', { productId, variantId: initial.id, priceSoum: initial.priceSoum });
+  }, [productId, initial]);
   useEffect(() => {
     const root = document.documentElement;
     if (ctaVisible) delete root.dataset.buybar;
@@ -126,7 +133,9 @@ export function PurchaseProvider({
   async function add() {
     if (!variant?.inStock || busy) return false;
     setBusy(true);
-    const ok = await addItems([{ variantId: variant.id, qty, priceSoum: variant.priceSoum }]);
+    const ok = await addItems([{ variantId: variant.id, qty, priceSoum: variant.priceSoum }], {
+      list: 'product',
+    });
     setBusy(false);
     return ok;
   }
@@ -139,6 +148,7 @@ export function PurchaseProvider({
     coverage,
     variant,
     setVariantId: (id) => {
+      if (id !== variant.id) track('select_variant', { productId, variantId: id });
       setVariantIdState(id);
       setQtyState(1);
     },
@@ -389,6 +399,7 @@ function Waitlist({ variantId }: { variantId: string }) {
         setState('busy');
         try {
           await clientApi.catalog.waitlist({ variantId, phone: parsed.e164 });
+          track('waitlist_join', { variantId });
           setState('done');
         } catch (err) {
           setState('idle');

@@ -57,6 +57,7 @@ export class SettingsService {
       this.get('returns.rules'),
       this.integrations.telegramLogin(),
     ]);
+    const tracking = await this.get('tracking.rules');
     const legalComplete = Object.values(store.legal).every(
       (v) => typeof v === 'string' && v.length > 0,
     );
@@ -94,6 +95,11 @@ export class SettingsService {
       flags,
       // The widget only works with the bot whose token verifies it — not `store.telegramBot`.
       auth: { telegramBot: telegram?.botUsername ?? null },
+      replay: {
+        enabled: tracking.replayEnabled,
+        samplePct: tracking.replaySamplePct,
+        checkoutPct: tracking.replayCheckoutPct,
+      },
     };
   }
 }

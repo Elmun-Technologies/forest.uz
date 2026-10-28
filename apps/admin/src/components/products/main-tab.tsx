@@ -4,6 +4,7 @@ import {
   type AdminCategoryOptionDto,
   type AdminProductDto,
   type AdminSpecDto,
+  type AiProductDescriptionDraftDto,
   PRODUCT_BADGES,
   PRODUCT_STATUSES,
   RELATION_KINDS,
@@ -13,7 +14,7 @@ import {
 import { Button, Field, Input, Switch } from '@forest/ui';
 import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useState } from 'react';
-import { adminFetch } from '../../lib/client-api';
+import { adminFetch, errorText } from '../../lib/client-api';
 import { BADGE_LABEL, COPY, PRODUCT_STATUS_LABEL, RELATION_LABEL, SURFACE_LABEL } from './copy';
 import { ChipToggles, compactInput, LocalizedInput, NumberInput, selectClass } from './fields';
 import type { ProductAction } from './use-product-action';
@@ -60,6 +61,22 @@ export function MainTab({
   useEffect(() => setD(draftOf(product)), [product]);
   const set = <K extends keyof typeof d>(k: K, v: (typeof d)[K]) => setD((x) => ({ ...x, [k]: v }));
   const off = !canEdit;
+  const [ai, setAi] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
+
+  /** AI draft (CLAUDE.md §6): fills the two description fields; nothing is saved until "Saqlash". */
+  async function aiDraft() {
+    setAi({ busy: true, note: null });
+    try {
+      const r = await adminFetch<AiProductDescriptionDraftDto>('/admin/ai/product-description', {
+        method: 'POST',
+        body: { productId: product.id },
+      });
+      setD((x) => ({ ...x, shortDesc: r.shortDesc, description: r.description }));
+      setAi({ busy: false, note: r.fake ? COPY.aiDraftFake : COPY.aiDraftReady });
+    } catch (e) {
+      setAi({ busy: false, note: errorText(e) });
+    }
+  }
 
   async function save(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -166,20 +183,25 @@ export function MainTab({
 
       <div className="flex items-center justify-between gap-2">
         <span className="font-semibold">Tavsiflar</span>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          disabled
-          title={COPY.aiDraftHint}
-          aria-describedby="ai-hint"
-        >
-          ✦ {COPY.aiDraft}
-        </Button>
-        <span id="ai-hint" className="sr-only">
-          {COPY.aiDraftHint}
-        </span>
+        {canEdit ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            loading={ai.busy}
+            title={COPY.aiDraftHint}
+            onClick={() => void aiDraft()}
+            data-testid="ai-description"
+          >
+            ✦ {COPY.aiDraft}
+          </Button>
+        ) : null}
       </div>
+      {ai.note ? (
+        <p role="status" className="text-xs text-muted" data-testid="ai-note">
+          {ai.note}
+        </p>
+      ) : null}
       <LocalizedInput
         label="Qisqa tavsif"
         value={d.shortDesc}

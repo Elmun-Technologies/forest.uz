@@ -61,12 +61,6 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 
 // ───────── SEO ─────────
 
-export interface SitemapDataDto {
-  products: { slug: string; updatedAt: string }[];
-  categories: { slug: string; updatedAt: string | null }[];
-  pages: { kind: string; slug: string; locales: ('uz' | 'ru')[]; updatedAt: string }[];
-}
-
 export const redirectQuerySchema = z.object({ path: z.string().min(1).max(2048) });
 
 export interface RedirectDto {

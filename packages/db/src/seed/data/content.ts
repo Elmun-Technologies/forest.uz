@@ -442,6 +442,10 @@ export const messageTemplates: {
   buttons?: { text: L; url: string }[];
   delayMin?: number;
   smsFallback?: boolean;
+  /** Eskiz-approved SMS text (CLAUDE.md §6 messaging engine); default false. */
+  smsApproved?: boolean;
+  /** Drafts the owner switches on after approval; default true. */
+  active?: boolean;
 }[] = [
   {
     key: 'otp',
@@ -450,6 +454,7 @@ export const messageTemplates: {
       ru: 'Forest: код входа {kod}. Никому не сообщайте.',
     },
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'lead_welcome',
@@ -466,6 +471,7 @@ export const messageTemplates: {
       ru: 'Forest: промокод −10% на первый заказ {kod}. Действует 7 дней. {link}',
     },
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'order_created',
@@ -475,6 +481,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'order_paid',
@@ -484,6 +491,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     // COD: the operator confirmed the order by phone (no payment yet — docs/02).
@@ -494,6 +502,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'order_courier',
@@ -503,6 +512,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     // Handed to the courier when the carrier gives no ETA (else order_courier with {vaqt}).
@@ -513,6 +523,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'order_delivered',
@@ -522,6 +533,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: "Video qo'llanma ↗", ru: 'Видеоинструкция ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'payment_reminder',
@@ -531,6 +543,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: "To'lash ↗", ru: 'Оплатить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'cart_abandoned_2h',
@@ -545,8 +558,8 @@ export const messageTemplates: {
   {
     key: 'cart_abandoned_24h_sms',
     body: {
-      uz: 'Forest: savatingiz saqlangan. {kod} kodi bilan −5%: {link}',
-      ru: 'Forest: ваша корзина сохранена. −5% по коду {kod}: {link}',
+      uz: 'Forest: savatingiz saqlangan. {kod} kodi bilan −5%: {link} Rad etish: {stop}',
+      ru: 'Forest: ваша корзина сохранена. −5% по коду {kod}: {link} Отписаться: {stop}',
     },
     delayMin: 1440,
     smsFallback: true,
@@ -611,6 +624,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     // BTS branch delivery: the parcel waits at {filial} (branch name/address).
@@ -621,6 +635,7 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
   },
   {
     key: 'order_delivery_failed',
@@ -630,6 +645,38 @@ export const messageTemplates: {
     },
     buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
     smsFallback: true,
+    smsApproved: true,
+  },
+  {
+    // SMS fallback of flow 5 for customers without Telegram ({link} = tracking page).
+    key: 'review_request_sms',
+    body: {
+      uz: 'Forest: {ism}, buyurtma {raqam} natijasi qanday chiqdi? Baho qoldiring: {link} Rad etish: {stop}',
+      ru: 'Forest: {ism}, как результат по заказу {raqam}? Оставьте оценку: {link} Отписаться: {stop}',
+    },
+    delayMin: 4320,
+    smsFallback: true,
+  },
+  {
+    // Draft: staff/auto cancellation notice (CLAUDE.md §6 staff cancel). Owner activates it.
+    key: 'order_cancelled',
+    body: {
+      uz: "Forest: buyurtma {raqam} bekor qilindi. Savollar bo'lsa, bizga yozing: {link}",
+      ru: 'Forest: заказ {raqam} отменён. Если есть вопросы, напишите нам: {link}',
+    },
+    smsFallback: true,
+    active: false,
+  },
+  {
+    // Draft: confirmation of an order the operator placed by phone (`source = 'phone'`).
+    key: 'order_phone_created',
+    body: {
+      uz: 'Forest: telefon orqali buyurtma {raqam} qabul qilindi. Kuzatish: {link}',
+      ru: 'Forest: заказ {raqam}, оформленный по телефону, принят. Отслеживание: {link}',
+    },
+    buttons: [{ text: { uz: 'Kuzatish ↗', ru: 'Отследить ↗' }, url: '{link}' }],
+    smsFallback: true,
+    active: false,
   },
 ];
 

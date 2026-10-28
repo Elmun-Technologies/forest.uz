@@ -40,7 +40,15 @@ const config: NextConfig = {
   // readable by SSR. Server components call API_INTERNAL_URL directly, forwarding cookies.
   async rewrites() {
     const api = process.env.API_INTERNAL_URL ?? process.env.API_URL ?? 'http://localhost:4000';
-    return [{ source: '/api/:path*', destination: `${api}/v1/:path*` }];
+    return [
+      { source: '/api/:path*', destination: `${api}/v1/:path*` },
+      // SEO files are built by the API (A9, CLAUDE.md §6): robots.txt (editable), sitemap index +
+      // per locale/type files, and the IndexNow key file at the site root.
+      { source: '/robots.txt', destination: `${api}/v1/seo/robots.txt` },
+      { source: '/sitemap.xml', destination: `${api}/v1/seo/sitemap.xml` },
+      { source: '/sitemaps/:file', destination: `${api}/v1/seo/sitemaps/:file` },
+      { source: '/:key([a-zA-Z0-9-]{8,128}).txt', destination: `${api}/v1/seo/indexnow/:key` },
+    ];
   },
   images: {
     // WebP only: sharp's AVIF encoder is ~5× slower and hung (>20 s) on some PNG logos, which

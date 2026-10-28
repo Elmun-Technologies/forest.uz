@@ -7,6 +7,8 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { routes, telegramUrl } from '@/config/site';
 import { JsonLd } from '@/components/json-ld';
+import { getSchemaToggles } from '@/lib/seo-meta';
+import { TrackView } from '@/components/analytics/track-view';
 import { ProductCard } from '@/components/product/product-card';
 import {
   type CatalogFilters,
@@ -43,6 +45,7 @@ export async function CatalogView({
 }: CatalogViewProps) {
   const t = await getTranslations('catalog');
   const tc = await getTranslations('common');
+  const schema = await getSchemaToggles(locale);
   const base = category ? routes.category(category.slug) : routes.catalog;
   const allCount = categories.reduce((a, c) => a + c.productCount, 0);
   const title = category?.name ?? t('title');
@@ -70,31 +73,38 @@ export async function CatalogView({
 
   return (
     <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pb-16 lg:gap-6 lg:px-6 lg:pt-2">
-      <JsonLd
-        data={{
-          '@context': 'https://schema.org',
-          '@type': 'BreadcrumbList',
-          itemListElement: [
-            { '@type': 'ListItem', position: 1, name: tc('home'), item: absoluteUrl(locale, '/') },
-            {
-              '@type': 'ListItem',
-              position: 2,
-              name: t('title'),
-              item: absoluteUrl(locale, routes.catalog),
-            },
-            ...(category
-              ? [
-                  {
-                    '@type': 'ListItem',
-                    position: 3,
-                    name: category.name,
-                    item: absoluteUrl(locale, base),
-                  },
-                ]
-              : []),
-          ],
-        }}
-      />
+      {schema.breadcrumb ? (
+        <JsonLd
+          data={{
+            '@context': 'https://schema.org',
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+              {
+                '@type': 'ListItem',
+                position: 1,
+                name: tc('home'),
+                item: absoluteUrl(locale, '/'),
+              },
+              {
+                '@type': 'ListItem',
+                position: 2,
+                name: t('title'),
+                item: absoluteUrl(locale, routes.catalog),
+              },
+              ...(category
+                ? [
+                    {
+                      '@type': 'ListItem',
+                      position: 3,
+                      name: category.name,
+                      item: absoluteUrl(locale, base),
+                    },
+                  ]
+                : []),
+            ],
+          }}
+        />
+      ) : null}
 
       {/* Title + categories (desktop panel) */}
       <section className="flex flex-col gap-9 lg:rounded-xl lg:bg-panel lg:px-12 lg:pt-10 lg:pb-12">
@@ -288,6 +298,16 @@ export async function CatalogView({
             </div>
           </div>
 
+          {items.length ? (
+            <TrackView
+              name="view_item_list"
+              props={{
+                list: category ? `category:${category.slug}` : 'catalog',
+                items: items.slice(0, 60).map((p) => p.id),
+                count: list.total,
+              }}
+            />
+          ) : null}
           {items.length === 0 ? (
             <div className="flex flex-col items-start gap-3 rounded-[32px] bg-panel p-8">
               <h2 className="text-h3 font-medium">{t('empty')}</h2>

@@ -23,9 +23,10 @@ describe('IntegrationsService (integration)', () => {
     await app.close();
   });
 
-  it('lists all 46 registry entries with launch kit flags', async () => {
+  it('lists all 48 registry entries with launch kit flags', async () => {
     const list = await svc.list();
-    expect(list).toHaveLength(46);
+    // 46 from the design + Phase 4: PageSpeed Insights (A9 lab CWV), Yandex Audiences (A8).
+    expect(list).toHaveLength(48);
     expect(list.filter((i) => i.definition.launchKit)).toHaveLength(12);
     expect(list.find((i) => i.definition.key === 'uzum_nasiya')?.status).toBe('COMING_SOON');
   });
@@ -74,11 +75,13 @@ describe('IntegrationsService (integration)', () => {
       direction: 'OUT',
       kind: 'order.push',
       ok: true,
-      message: 'ok',
+      message: 'redaction-check',
       payload: { phone: '+998901234567', name: 'x' },
     });
+    // Shared DB: other suites write moysklad logs too — read back this row only.
     const log = await prisma.integrationLog.findFirstOrThrow({
-      where: { integrationKey: 'moysklad' },
+      where: { integrationKey: 'moysklad', message: 'redaction-check' },
+      orderBy: { createdAt: 'desc' },
     });
     expect(log.payload).toEqual({ phone: '[redacted]', name: 'x' });
   });

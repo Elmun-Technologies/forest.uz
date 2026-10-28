@@ -33,9 +33,9 @@ test('owner: login → TOTP → shell → staff → invite → logout', async ({
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   for (const group of ['Asosiy', 'Savdo', 'Katalog', 'Marketing'])
     await expect(nav.getByText(group, { exact: true })).toBeVisible();
-  // Pages that don't exist yet are disabled, not dead links.
-  await expect(nav.getByRole('link', { name: 'Analitika' })).toHaveCount(0);
-  await expect(nav.getByText('Analitika')).toBeVisible();
+  // Every sidebar page exists since Phase 4–5 (no "tez orada" items left): real links only.
+  await expect(nav.getByRole('link', { name: 'Analitika' })).toHaveAttribute('href', '/analytics');
+  await expect(nav.locator('[aria-disabled="true"]')).toHaveCount(0);
 
   await nav.getByRole('link', { name: 'Sozlamalar' }).click();
   await expect(page).toHaveURL(/\/settings\/staff$/);

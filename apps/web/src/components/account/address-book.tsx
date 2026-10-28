@@ -84,10 +84,10 @@ export function AddressBook({
               )}
             >
               <span className="flex items-center justify-between gap-2">
-                <b>{a.label ?? placeName(a, locale)}</b>
+                <b data-private>{a.label ?? placeName(a, locale)}</b>
                 {a.isDefault ? <Badge tone="dark">{t('default')}</Badge> : null}
               </span>
-              <span className="text-sm text-muted">
+              <span className="text-sm text-muted" data-private>
                 {placeName(a, locale)}, {a.line}
               </span>
               {compact ? null : (
@@ -177,6 +177,7 @@ function AddressForm({
             {...p}
             value={label}
             maxLength={40}
+            data-private
             placeholder={t('labelPlaceholder')}
             onChange={(e) => setLabel(e.target.value)}
           />
@@ -222,6 +223,7 @@ function AddressForm({
               {...p}
               value={district}
               maxLength={80}
+              data-private
               onChange={(e) => setDistrict(e.target.value)}
             />
           )

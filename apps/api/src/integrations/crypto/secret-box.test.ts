@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import { maskSecret, parseKey, SecretBox } from './secret-box';
+import { loadEnv } from '../../config/env';
+import { keyringFromEnv, maskSecret, parseKey, SecretBox } from './secret-box';
 
 describe('SecretBox (AES-256-GCM)', () => {
   const k1 = randomBytes(32);
@@ -35,6 +36,32 @@ describe('SecretBox (AES-256-GCM)', () => {
     expect(rotated.needsRotation(blob)).toBe(true);
     expect(rotated.needsRotation(rotated.encrypt('v'))).toBe(false);
     expect(() => new SecretBox({ current: k2 }).decrypt(blob)).toThrow('unknown encryption key id');
+  });
+
+  it('builds the keyring from APP_ENCRYPTION_KEY + APP_ENCRYPTION_KEY_PREVIOUS', () => {
+    const k3 = randomBytes(32);
+    const base = {
+      DATABASE_URL: 'postgresql://x@localhost/forest',
+      SESSION_SECRET: 'x'.repeat(32),
+      APP_ENCRYPTION_KEY: k2.toString('base64'),
+    };
+    expect(loadEnv(base).APP_ENCRYPTION_KEY_PREVIOUS).toEqual([]);
+    expect(
+      loadEnv({ ...base, APP_ENCRYPTION_KEY_PREVIOUS: '' }).APP_ENCRYPTION_KEY_PREVIOUS,
+    ).toEqual([]);
+    const env = loadEnv({
+      ...base,
+      APP_ENCRYPTION_KEY_PREVIOUS: ` ${k1.toString('base64')} , ${k3.toString('base64')}`,
+    });
+    const box = new SecretBox(keyringFromEnv(env));
+    expect(box.decrypt(new SecretBox({ current: k1 }).encrypt('a', 'x'), 'x').toString()).toBe('a');
+    expect(box.decrypt(new SecretBox({ current: k3 }).encrypt('b', 'x'), 'x').toString()).toBe('b');
+    // New envelopes always use the current key.
+    expect(new SecretBox({ current: k2 }).decrypt(box.encrypt('c')).toString()).toBe('c');
+    expect(box.needsRotation(new Uint8Array(0))).toBe(false);
+    expect(() => loadEnv({ ...base, APP_ENCRYPTION_KEY_PREVIOUS: 'c2hvcnQ=' })).toThrow(
+      /APP_ENCRYPTION_KEY_PREVIOUS/,
+    );
   });
 
   it('parses keys and masks secrets', () => {

@@ -1,42 +1,149 @@
-# Client IP: requests from TRUSTED_PROXIES (set it to Cloudflare's published IP ranges when
-# Cloudflare is in front) keep their X-Forwarded-For and Caddy appends the edge address; anything
-# else gets its XFF replaced by the real peer. Pair with the API's TRUST_PROXY_HOPS (1 without
-# Cloudflare, 2 with it) — see docs/runbooks/deploy-network.md.
+# Forest edge (Caddy 2). Used by infra/compose.yml (CI/prod-like) and the production override
+# infra/deploy/compose.prod.yml. Security headers + CSP: CLAUDE.md §6 "CSP is static and set by
+# Caddy"; verify after changes with `node e2e/csp-check.mjs` (docs/runbooks/deploy-and-rollback.md).
+#
+# Client IP: requests from TRUSTED_PROXIES (Cloudflare's IP ranges when Cloudflare is in front,
+# infra/deploy/cloudflare-ips.sh prints them) keep their X-Forwarded-For and Caddy appends the edge
+# address; anything else gets its XFF replaced by the real peer. Pair with the API's
+# TRUST_PROXY_HOPS (1 without Cloudflare, 2 with it) — docs/runbooks/deploy-network.md.
 {
 	servers {
 		trusted_proxies static {$TRUSTED_PROXIES:private_ranges}
+		# Caddy's own client_ip (admin allowlist, logs) = the rightmost untrusted XFF entry.
+		trusted_proxies_strict
+		timeouts {
+			read_header 10s
+			read_body 60s
+			idle 2m
+		}
 	}
 }
 
-# TLS is automatic (Let's Encrypt) when the domains resolve to this host. Cloudflare sits in front
-# in production: HTML/API with personal data must never be cached there (docs/14).
-{$SITE_DOMAIN} {
-	encode zstd gzip
+# Headers shared by every site. `defer` so they replace (not duplicate) upstream values.
+(common_headers) {
 	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
-	}
-	reverse_proxy web:3000
-}
-
-{$ADMIN_DOMAIN} {
-	encode zstd gzip
-	header {
+		defer
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
+		-Server
+		-X-Powered-By
+	}
+}
+
+# ── Storefront ────────────────────────────────────────────────────────────────────────────────
+# script-src needs 'unsafe-inline': Next streams the RSC payload in inline <script> tags and the
+# pages are cached (no per-request nonce). /t.js (tracker) and /r.js (replay) are same-origin.
+# The Telegram Login widget (script telegram.org → iframe oauth.telegram.org) is allowed only on
+# the two pages that render it (CLAUDE.md §6 Telegram Login); only there also 'unsafe-eval', which
+# the widget needs to compile its data-onauth handler (see docs/security/asvs-l2.md, verify on staging).
+{$SITE_DOMAIN} {
+	import common_headers
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+
+	@telegram_widget path /uz/kirish /uz/kirish/* /ru/kirish /ru/kirish/* /uz/kabinet/sozlamalar /uz/kabinet/sozlamalar/* /ru/kabinet/sozlamalar /ru/kabinet/sozlamalar/*
+	header @telegram_widget {
+		defer
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: {$CSP_S3_ORIGIN:} https://telegram.org https://t.me; font-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' https: {$CSP_S3_ORIGIN:}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org; frame-src https://oauth.telegram.org{$CSP_REPORT:}"
+	}
+	@other not path /uz/kirish /uz/kirish/* /ru/kirish /ru/kirish/* /uz/kabinet/sozlamalar /uz/kabinet/sozlamalar/* /ru/kabinet/sozlamalar /ru/kabinet/sozlamalar/*
+	header @other {
+		defer
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: {$CSP_S3_ORIGIN:}; font-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self'; media-src 'self' https: {$CSP_S3_ORIGIN:}; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; script-src 'self' 'unsafe-inline'; frame-src https://www.youtube-nocookie.com{$CSP_REPORT:}"
+	}
+	header {
+		defer
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(self), payment=(), usb=(), browsing-topics=()"
+		# allow-popups: the Telegram widget's OAuth popup posts back to its opener.
+		Cross-Origin-Opener-Policy same-origin-allow-popups
+	}
+
+	# Only the API calls it, over the internal network (signed anyway; CLAUDE.md §6).
+	respond /api/revalidate 404
+	# Dev endpoints never go through the edge (they 404 in production anyway: DEV_ENDPOINTS off).
+	respond /api/dev/* 404
+	# One Node process uses one core: production runs WEB_REPLICAS storefront containers
+	# (compose.prod.yml) and Caddy spreads requests over every address `web` resolves to.
+	reverse_proxy {
+		dynamic a {
+			name web
+			port 3000
+			refresh 10s
+		}
+		lb_policy least_conn
+		lb_try_duration 5s
+		fail_duration 30s
+	}
+}
+
+# ── Admin ─────────────────────────────────────────────────────────────────────────────────────
+# The admin CSP is authoritative in apps/admin/next.config.ts (it is baked with the build's
+# S3_PUBLIC_URL and knows the same-origin /sf proxy used by heatmap backdrops and replays); Caddy
+# deliberately sets none here, so the two can never conflict. Caddy adds the other headers.
+# ADMIN_ALLOWLIST: optional office/VPN CIDRs (docs/14 "optional IP allowlist"); default = all.
+{$ADMIN_DOMAIN} {
+	import common_headers
+	encode zstd gzip
+	request_body {
+		max_size 12MB
+	}
+	@denied not client_ip {$ADMIN_ALLOWLIST:0.0.0.0/0 ::/0}
+	respond @denied 403
+	header {
+		defer
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy same-origin
+		X-Robots-Tag "noindex, nofollow"
 	}
+	# Admin API answers carry PII and staff data: never cacheable unless the API says otherwise
+	# (`?` = only when the upstream set no Cache-Control; ASVS 8.2.1, docs/security/asvs-l2.md).
+	header /api/* {
+		defer
+		?Cache-Control "no-store"
+	}
+	respond /api/dev/* 404
 	reverse_proxy admin:3001
 }
 
+# ── API (webhooks: Payme, Click, Telegram, MoySklad, Eskiz, Yandex; partner API) ───────────────
 {$API_DOMAIN} {
+	import common_headers
 	encode zstd gzip
-	header {
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		X-Content-Type-Options nosniff
+	request_body {
+		max_size 12MB
 	}
+	header {
+		defer
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+		Referrer-Policy no-referrer
+	}
+	respond /v1/dev/* 404
 	reverse_proxy api:4000
+}
+
+# ── Public bucket (only when the self-hosted SeaweedFS serves product images; with a UZ S3
+# provider/CDN, point S3_PUBLIC_URL there and this site stays unused). Read-only, public bucket only.
+{$CDN_DOMAIN:cdn.localhost} {
+	import common_headers
+	@read {
+		method GET HEAD
+		path /{$S3_BUCKET_PUBLIC:forest-public}/*
+	}
+	handle @read {
+		header {
+			defer
+			# Uploaded files are images (magic-byte checked); never let one run as a document.
+			Content-Security-Policy "default-src 'none'; sandbox"
+			Cache-Control "public, max-age=86400"
+			-Set-Cookie
+		}
+		reverse_proxy storage:8333
+	}
+	respond 404
 }

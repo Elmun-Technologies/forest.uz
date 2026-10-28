@@ -4,8 +4,9 @@ import type { VariantDto } from '@forest/contracts';
 import { formatSoum, litersNeeded, recommendVariants, soumToTiyin } from '@forest/contracts/core';
 import { cn } from '@forest/ui';
 import { useLocale, useTranslations } from 'next-intl';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useCart } from '@/components/cart/cart-provider';
+import { track } from '@/lib/track';
 
 const PRESETS = [
   { key: 'tumba', area: 1.5 },
@@ -67,11 +68,33 @@ export function PaintCalculator({
     .filter((i) => i.v);
   const recText = items?.map((i) => `${i.v?.label} × ${i.qty}`).join(' + ');
 
+  // calculator_used once the visitor's input settles (not for the initial defaults).
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (!valid) return;
+    const id = window.setTimeout(
+      () =>
+        track('calculator_used', {
+          areaM2: a,
+          coats: c,
+          liters: Math.round(liters * 100) / 100,
+          ...(preset ? { preset: preset.key } : {}),
+        }),
+      800,
+    );
+    return () => window.clearTimeout(id);
+  }, [a, c, valid, liters, preset]);
+
   async function add() {
     if (!items?.length || busy) return;
     setBusy(true);
     await addItems(
       items.map((i) => ({ variantId: i.variantId, qty: i.qty, priceSoum: i.v?.priceSoum })),
+      { list: 'calculator' },
     );
     setBusy(false);
   }

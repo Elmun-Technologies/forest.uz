@@ -4,7 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { inject } from 'vitest';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 
 /** `pnpm --filter @forest/db seed -- --force` (dev reset) on the shared test DB. */
 describe('seed --force (integration)', () => {
@@ -25,6 +25,7 @@ describe('seed --force (integration)', () => {
     await agent.post('/v1/cart/items').send({ variantId, qty: 1 }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `seed-${phone.slice(1)}-${Date.now()}`)
       .send({
         name: 'Nodira',

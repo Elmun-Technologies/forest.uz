@@ -14,7 +14,7 @@ import {
 import { Badge, Button, cn, Panel, Textarea } from '@forest/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import { adminFetch, errorText } from '../../lib/client-api';
 import { formatWhen, initials } from '../../lib/format';
 import { CarrierLogo, OrderStatusBadge, PaymentCell } from './badges';
@@ -92,9 +92,11 @@ const newKey = () =>
 export function OrderDetail({
   order,
   canCancelPaidClaim,
+  journey,
 }: {
   order: AdminOrderDetailDto;
   canCancelPaidClaim: boolean;
+  journey?: ReactNode;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -414,14 +416,8 @@ export function OrderDetail({
             ) : null}
           </Panel>
 
-          <Panel tone="sage" className="flex flex-col gap-2 p-5 text-[13px]">
-            <h2 className="text-lg font-semibold">Buyurtma yo&apos;li</h2>
-            <p className="text-ink-2">
-              Reklama manbalari, tashriflar va xarid sessiyasi (atribusiya) birinchi tomon
-              analitikasi bilan 4-bosqichda qo&apos;shiladi. Hozircha quyidagi tizim jurnali —
-              buyurtmaning to&apos;liq tarixi.
-            </p>
-          </Panel>
+          {/* A7 order journey (Phase 4): rendered by the page when the role has analytics. */}
+          {journey}
         </aside>
       </div>
 

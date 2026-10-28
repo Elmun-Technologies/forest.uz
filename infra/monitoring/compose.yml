@@ -1,0 +1,117 @@
+# Forest monitoring host (CLAUDE.md §6 "Error monitoring", "Uptime + ops alerts";
+# docs/runbooks/monitoring.md). Runs on a SECOND small VPS in Uzbekistan — not the shop VPS:
+# uptime checks must see the shop go down, and error events may carry route names and stack
+# traces of a UZ personal-data system.
+#
+#   cd /opt/forest/app/infra/monitoring && cp env.example .env   # then fill the generated values
+#   docker compose up -d
+#
+# GlitchTip (Sentry protocol, self-hosted): web + worker + its own Postgres and Valkey.
+# Uptime Kuma: HTTP / certificate / push monitors → Telegram admin alerts group.
+name: forest-monitoring
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: '20m', max-file: '5' }
+
+x-glitchtip-env: &glitchtip-env
+  DATABASE_URL: postgres://glitchtip:${GLITCHTIP_DB_PASSWORD:?set GLITCHTIP_DB_PASSWORD}@gt-postgres:5432/glitchtip
+  REDIS_URL: redis://gt-valkey:6379/0
+  SECRET_KEY: ${GLITCHTIP_SECRET_KEY:?set GLITCHTIP_SECRET_KEY}
+  GLITCHTIP_DOMAIN: https://${GLITCHTIP_DOMAIN:?set GLITCHTIP_DOMAIN}
+  DEFAULT_FROM_EMAIL: ${GLITCHTIP_FROM_EMAIL:-glitchtip@localhost}
+  EMAIL_URL: ${GLITCHTIP_EMAIL_URL:-consolemail://}
+  # No public sign-up: the owner creates the first user with `createsuperuser` (runbook).
+  ENABLE_USER_REGISTRATION: 'false'
+  ENABLE_ORGANIZATION_CREATION: 'false'
+  # docs/14 / CLAUDE.md §6: error events are kept 30 days.
+  GLITCHTIP_MAX_EVENT_LIFE_DAYS: '30'
+  GLITCHTIP_MAX_TRANSACTION_EVENT_LIFE_DAYS: '7'
+  GLITCHTIP_MAX_FILE_LIFE_DAYS: '30'
+  CELERY_WORKER_AUTOSCALE: '1,3'
+
+services:
+  gt-postgres:
+    <<: *logging
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: glitchtip
+      POSTGRES_PASSWORD: ${GLITCHTIP_DB_PASSWORD}
+      POSTGRES_DB: glitchtip
+    volumes: [gtpg:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U glitchtip -d glitchtip']
+      interval: 5s
+      retries: 20
+
+  gt-valkey:
+    <<: *logging
+    image: valkey/valkey:8-alpine
+    restart: always
+
+  gt-migrate:
+    <<: *logging
+    image: glitchtip/glitchtip:v5.1
+    environment: *glitchtip-env
+    command: ./bin/run-migrate.sh
+    depends_on:
+      gt-postgres: { condition: service_healthy }
+
+  glitchtip:
+    <<: *logging
+    image: glitchtip/glitchtip:v5.1
+    restart: always
+    environment:
+      <<: *glitchtip-env
+      SERVER_ROLE: web
+    depends_on:
+      gt-migrate: { condition: service_completed_successfully }
+      gt-valkey: { condition: service_started }
+    deploy:
+      resources:
+        limits: { memory: 768m }
+
+  glitchtip-worker:
+    <<: *logging
+    image: glitchtip/glitchtip:v5.1
+    restart: always
+    environment:
+      <<: *glitchtip-env
+      SERVER_ROLE: worker_with_beat
+    depends_on:
+      gt-migrate: { condition: service_completed_successfully }
+      gt-valkey: { condition: service_started }
+    deploy:
+      resources:
+        limits: { memory: 768m }
+
+  uptime-kuma:
+    <<: *logging
+    image: louislam/uptime-kuma:1.23.16
+    restart: always
+    volumes: [kuma:/app/data]
+    deploy:
+      resources:
+        limits: { memory: 512m }
+
+  caddy:
+    <<: *logging
+    image: caddy:2-alpine
+    restart: always
+    ports: ['80:80', '443:443']
+    environment:
+      GLITCHTIP_DOMAIN: ${GLITCHTIP_DOMAIN}
+      KUMA_DOMAIN: ${KUMA_DOMAIN:?set KUMA_DOMAIN}
+      # Office/VPN CIDRs allowed to open the Kuma UI (push URLs stay open for the shop VPS).
+      KUMA_ALLOWLIST: ${KUMA_ALLOWLIST:-0.0.0.0/0 ::/0}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on: [glitchtip, uptime-kuma]
+
+volumes:
+  gtpg:
+  kuma:
+  caddydata:

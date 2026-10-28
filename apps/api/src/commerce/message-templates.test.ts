@@ -2,9 +2,14 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { messageTemplates } from '../../../../packages/db/src/seed/data/content';
 
-const MIGRATION = path.resolve(
-  __dirname,
-  '../../../../packages/db/prisma/migrations/20261027120000_message_templates_backfill/migration.sql',
+const MIGRATIONS = path.resolve(__dirname, '../../../../packages/db/prisma/migrations');
+const MIGRATION = path.join(MIGRATIONS, '20261027120000_message_templates_backfill/migration.sql');
+/** Phase 5B: automation/bot templates, with the `active` and `smsApproved` columns. */
+const MIGRATION_5B = path.join(MIGRATIONS, '20261027161000_messaging_automation/migration.sql');
+/** Follow-up: `{stop}` opt-out slot written into the marketing SMS texts (UPDATE … WHERE body = old). */
+const MIGRATION_5B_STOP = path.join(
+  MIGRATIONS,
+  '20261027161001_messaging_optout_slot/migration.sql',
 );
 
 interface Row {
@@ -13,6 +18,8 @@ interface Row {
   buttons: unknown;
   delayMin: number;
   smsFallback: boolean;
+  active?: boolean;
+  smsApproved?: boolean;
 }
 
 /** Rows of the backfill INSERT: ('id', 'key', '<json>'::jsonb, '<json>'::jsonb|NULL, n, bool, …). */
@@ -31,6 +38,42 @@ function migrationRows(): Row[] {
     delayMin: Number(m[5]),
     smsFallback: m[6] === 'true',
   }));
+}
+
+/** Rows of the 5B INSERT: (…, n, fallback, active, approved, CURRENT_TIMESTAMP). */
+function migration5bRows(): Row[] {
+  const sql = readFileSync(MIGRATION_5B, 'utf8');
+  const lit = "'((?:[^']|'')*)'";
+  const row = new RegExp(
+    `\\(${lit}, ${lit}, ${lit}::jsonb, (?:${lit}::jsonb|NULL), (\\d+), (true|false), (true|false), (true|false), CURRENT_TIMESTAMP\\)`,
+    'g',
+  );
+  const un = (s: string) => s.replace(/''/g, "'");
+  // Rows as a fresh database holds them: inserted by 161000, then rewritten by 161001.
+  const updates = new Map<string, { body: unknown; old: unknown }>();
+  for (const m of readFileSync(MIGRATION_5B_STOP, 'utf8').matchAll(
+    new RegExp(
+      `SET "body" = ${lit}::jsonb, "smsApproved" = false, "updatedAt" = CURRENT_TIMESTAMP\\s+WHERE "key" = ${lit} AND "body" = ${lit}::jsonb;`,
+      'g',
+    ),
+  ))
+    updates.set(un(m[2]!), { body: JSON.parse(un(m[1]!)), old: JSON.parse(un(m[3]!)) });
+  expect(updates.size).toBe(2);
+  return [...sql.matchAll(row)].map((m) => {
+    const key = un(m[2]!);
+    const body: unknown = JSON.parse(un(m[3]!));
+    const upd = updates.get(key);
+    if (upd) expect(upd.old, `161001 rewrites the 161000 text of ${key}`).toEqual(body);
+    return {
+      key,
+      body: upd ? upd.body : body,
+      buttons: m[4] === undefined ? null : JSON.parse(un(m[4])),
+      delayMin: Number(m[5]),
+      smsFallback: m[6] === 'true',
+      active: m[7] === 'true',
+      smsApproved: upd ? false : m[8] === 'true',
+    };
+  });
 }
 
 /** Template keys the API code sends (string literals next to the send APIs). */
@@ -75,9 +118,31 @@ describe('message template backfill migration', () => {
     }
   });
 
+  it('the 5B migration inserts the remaining seed texts exactly', () => {
+    const later = migration5bRows();
+    expect(later.length).toBeGreaterThanOrEqual(10);
+    for (const r of later) {
+      const seed = messageTemplates.find((t) => t.key === r.key);
+      expect(seed, r.key).toBeDefined();
+      expect(r).toEqual({
+        key: seed!.key,
+        body: seed!.body,
+        buttons: seed!.buttons ?? null,
+        delayMin: seed!.delayMin ?? 0,
+        smsFallback: seed!.smsFallback ?? false,
+        active: seed!.active ?? true,
+        smsApproved: seed!.smsApproved ?? false,
+      });
+    }
+    // Together the two migrations insert every seeded template.
+    const all = new Set([...rows, ...later].map((r) => r.key));
+    expect(messageTemplates.map((t) => t.key).filter((k) => !all.has(k))).toEqual([]);
+  });
+
   it('covers every template key the API sends', () => {
     const sent = keysSentByCode();
     expect(sent.size).toBeGreaterThanOrEqual(12);
-    expect([...sent].filter((k) => !rows.some((r) => r.key === k))).toEqual([]);
+    const all = [...rows, ...migration5bRows()];
+    expect([...sent].filter((k) => !all.some((r) => r.key === k))).toEqual([]);
   });
 });

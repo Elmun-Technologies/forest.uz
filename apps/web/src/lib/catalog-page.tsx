@@ -10,6 +10,7 @@ import { catalogApiQuery, catalogSearch, isRefined, parseCatalogParams } from '.
 import { getCategories, getSettings } from './data';
 import { notFoundWithRedirect } from './not-found';
 import { alternates, metaDescription } from './seo';
+import { getSeoOverride, withSeoOverride } from './seo-meta';
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -26,6 +27,8 @@ export async function catalogMetadata(
   if (slug && !category) return {};
   const base = slug ? routes.category(slug) : routes.catalog;
   const refined = isRefined(filters);
+  // Admin overrides apply to the base listing only; refinements keep noindex + base canonical.
+  const override = !refined && filters.page === 1 ? await getSeoOverride(locale, base) : null;
   const title = category ? t('categoryMetaTitle', { name: category.name }) : t('metaTitle');
   const description = category
     ? metaDescription(
@@ -33,17 +36,20 @@ export async function catalogMetadata(
           t('categoryMetaDescription', { name: category.name, count: category.productCount }),
       )
     : t('metaDescription');
-  return {
-    title,
-    description,
-    // Filters/sort → noindex,follow + canonical to the base category; `?page=n` is self-canonical.
-    alternates: alternates(
-      locale,
-      refined ? base : `${base}${catalogSearch({ ...filters, sort: 'popular' })}`,
-    ),
-    robots: refined ? { index: false, follow: true } : undefined,
-    openGraph: { title, description },
-  };
+  return withSeoOverride(
+    {
+      title,
+      description,
+      // Filters/sort → noindex,follow + canonical to the base category; `?page=n` is self-canonical.
+      alternates: alternates(
+        locale,
+        refined ? base : `${base}${catalogSearch({ ...filters, sort: 'popular' })}`,
+      ),
+      robots: refined ? { index: false, follow: true } : undefined,
+      openGraph: { title, description },
+    },
+    override,
+  );
 }
 
 export async function CatalogPage({
@@ -65,9 +71,12 @@ export async function CatalogPage({
     apiGet<ProductListDto>(
       `/catalog/products${catalogApiQuery(filters, slug ?? undefined)}`,
       locale,
+      { tags: ['catalog'] },
     ),
     filters.page === 1
-      ? apiGetOptional<ProductListDto>('/catalog/products?onSale=true&limit=12', locale)
+      ? apiGetOptional<ProductListDto>('/catalog/products?onSale=true&limit=12', locale, {
+          tags: ['catalog'],
+        })
       : Promise.resolve(null),
   ]);
   const promo: ProductCardDto | null =

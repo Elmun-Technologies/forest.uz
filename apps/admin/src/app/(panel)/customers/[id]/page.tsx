@@ -1,4 +1,9 @@
-import { type CustomerDetailDto, formatTashkentDate, hasPermission } from '@forest/contracts/core';
+import {
+  type CustomerDetailDto,
+  type CustomerJourneyDto,
+  formatTashkentDate,
+  hasPermission,
+} from '@forest/contracts/core';
 import { Badge, KpiTile, Panel } from '@forest/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -21,6 +26,10 @@ import {
   RevealPii,
   TagsEditor,
 } from '../../../../components/customers/customer-actions';
+import {
+  AttributionSummary,
+  CustomerVisits,
+} from '../../../../components/analytics/customer-journey';
 import { CustomerTimeline } from '../../../../components/customers/customer-timeline';
 import { NoAccess, PageHeader } from '../../../../components/page';
 import { AdminApiError, adminGet, requireFullSession } from '../../../../lib/api';
@@ -71,6 +80,13 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
     throw e;
   }
   const erased = c.erasedAt !== null;
+  // A5 visits + attribution (Phase 4) need analytics.view; a failure must not break the page.
+  const journey =
+    !erased && hasPermission(role, 'analytics.view')
+      ? await adminGet<CustomerJourneyDto>(
+          `/admin/analytics/customers/${encodeURIComponent(c.id)}/journey`,
+        ).catch(() => null)
+      : null;
   const badge = c.segments[0] ? SEGMENT_BADGE[c.segments[0]] : null;
   const title = erased ? "O'chirilgan mijoz" : (c.name ?? c.phoneMasked ?? c.publicId);
   const consentAt = (channel: string) => c.consents.history.find((h) => h.channel === channel);
@@ -134,7 +150,9 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         </Panel>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div
+        className={`grid grid-cols-2 gap-3 ${journey ? 'lg:grid-cols-3 2xl:grid-cols-6' : 'lg:grid-cols-4'}`}
+      >
         <KpiTile
           label="LTV (umumiy xarid)"
           value={SOUM(c.kpis.ltvSoum)}
@@ -147,23 +165,45 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           hint="so'm"
         />
         <KpiTile label="Jami buyurtmalar" value={c.kpis.ordersTotal} hint="to'lanmaganlari bilan" />
+        {journey ? (
+          <>
+            <KpiTile
+              label="Tashrifdan xaridgacha"
+              value={
+                journey.summary.visitToPurchaseDays !== null
+                  ? `${String(journey.summary.visitToPurchaseDays).replace('.', ',')} kun`
+                  : '—'
+              }
+              hint="birinchi tashrif → birinchi xarid"
+            />
+            <KpiTile label="Sessiyalar" value={journey.summary.sessions} hint="saytga tashriflar" />
+          </>
+        ) : null}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
-        <Card title="Mijoz yo'li">
-          <CustomerTimeline items={c.timeline} />
-          {c.timelineTruncated ? (
-            <p className="text-xs text-muted">
-              Faqat oxirgi voqealar ko&apos;rsatilgan; eskilari buyurtma sahifalarida.
-            </p>
+        <div className="flex min-w-0 flex-col gap-4">
+          <Card title="Mijoz yo'li">
+            <CustomerTimeline items={c.timeline} />
+            {c.timelineTruncated ? (
+              <p className="text-xs text-muted">
+                Faqat oxirgi voqealar ko&apos;rsatilgan; eskilari buyurtma sahifalarida.
+              </p>
+            ) : null}
+          </Card>
+          {journey ? (
+            <Card title="Saytga tashriflar">
+              <CustomerVisits j={journey} />
+            </Card>
           ) : null}
-          <p className="pt-1 text-xs text-muted">
-            Sayt tashriflari va reklama bosishlari analitika ishga tushgach ko&apos;rinadi.
-          </p>
-        </Card>
+        </div>
 
         <div className="flex flex-col gap-4">
-          {c.firstTouch || c.firstSource ? (
+          {journey?.summary.firstTouch ? (
+            <Card title="Atributsiya">
+              <AttributionSummary j={journey} />
+            </Card>
+          ) : c.firstTouch || c.firstSource ? (
             <Card title="Atributsiya">
               <dl className="grid grid-cols-[130px_minmax(0,1fr)] gap-x-3 gap-y-1.5">
                 <dt className="text-muted">Birinchi manba</dt>

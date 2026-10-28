@@ -1,8 +1,16 @@
-import { Body, Controller, HttpCode, Inject, NotFoundException, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Inject,
+  NotFoundException,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { DELIVERY_STATUSES } from '@forest/contracts';
 import { Prisma } from '@forest/db';
 import { z } from 'zod';
-import { assertDevEndpoints } from '../common/dev-endpoints';
+import { assertDevEndpoints, DevEndpointsGuard } from '../common/dev-endpoints';
 import { ZodPipe } from '../common/http';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
@@ -37,6 +45,7 @@ const devShipmentSchema = z.object({
  * DEV_ENDPOINTS=true and PROVIDERS_MODE=fake.
  */
 @Controller('dev')
+@UseGuards(DevEndpointsGuard)
 export class DevShipmentController {
   constructor(
     private readonly prisma: PrismaService,

@@ -13,5 +13,7 @@ import { TelegramAuthService } from './telegram-auth.service';
   imports: [CommerceModule, CustomerCommonModule, MeModule],
   controllers: [AuthController, TelegramLinkController, DevAuthController],
   providers: [OtpService, TelegramAuthService, CustomerSignIn, cartMergerProvider],
+  // The bot links Telegram-verified phones to accounts the same way (5A).
+  exports: [TelegramAuthService],
 })
 export class AuthModule {}

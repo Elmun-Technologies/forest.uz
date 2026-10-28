@@ -11,7 +11,7 @@ import {
 import { Badge, Button, Chip, cn, Panel } from '@forest/ui';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { adminFetch, errorText } from '../../lib/client-api';
 import { formatWhen } from '../../lib/format';
 import { FormError } from '../auth-card';
@@ -42,7 +42,16 @@ function Mark({ card, size = 40 }: { card: IntegrationCardDto; size?: number }) 
  * detail panel. Credentials are editable only with `integrations.keys` (Owner); secrets are shown
  * masked and blank secret inputs keep the stored value.
  */
-export function IntegrationsHub({ hub, canKeys }: { hub: IntegrationsHubDto; canKeys: boolean }) {
+export function IntegrationsHub({
+  hub,
+  canKeys,
+  developer,
+}: {
+  hub: IntegrationsHubDto;
+  canKeys: boolean;
+  /** Webhooks / API keys / key security row (server-rendered, `DeveloperSummary`). */
+  developer?: ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -240,32 +249,7 @@ export function IntegrationsHub({ hub, canKeys }: { hub: IntegrationsHubDto; can
         <p className="py-6 text-center text-muted">Hech narsa topilmadi.</p>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <Panel as="section" className="flex flex-col gap-2 p-5 text-[13px] sm:p-[22px]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xl font-semibold">Webhook va REST API</h2>
-            <Badge tone="warn">Tez orada</Badge>
-          </div>
-          <p className="text-muted">
-            Buyurtma, savat va mijoz hodisalarini boshqa tizimlarga (MoySklad, Telegram guruh,
-            Google Sheets) imzolangan webhook bilan yuborish va API kalitlari keyingi bosqichda
-            qo&apos;shiladi.
-          </p>
-        </Panel>
-        <Panel as="section" className="flex flex-col gap-2 p-5 text-[13px] sm:p-[22px]">
-          <h2 className="text-xl font-semibold">Kalitlar xavfsizligi</h2>
-          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-y-2">
-            <dt className="text-muted">Saqlash</dt>
-            <dd className="text-right font-semibold">Shifrlangan (AES-256-GCM) · faqat server</dd>
-            <dt className="text-muted">Ko&apos;rinishi</dt>
-            <dd className="text-right font-semibold">Oxirgi 4 belgi</dd>
-            <dt className="text-muted">Kim o&apos;zgartira oladi</dt>
-            <dd className="text-right font-semibold">Faqat Egasi</dd>
-            <dt className="text-muted">Har o&apos;zgarish</dt>
-            <dd className="text-right font-semibold">Jurnalga yoziladi</dd>
-          </dl>
-        </Panel>
-      </div>
+      {developer}
     </div>
   );
 }

@@ -120,13 +120,16 @@ test.describe('legal, edge states and SEO', () => {
     expect(robots).toContain('Disallow: /uz/checkout');
     expect(robots).toContain('Disallow: /t/');
     expect(robots).toMatch(/Sitemap: .*\/sitemap\.xml/);
+    // Sitemap index (A9) → per locale × type files.
     const res = await request.get('/sitemap.xml');
     expect(res.ok()).toBe(true);
-    const xml = await res.text();
-    expect(xml).toContain('/uz/p/chalk-white</loc>');
-    expect(xml).toContain('/ru/oferta</loc>');
-    expect(xml).toContain('hreflang="x-default"');
-    expect(xml).not.toContain('/savat');
+    expect(await res.text()).toContain('/sitemaps/uz-products.xml</loc>');
+    const products = await (await request.get('/sitemaps/uz-products.xml')).text();
+    expect(products).toContain('/uz/p/chalk-white</loc>');
+    expect(products).toContain('hreflang="x-default"');
+    const pages = await (await request.get('/sitemaps/ru-pages.xml')).text();
+    expect(pages).toContain('/ru/oferta</loc>');
+    expect(pages).not.toContain('/savat');
   });
 
   test('private pages are noindex', async ({ page }) => {

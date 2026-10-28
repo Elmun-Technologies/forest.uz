@@ -22,6 +22,8 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import type { PaymentProvider } from '../integrations/providers/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { BotAlertsService } from '../bot/bot-alerts.service';
+import { verifiedSessionId } from '../tracking/server-events';
 import { CartService, type CartWithItems } from './cart.service';
 import { orderPageUrl, orderPublicId, trackingToken } from './ids';
 import { NotificationsService } from './notifications.service';
@@ -31,8 +33,15 @@ import { OrderLifecycleService } from './order-lifecycle.service';
 interface PlaceOptions {
   source: 'web' | 'phone';
   staffId: string | null;
+  /** Storefront analytics ids (fr_aid, fr_sid): stored on the order (attribution only). */
+  tracking?: CheckoutTracking;
   /** Runs inside the order transaction (admin audit row). */
   audit?: (tx: Prisma.TransactionClient, order: { id: string; number: string }) => Promise<void>;
+}
+
+export interface CheckoutTracking {
+  anonymousId: string | null;
+  sessionId: string | null;
 }
 
 const WEB: PlaceOptions = { source: 'web', staffId: null };
@@ -78,6 +87,7 @@ export class CheckoutService {
     private readonly limiter: RateLimiter,
     private readonly consents: ConsentsService,
     private readonly quotes: DeliveryQuoteService,
+    private readonly alerts: BotAlertsService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -92,6 +102,7 @@ export class CheckoutService {
     locale: Locale,
     deviceHash: string | null,
     ip: string | null,
+    tracking?: CheckoutTracking,
   ): Promise<CheckoutResultDto> {
     const cart = await this.carts.current(req);
     const requestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex');
@@ -122,7 +133,16 @@ export class CheckoutService {
         3600,
         'CHECKOUT_LIMITED',
       );
-      const result = await this.place(cart, input, locale, deviceHash);
+      // The checkout phone is unverified: the order records this browser's visitor + session for
+      // attribution, but the visitor is never linked to the phone's customer (CLAUDE.md §6).
+      const analytics = tracking && {
+        anonymousId: tracking.anonymousId,
+        sessionId: await verifiedSessionId(this.prisma, tracking.sessionId, tracking.anonymousId),
+      };
+      const result = await this.place(cart, input, locale, deviceHash, {
+        ...WEB,
+        tracking: analytics,
+      });
       await this.prisma.idempotencyKey.update({
         where: { key },
         data: { status: 201, response: result as unknown as Prisma.InputJsonValue },
@@ -324,6 +344,8 @@ export class CheckoutService {
             carrier: zone.carrier,
             offerVersion: input.offerVersion,
             source: opts.source,
+            anonymousId: opts.tracking?.anonymousId ?? null,
+            sessionId: opts.tracking?.sessionId ?? null,
             items: {
               create: priced.lines.map((l) => {
                 const v = byId.get(l.variantId)!;
@@ -414,6 +436,8 @@ export class CheckoutService {
     );
 
     await this.notifications.orderStatus(order.id, 'order_created');
+    // Admin Telegram group (docs/09); fire-and-forget, after commit.
+    this.alerts.orderCreated(order.id);
 
     if (!provider) {
       return { orderNumber: order.number, publicId: order.publicId, next: { type: 'cod' } };

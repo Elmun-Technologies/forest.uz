@@ -25,6 +25,7 @@ import {
   selectorItems,
   synonyms,
 } from './data/content';
+import { audiencePresets, PRODUCT_SLUG_PREFIX, presetProductSlugs } from './data/audiences';
 import { settings } from './data/settings';
 import { createSeedStorage } from './storage';
 
@@ -306,6 +307,8 @@ async function seedContent(files: Map<string, string>) {
       buttons: t.buttons ? json(t.buttons) : Prisma.JsonNull,
       delayMin: t.delayMin ?? 0,
       smsFallback: t.smsFallback ?? false,
+      smsApproved: t.smsApproved ?? false,
+      active: t.active ?? true,
     };
     await prisma.messageTemplate.upsert({
       where: { key: t.key },
@@ -421,6 +424,30 @@ async function releaseReservations() {
   );
 }
 
+/** Preset audience segments (same rows as migration `20261027153000_audiences`). */
+async function seedAudiences() {
+  for (const preset of audiencePresets) {
+    const slugs = presetProductSlugs(preset);
+    const found = await prisma.product.findMany({
+      where: { slug: { in: slugs } },
+      select: { id: true, slug: true },
+    });
+    if (found.length !== new Set(slugs).size) continue;
+    const ids = new Map(found.map((p) => [`${PRODUCT_SLUG_PREFIX}${p.slug}`, p.id]));
+    const rules = JSON.parse(
+      JSON.stringify(preset.rules, (k, v: unknown) =>
+        k === 'productId' && typeof v === 'string' ? (ids.get(v) ?? v) : v,
+      ),
+    ) as Prisma.InputJsonValue;
+    const data = { name: preset.name, description: preset.description, rules };
+    await prisma.segment.upsert({
+      where: { key: preset.key },
+      update: force ? data : {},
+      create: { id: `seg_${preset.key}`, key: preset.key, destinations: [], ...data },
+    });
+  }
+}
+
 async function main() {
   if (process.env.NODE_ENV === 'production' && !process.argv.includes('--allow-production')) {
     throw new Error('Refusing to seed production. Pass --allow-production if you really mean it.');
@@ -430,6 +457,7 @@ async function main() {
   await seedCatalog(files);
   await releaseReservations();
   await seedContent(files);
+  await seedAudiences();
   await seedOwner();
   await seedIntegrations();
 }

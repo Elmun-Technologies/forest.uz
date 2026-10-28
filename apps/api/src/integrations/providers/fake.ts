@@ -1,8 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { maskUzPhone } from '@forest/contracts';
 import type {
-  AdSignalProvider,
-  AiProvider,
   CheckoutInput,
   DeliveryAddress,
   DeliveryProvider,
@@ -164,22 +162,5 @@ export class FakeFiscalProvider implements FiscalProvider {
 /** MoySklad's fake lives in `moysklad-fake.ts`. */
 export { FakeInventoryProvider } from './moysklad-fake';
 
-export class FakeAdSignalProvider implements AdSignalProvider {
-  constructor(readonly key: AdSignalProvider['key']) {}
-
-  async send(events: unknown[]) {
-    return { accepted: events.length };
-  }
-}
-
-export class FakeAiProvider implements AiProvider {
-  readonly key = 'claude' as const;
-
-  async complete(input: { prompt: string }) {
-    return {
-      text: `AI qoralama (fake): ${input.prompt.slice(0, 80)}`,
-      inputTokens: 0,
-      outputTokens: 0,
-    };
-  }
-}
+/** Claude's fake lives in `claude-fake.ts`. */
+export { FakeAiProvider } from './claude-fake';

@@ -84,6 +84,8 @@ services:
       DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
       REDIS_URL: redis://redis:6379
       S3_ENDPOINT: http://storage:8333
+      # On-demand storefront revalidation after admin saves (POST web:3000/api/revalidate).
+      WEB_INTERNAL_URL: http://web:3000
     depends_on:
       migrate: { condition: service_completed_successfully }
       redis: { condition: service_healthy }
@@ -114,11 +116,15 @@ services:
       # The /api rewrite is baked at build time (CLAUDE.md §17), like web.
       args:
         APP: admin
+        # The admin CSP (next.config.ts) is baked with the public bucket origin.
+        S3_PUBLIC_URL: '${S3_PUBLIC_URL:-http://localhost:9000/forest-public}'
         API_INTERNAL_URL: http://api:4000
     ports: ['127.0.0.1:3001:3001']
     environment:
       PORT: 3001
       API_INTERNAL_URL: http://api:4000
+      # A3 heatmap backdrop: the admin server fetches storefront pages and assets (runtime env).
+      WEB_INTERNAL_URL: http://web:3000
     depends_on: [api]
 
   caddy:

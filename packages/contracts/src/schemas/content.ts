@@ -29,6 +29,14 @@ export const contentBlockSchema = z.discriminatedUnion('type', [
     text: z.string(),
   }),
   z.object({ type: z.literal('faq'), items: z.array(z.object({ q: z.string(), a: z.string() })) }),
+  // Ilhom/Brend CMS (CLAUDE.md §6): a stored File (public bucket) and a pull quote.
+  z.object({
+    type: z.literal('image'),
+    fileId: z.string().min(1).max(64),
+    alt: z.string().max(200).default(''),
+    caption: z.string().max(300).default(''),
+  }),
+  z.object({ type: z.literal('quote'), text: z.string(), cite: z.string().max(120).default('') }),
 ]);
 export type ContentBlock = z.infer<typeof contentBlockSchema>;
 

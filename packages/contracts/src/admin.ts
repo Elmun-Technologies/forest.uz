@@ -10,6 +10,7 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 export const PERMISSIONS = [
   'dashboard.view',
   'analytics.view',
+  'analytics.import',
   'orders.view',
   'orders.edit',
   'orders.cancel_refund',
@@ -29,6 +30,8 @@ export const PERMISSIONS = [
   'reviews.moderate',
   'promo.edit',
   'seo.edit',
+  'seo.canonical_external',
+  'content.edit',
   'integrations.view',
   'integrations.keys',
   'settings.staff',
@@ -51,6 +54,7 @@ const OMMk = ['OWNER', 'MANAGER', 'MARKETER'] as const;
 export const PERMISSION_ROLES: Record<Permission, readonly StaffRole[]> = {
   'dashboard.view': ALL_ROLES,
   'analytics.view': OMMk, // docs/02 "Analytics & heatmaps"
+  'analytics.import': OMMk, // ad spend CSV/API import (docs/02 silent → analytics holders)
   'orders.view': ['OWNER', 'MANAGER', 'OPERATOR', 'WAREHOUSE'], // docs/02 "View/edit orders"
   'orders.edit': ['OWNER', 'MANAGER', 'OPERATOR', 'WAREHOUSE'], // docs/02 "View/edit orders"
   'orders.cancel_refund': OM, // docs/02 "Cancel / refund"
@@ -70,6 +74,9 @@ export const PERMISSION_ROLES: Record<Permission, readonly StaffRole[]> = {
   'reviews.moderate': OMMk,
   'promo.edit': OMMk, // docs/02 "Promo codes"
   'seo.edit': OMMk, // docs/02 "Product content, images, SEO"
+  // A canonical to another host hands the page's ranking away (docs/02 silent → Owner/Manager).
+  'seo.canonical_external': OM,
+  'content.edit': OMMk, // Ilhom/Brend CMS — docs/02 "Product content, images, SEO"
   'integrations.view': OM,
   'integrations.keys': O, // docs/02 "Integration keys"
   'settings.staff': O,

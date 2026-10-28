@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   type AdminGalleryItemDto,
   type AdminReviewDto,
@@ -14,7 +14,10 @@ import {
 } from '@forest/contracts';
 import type { Prisma, Review } from '@forest/db';
 import { reviewAuthor } from '../../catalog/catalog.mapper';
+import { publishReviewPhotos, unpublishReviewPhotos } from '../../bot/review-photos';
+import { FilesService } from '../../files/files.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SeoEventsService } from '../../seo/seo-events.service';
 import { type AuditActor, AuditService } from '../audit/audit.service';
 import { AdminUploadService, type UploadedImage } from '../files/upload.service';
 import { afterCursor, encodeCursor } from '../products/cursor';
@@ -44,7 +47,11 @@ export class AdminReviewsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly uploads: AdminUploadService,
+    private readonly seoEvents: SeoEventsService,
+    private readonly files: FilesService,
   ) {}
+
+  private readonly logger = new Logger('AdminReviews');
 
   async summary(): Promise<AdminReviewsSummaryDto> {
     const [byStatus, approvedAgg, withPhoto, openLowRated] = await Promise.all([
@@ -99,6 +106,25 @@ export class AdminReviewsService {
   }
 
   async moderate(
+    actor: AuditActor,
+    id: string,
+    input: ReviewModerateInput,
+  ): Promise<AdminReviewDto> {
+    const dto = await this.moderateRow(actor, id, input);
+    // Bot photos are public only while the review is approved with consent (5A); after commit.
+    const changed =
+      input.status === 'APPROVED'
+        ? await publishReviewPhotos(this.prisma, this.files, id, this.logger)
+        : await unpublishReviewPhotos(this.prisma, this.files, id, this.logger);
+    if (!changed) return dto;
+    const row = await this.prisma.review.findUniqueOrThrow({
+      where: { id },
+      include: reviewInclude,
+    });
+    return (await this.toDtos([row]))[0]!;
+  }
+
+  private moderateRow(
     actor: AuditActor,
     id: string,
     input: ReviewModerateInput,
@@ -236,6 +262,7 @@ export class AdminReviewsService {
         tx,
       );
     });
+    this.seoEvents.reviewsChanged(null);
     return this.galleryItems();
   }
 
@@ -275,6 +302,8 @@ export class AdminReviewsService {
       where: { id },
       include: reviewInclude,
     });
+    // Rating, review list and the home gallery are cached on the storefront.
+    this.seoEvents.reviewsChanged(row.product.slug);
     const [dto] = await this.toDtos([row]);
     return dto!;
   }

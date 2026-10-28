@@ -65,6 +65,7 @@ describe('access log request serializer', () => {
       serializeRequestForLog({ id: 'r1', method: 'POST', url: `/v1/webhooks/eskiz/${token}` }),
     ).toEqual({ id: 'r1', method: 'POST', path: '/v1/webhooks/eskiz/***' });
     expect(requestLogPath(`/v1/Webhooks/ESKIZ/${token}/?x=1`)).toBe('/v1/Webhooks/ESKIZ/***/');
+    expect(requestLogPath(`/v1/webhooks/telegram/${token}`)).toBe('/v1/webhooks/telegram/***');
     expect(requestLogPath('/v1/webhooks/yandex-delivery?key=secret&claim_id=c1')).toBe(
       '/v1/webhooks/yandex-delivery',
     );

@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from 'react';
 import { ClientApiError, clientApi } from '@/lib/client-api';
+import { track } from '@/lib/track';
 import { useToast } from '@/components/ui/toast';
 
 export interface CartLineInput {
@@ -27,8 +28,11 @@ export interface CartContextValue {
   count: number;
   totalSoum: number;
   cart: CartDto | null;
-  /** Optimistically adds lines (sequentially), rolls back + toasts on failure. */
-  addItems: (lines: CartLineInput[]) => Promise<boolean>;
+  /**
+   * Optimistically adds lines (sequentially), rolls back + toasts on failure. `list` names the
+   * placement for analytics (`add_to_cart.list`: product, calculator, selector, catalog…).
+   */
+  addItems: (lines: CartLineInput[], opts?: { list?: string }) => Promise<boolean>;
   /** Replace local state with a CartDto returned by any other cart call (qty change, promo…). */
   setCart: (cart: CartDto) => void;
   refresh: () => Promise<void>;
@@ -66,7 +70,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   const addItems = useCallback(
-    async (lines: CartLineInput[]) => {
+    async (lines: CartLineInput[], opts?: { list?: string }) => {
       const qty = lines.reduce((a, l) => a + l.qty, 0);
       const sum = lines.reduce((a, l) => a + (l.priceSoum ?? 0) * l.qty, 0);
       setOptimistic((o) => ({ count: o.count + qty, total: o.total + sum }));
@@ -75,6 +79,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         for (const l of lines)
           last = await clientApi.cart.addItem({ variantId: l.variantId, qty: l.qty });
         if (last) setCart(last);
+        for (const l of lines)
+          track('add_to_cart', {
+            variantId: l.variantId,
+            qty: l.qty,
+            ...(l.priceSoum !== undefined ? { priceSoum: l.priceSoum } : {}),
+            ...(opts?.list ? { list: opts.list } : {}),
+          });
         toast(t('added'), 'good');
         return true;
       } catch (e) {

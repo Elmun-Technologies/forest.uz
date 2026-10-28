@@ -76,7 +76,7 @@ POST /webhooks/eskiz/:token        # SMS delivery status callback (unsigned → 
 auth: login, totp/setup, totp/verify, logout, me
 dashboard: GET /admin/dashboard?range=   # KPIs, alerts, funnel, sources, latest orders, top products
 analytics: realtime, sources(utm), landing/exit, events-goals, devices-geo, cohorts, ad-spend
-heatmaps: GET /admin/heatmaps?path=&device=&type=click|scroll|move ; sessions list/filters; replay/:sessionId
+heatmaps: GET /admin/heatmaps?path=&device=mobile|desktop&days=7|30|90 (click cells, rage cells, scroll reach, top elements, problems; `move` is not collected) ; GET /admin/heatmaps/pages ; POST /admin/heatmaps/refresh ; GET|PUT /admin/heatmaps/settings (replay kill switch, sample %) ; GET /admin/replays?filter=abandoned|purchased|rage|lead&days=&cursor= ; POST /admin/replays/:sessionId/open (audited session.view_replay → rrweb events + markers)
 customers: list/filter/search, :id (360: KPIs, journey timeline, orders, audiences, consents), notes, tags, export (OWNER), erase
 orders: list/filter (status, payment, carrier, SLA), :id, transitions, call courier, print label, refund, notes, timeline
 audiences: CRUD segments (rule tree), preview size, sync status per destination, automations

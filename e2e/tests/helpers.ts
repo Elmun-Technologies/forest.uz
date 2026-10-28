@@ -1,4 +1,7 @@
 import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test';
+import { devHeaders } from '../dev-token';
+
+export { devHeaders };
 
 export const API = process.env.API_URL ?? 'http://localhost:4000';
 export const PLACEHOLDER = /\[[^\]\n]{1,40}\]/;
@@ -54,7 +57,9 @@ export async function readOtp(request: APIRequestContext, e164: string): Promise
   let code: string | undefined;
   await expect
     .poll(async () => {
-      const res = await request.get(`${API}/v1/dev/outbox?to=${encodeURIComponent(e164)}`);
+      const res = await request.get(`${API}/v1/dev/outbox?to=${encodeURIComponent(e164)}`, {
+        headers: devHeaders(),
+      });
       const msgs = (await res.json()) as { templateKey: string; text: string }[];
       code = msgs
         .filter((m) => m.templateKey === 'otp')

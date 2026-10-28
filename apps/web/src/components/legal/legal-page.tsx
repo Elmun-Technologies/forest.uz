@@ -16,6 +16,7 @@ import { ApiError, apiGet } from '@/lib/api';
 import { getSettings } from '@/lib/data';
 import { soum } from '@/lib/format';
 import { alternates, metaDescription } from '@/lib/seo';
+import { getSeoOverride, withSeoOverride } from '@/lib/seo-meta';
 
 type Props = { params: Promise<{ locale: Locale }> };
 
@@ -39,17 +40,21 @@ async function loadPage(slug: LegalSlug, locale: Locale): Promise<ContentPageDto
 export function legalRoute(slug: LegalSlug, opts: { zones?: boolean } = {}) {
   async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { locale } = await params;
-    const [page, t] = await Promise.all([
+    const [page, t, override] = await Promise.all([
       loadPage(slug, locale),
       getTranslations({ locale, namespace: 'legal' }),
+      getSeoOverride(locale, `/${slug}`),
     ]);
-    return {
-      title: page.title,
-      description: metaDescription(
-        t('metaDescription', { title: page.title, subtitle: page.subtitle ?? '' }),
-      ),
-      alternates: alternates(locale, `/${slug}`),
-    };
+    return withSeoOverride(
+      {
+        title: page.title,
+        description: metaDescription(
+          t('metaDescription', { title: page.title, subtitle: page.subtitle ?? '' }),
+        ),
+        alternates: alternates(locale, `/${slug}`),
+      },
+      override,
+    );
   }
 
   async function LegalPage({ params }: Props) {

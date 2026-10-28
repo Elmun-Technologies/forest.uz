@@ -1,3 +1,5 @@
+import { stripImageMetadata } from '../../common/image-metadata';
+
 /**
  * Image type and size from the file header (the API has no image library). The type comes from
  * magic bytes only — never from the client's MIME type or file name.
@@ -23,6 +25,21 @@ export function imageMeta(buf: Buffer): ImageMeta | null {
   )
     return null;
   return meta;
+}
+
+/**
+ * The bytes to store for an uploaded image: type/size checked, metadata (Exif/GPS, XMP, IPTC,
+ * text chunks) stripped, re-checked. Null = refuse the file (not an image we accept, or it doesn't
+ * parse completely). Every path that stores an image uses this (CLAUDE.md §6 "Image metadata").
+ */
+export function sanitizeImage(buf: Buffer): { bytes: Buffer; meta: ImageMeta } | null {
+  const meta = imageMeta(buf);
+  if (!meta) return null;
+  const bytes = stripImageMetadata(buf, meta.mime);
+  if (!bytes) return null;
+  const after = imageMeta(bytes);
+  if (!after || after.mime !== meta.mime) return null;
+  return { bytes, meta: after };
 }
 
 function sniff(buf: Buffer): ImageMeta | null {

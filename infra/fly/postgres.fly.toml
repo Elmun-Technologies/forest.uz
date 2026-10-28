@@ -1,0 +1,26 @@
+# Forest DEMO PostgreSQL 16 on Fly.io: the official postgres:16-alpine image (same as
+# infra/compose.yml) on a volume — plain Postgres incl. partitioned tables and plpgsql.
+# Private only: no [http_service], reachable at <app>.internal:5432 over Fly's private network.
+# Created/deployed by infra/fly/provision.sh; POSTGRES_PASSWORD is a Fly secret set there.
+app = "forest-demo-db"
+primary_region = "fra"
+# SIGINT = Postgres "fast" shutdown (rolls back open transactions, checkpoints, exits).
+kill_signal = "SIGINT"
+kill_timeout = "60s"
+
+[build]
+  image = "postgres:16-alpine"
+
+[env]
+  POSTGRES_USER = "forest"
+  POSTGRES_DB = "forest"
+  # Fly volumes contain lost+found at the root; initdb needs an empty directory.
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[mounts]
+  source = "pgdata"
+  destination = "/var/lib/postgresql/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

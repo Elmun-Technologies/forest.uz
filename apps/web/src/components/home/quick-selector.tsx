@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { useCart } from '@/components/cart/cart-provider';
+import { track } from '@/lib/track';
 
 /**
  * "Nimani yangilaymiz?" — pick an item → recommended kit with live price and one-tap
@@ -26,7 +27,10 @@ export function QuickSelector({ items }: { items: SelectorItemDto[] }) {
   async function addKit() {
     if (!sel || busy) return;
     setBusy(true);
-    await addItems(sel.items.map((i) => ({ variantId: i.variantId, qty: i.qty })));
+    await addItems(
+      sel.items.map((i) => ({ variantId: i.variantId, qty: i.qty })),
+      { list: 'selector' },
+    );
     setBusy(false);
   }
 
@@ -40,7 +44,16 @@ export function QuickSelector({ items }: { items: SelectorItemDto[] }) {
               <button
                 type="button"
                 aria-pressed={on}
-                onClick={() => setKey(it.key)}
+                onClick={() => {
+                  setKey(it.key);
+                  track('selector_used', { item: it.key });
+                  track('selector_result', {
+                    item: it.key,
+                    inStock: it.inStock,
+                    priceSoum: it.priceSoum,
+                    items: it.items.length,
+                  });
+                }}
                 data-track="selector_used"
                 data-selector-item={it.key}
                 className={cn(

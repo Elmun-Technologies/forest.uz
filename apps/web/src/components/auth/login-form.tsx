@@ -167,6 +167,7 @@ export function LoginForm({ next, telegramBot }: { next: string; telegramBot: st
                   aria-label={t('digit', { n: i + 1 })}
                   inputMode="numeric"
                   autoComplete={i === 0 ? 'one-time-code' : 'off'}
+                  data-private
                   pattern="[0-9]*"
                   maxLength={CELLS}
                   value={d}

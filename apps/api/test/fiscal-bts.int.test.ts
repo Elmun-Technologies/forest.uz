@@ -5,7 +5,7 @@ import { OrderLifecycleService } from '../src/commerce/order-lifecycle.service';
 import { ManualShipmentService } from '../src/delivery/manual-shipment.service';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 
 describe('BTS manual shipments + fiscal receipt rule (integration)', () => {
   let app: NestExpressApplication;
@@ -30,6 +30,7 @@ describe('BTS manual shipments + fiscal receipt rule (integration)', () => {
     await agent.post('/v1/cart/items').send({ variantId, qty: 1 }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `bts-${Date.now()}-${seq}-abcdefgh`)
       .send({
         name: 'Jasur Aliyev',

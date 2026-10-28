@@ -18,7 +18,7 @@ import type { Request, Response } from 'express';
 import { ENV } from '../../config/config.module';
 import type { Env } from '../../config/env';
 import { RateLimiter } from '../../customer/common/rate-limit';
-import { parseKey, SecretBox } from '../../integrations/crypto/secret-box';
+import { keyringFromEnv, SecretBox } from '../../integrations/crypto/secret-box';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AdminContext } from '../admin-access';
 import { type AuditActor, AuditService } from '../audit/audit.service';
@@ -64,7 +64,7 @@ export class AdminAuthService {
     private readonly limiter: RateLimiter,
     @Inject(ENV) env: Env,
   ) {
-    this.box = new SecretBox({ current: parseKey(env.APP_ENCRYPTION_KEY) });
+    this.box = new SecretBox(keyringFromEnv(env));
   }
 
   // ───────── password step ─────────
@@ -84,7 +84,7 @@ export class AdminAuthService {
       isStaffRole(staff.role) &&
       !isLocked(staff.lockedUntil);
     if (!staff || !usable || !passwordOk) {
-      if (staff && usable) await this.recordFailure(staff.id, actor);
+      if (staff && usable) await this.recordFailure(staff.id, actor, 'password');
       // Same write cost for unknown / unusable accounts: no timing hint that the email exists.
       else await this.prisma.staff.updateMany({ where: { id: '' }, data: { failedLogins: 0 } });
       throw new DomainError('ADMIN_LOGIN_FAILED');
@@ -141,7 +141,7 @@ export class AdminAuthService {
     const secret = this.box.decrypt(staff.totpSecret, totpAad(staff.id)).toString('utf8');
     const step = verifyTotp(secret, code, Date.now(), staff.totpLastUsedStep);
     if (step === null) {
-      await this.recordFailure(staff.id, actor);
+      await this.recordFailure(staff.id, actor, 'totp');
       throw new DomainError('ADMIN_TOTP_INVALID');
     }
     const enrolling = !staff.totpEnabled;
@@ -341,12 +341,33 @@ export class AdminAuthService {
     }
   }
 
-  /** Counts a failed password/TOTP attempt; the 10th locks the account and ends its sessions. */
-  private async recordFailure(staffId: string, actor: AuditActor): Promise<void> {
-    const row = await this.prisma.staff.update({
-      where: { id: staffId },
-      data: { failedLogins: { increment: 1 } },
-      select: { failedLogins: true },
+  /**
+   * Counts a failed password/TOTP attempt (audited `staff.login_failed` with the step and count —
+   * never the typed value); the 10th locks the account and ends its sessions. Unknown e-mails are
+   * not audited: there is no staff row to attach them to and storing the e-mail would keep typos.
+   */
+  private async recordFailure(
+    staffId: string,
+    actor: AuditActor,
+    step: 'password' | 'totp',
+  ): Promise<void> {
+    const row = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.staff.update({
+        where: { id: staffId },
+        data: { failedLogins: { increment: 1 } },
+        select: { failedLogins: true },
+      });
+      await this.audit.record(
+        { ...actor, staffId: null },
+        {
+          action: 'staff.login_failed',
+          entity: 'Staff',
+          entityId: staffId,
+          after: { step, failures: updated.failedLogins },
+        },
+        tx,
+      );
+      return updated;
     });
     if (row.failedLogins < ADMIN_AUTH_POLICY.maxFailures) return;
     const lockedUntil = new Date(Date.now() + ADMIN_AUTH_POLICY.lockMinutes * 60_000);

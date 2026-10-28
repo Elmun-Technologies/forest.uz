@@ -7,11 +7,15 @@ import type { ReactNode } from 'react';
 import { routing } from '@/i18n/routing';
 import { ClientMessages } from '@/components/client-messages';
 import { CartProvider } from '@/components/cart/cart-provider';
+import { ReplayGate } from '@/components/analytics/replay-gate';
+import { TrackerLoader } from '@/components/analytics/tracker-loader';
 import { ConsentBanner } from '@/components/layout/consent-banner';
 import { OfflineBanner } from '@/components/layout/offline-banner';
 import { ToastProvider } from '@/components/ui/toast';
 import { getSettings } from '@/lib/data';
 import { alternates } from '@/lib/seo';
+import { RECORDER_VERSION } from '@forest/replay';
+import { TRACKER_VERSION } from '@forest/tracker';
 import '../globals.css';
 
 // No build-time prerender: pages need live API data (prices, stock), so they render on first
@@ -56,6 +60,7 @@ export default async function LocaleLayout({
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
   const tc = await getTranslations('common');
+  const replay = (await getSettings(locale))?.replay ?? null;
 
   return (
     <html lang={locale}>
@@ -72,6 +77,8 @@ export default async function LocaleLayout({
               {children}
               <OfflineBanner />
               <ConsentBanner />
+              <ReplayGate config={replay} version={RECORDER_VERSION} />
+              <TrackerLoader src={`/t.js?v=${TRACKER_VERSION}`} />
             </CartProvider>
           </ToastProvider>
         </ClientMessages>

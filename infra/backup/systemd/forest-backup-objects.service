@@ -1,0 +1,15 @@
+[Unit]
+Description=Forest object storage backup (replays excluded)
+Documentation=file:///opt/forest/app/docs/runbooks/restore-db.md
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+Environment=FOREST_ROOT=/opt/forest/app
+Environment=BACKUP_DIR=/var/backups/forest
+ExecStart=/opt/forest/app/infra/backup/objects-backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=4h

@@ -6,7 +6,7 @@ import { Badge, Button, cn, Price, Skeleton, Stepper } from '@forest/ui';
 import { ArrowLeft, Check, ChevronLeft, X } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
-import { useCallback, useEffect, useId, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { useCart } from '@/components/cart/cart-provider';
@@ -15,6 +15,7 @@ import { Logo } from '@/components/ui/logo';
 import { useToast } from '@/components/ui/toast';
 import { ClientApiError, clientApi } from '@/lib/client-api';
 import { soum } from '@/lib/format';
+import { track } from '@/lib/track';
 import { optionEta, readRegion, storeRegion, useDeliveryQuote } from './use-quote';
 
 type Locale = 'uz' | 'ru';
@@ -67,6 +68,14 @@ export function CartView({ locale, returnDays, cod, tiles }: CartViewProps) {
       live = false;
     };
   }, [zoneKey, signature, setCart]);
+
+  // view_cart once per page view, when the cart has loaded with items.
+  const viewed = useRef(false);
+  useEffect(() => {
+    if (viewed.current || !cart?.lines.length) return;
+    viewed.current = true;
+    track('view_cart', { itemsCount: cart.totals.itemsCount, valueSoum: cart.totals.totalSoum });
+  }, [cart]);
 
   const fail = useCallback(
     (e: unknown) => {
@@ -183,7 +192,11 @@ export function CartView({ locale, returnDays, cod, tiles }: CartViewProps) {
                     void mutate(l.variantId, () => clientApi.cart.setQty(l.variantId, qty))
                   }
                   onRemove={() =>
-                    void mutate(l.variantId, () => clientApi.cart.remove(l.variantId))
+                    void mutate(l.variantId, async () => {
+                      const next = await clientApi.cart.remove(l.variantId);
+                      track('remove_from_cart', { variantId: l.variantId, qty: l.qty });
+                      return next;
+                    })
                   }
                 />
               ))}
@@ -236,7 +249,9 @@ export function CartView({ locale, returnDays, cod, tiles }: CartViewProps) {
                   const u = cart.upsell;
                   if (!u) return;
                   setBusy('upsell');
-                  await addItems([{ variantId: u.variantId, qty: 1, priceSoum: u.priceSoum }]);
+                  await addItems([{ variantId: u.variantId, qty: 1, priceSoum: u.priceSoum }], {
+                    list: 'cart_upsell',
+                  });
                   setBusy(null);
                 }}
                 className="lg:h-12 lg:px-[22px] lg:text-sm"
@@ -549,8 +564,14 @@ function PromoForm({ cart, onCart }: { cart: CartDto; onCart: (c: CartDto) => vo
       const dto = await clientApi.cart.applyPromo(code.trim());
       onCart(dto);
       setCode('');
-      if (dto.promo?.status === 'rejected') setError(dto.promo.message);
+      if (dto.promo?.status === 'rejected') {
+        setError(dto.promo.message);
+        track('promo_rejected', { reason: dto.promo.reason });
+      } else if (dto.promo?.status === 'applied')
+        track('promo_applied', { code: dto.promo.code, discountSoum: dto.promo.discountSoum });
     } catch (err) {
+      if (err instanceof ClientApiError && err.code.startsWith('PROMO_'))
+        track('promo_rejected', { reason: err.code });
       setError(
         err instanceof ClientApiError && err.code !== 'NETWORK' && err.status < 500
           ? err.message

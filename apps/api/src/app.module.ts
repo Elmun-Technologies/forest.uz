@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import { AdminModule } from './admin/admin.module';
+import { AudiencesModule } from './audiences/audiences.module';
+import { AttributionModule } from './attribution/attribution.module';
+import { BotCoreModule } from './bot/bot-core.module';
+import { BotModule } from './bot/bot.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CommerceModule } from './commerce/commerce.module';
 import { CustomerModule } from './customer/customer.module';
@@ -10,15 +14,21 @@ import { SessionModule } from './common/session';
 import { ConfigModule, ENV } from './config/config.module';
 import type { Env } from './config/env';
 import { FilesModule } from './files/files.service';
+import { HeatmapsModule } from './heatmaps/heatmaps.module';
 import { HealthModule } from './health/health.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { JobsModule } from './jobs/jobs.module';
+import { TrackingModule } from './tracking/tracking.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { MoyskladModule } from './moysklad/moysklad.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.service';
 import { RedisModule } from './redis/redis.module';
+import { SeoCoreModule } from './seo/seo-core.module';
 import { SettingsModule } from './settings/settings.module';
+import { CmsModule } from './cms/cms.module';
+import { PartnerModule } from './partner/partner.module';
+import { WebhooksOutModule } from './webhooks-out/webhooks.module';
 
 @Module({
   imports: [
@@ -56,9 +66,19 @@ import { SettingsModule } from './settings/settings.module';
     CustomerModule,
     PaymentsModule,
     MessagingModule,
+    BotCoreModule,
+    BotModule,
     DeliveryModule,
     MoyskladModule,
+    AudiencesModule,
     JobsModule,
+    TrackingModule,
+    SeoCoreModule,
+    HeatmapsModule,
+    AttributionModule,
+    WebhooksOutModule,
+    PartnerModule,
+    CmsModule,
     AdminModule,
   ],
 })

@@ -13,7 +13,7 @@ import { DELIVERY_QUEUE, SYNC_JOB } from '../src/delivery/delivery.module';
 import { IntegrationsService } from '../src/integrations/integrations.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { type AdminClient, createAdminTestApp, signedIn } from './admin-helpers';
-import { shopper } from './app';
+import { nextTestIp, shopper } from './app';
 import { YandexStub } from './yandex-stub';
 
 /**
@@ -56,6 +56,7 @@ describe('admin orders (integration)', () => {
     const phone = `+99893${run}${String(++seq).padStart(3, '0')}`;
     const res = await agent
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `ao-${run}-${seq}-${Date.now()}`)
       .send({
         name: `Malika ${run}`,

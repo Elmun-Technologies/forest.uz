@@ -20,7 +20,8 @@ export async function createSeedStorage(): Promise<SeedStorage | null> {
   const client = new S3Client({
     endpoint,
     region: process.env.S3_REGION ?? 'us-east-1',
-    forcePathStyle: true,
+    // Same switch as the API (env.ts): Tigris needs virtual-hosted addressing.
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false',
     credentials: {
       accessKeyId: process.env.S3_ACCESS_KEY ?? '',
       secretAccessKey: process.env.S3_SECRET_KEY ?? '',

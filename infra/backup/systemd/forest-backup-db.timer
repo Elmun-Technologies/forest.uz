@@ -1,0 +1,11 @@
+[Unit]
+Description=Forest nightly pg_dump to the UZ backup bucket (schedule)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Tashkent
+# Catch up after downtime; spread a little so jobs don't start on the same second.
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

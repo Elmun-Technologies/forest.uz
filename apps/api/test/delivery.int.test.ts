@@ -11,7 +11,7 @@ import { IntegrationsService } from '../src/integrations/integrations.service';
 import { yandexCallbackKey } from '../src/integrations/providers/yandex-delivery';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SettingsService } from '../src/settings/settings.service';
-import { createTestApp, shopper } from './app';
+import { createTestApp, nextTestIp, shopper } from './app';
 import { YandexStub } from './yandex-stub';
 
 /**
@@ -51,6 +51,7 @@ describe('delivery: Yandex claims + shipment lifecycle (integration)', () => {
     await agent.post('/v1/cart/items').send({ variantId, qty: 1 }).expect(201);
     const res = await agent
       .post('/v1/checkout/orders')
+      .set('X-Forwarded-For', nextTestIp())
       .set('Idempotency-Key', `yd-${Date.now()}-${++phoneSeq}-abcdefgh`)
       .send({
         name: 'Malika Karimova',
@@ -160,6 +161,7 @@ describe('delivery: Yandex claims + shipment lifecycle (integration)', () => {
       stub.price = '99999.00'; // a newer Yandex price must not change what the customer was shown
       const res = await agent
         .post('/v1/checkout/orders')
+        .set('X-Forwarded-For', nextTestIp())
         .set('Idempotency-Key', `yd-quote-${Date.now()}-abcdefgh`)
         .send({
           name: 'Malika Karimova',

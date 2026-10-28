@@ -28,8 +28,8 @@ export function safeUrl(url: string): string {
   }
 }
 
-/** Our own routes whose next path segment is a secret (Eskiz callback, MoySklad webhook token). */
-const SECRET_SEGMENT_AFTER = /(\/webhooks\/(?:eskiz|moysklad)\/)[^/]+/gi; // Express routes ignore case
+/** Our own routes whose next path segment is a secret (Eskiz callback, MoySklad/Telegram webhooks). */
+const SECRET_SEGMENT_AFTER = /(\/webhooks\/(?:eskiz|moysklad|telegram)\/)[^/]+/gi; // Express routes ignore case
 
 /**
  * Request path for access logs: no query string (tracking links, Yandex callback key) and secret

@@ -43,3 +43,52 @@ export async function telegramGetMe(
     return { ok: false, message: `getMe failed: ${e instanceof Error ? e.message : String(e)}` };
   }
 }
+
+/** Updates the bot handles (docs/09); `my_chat_member` reports a user blocking the bot. */
+export const TELEGRAM_ALLOWED_UPDATES = ['message', 'callback_query', 'my_chat_member'] as const;
+
+/** `/v1/webhooks/telegram/<secret>` — the secret is also sent back as `secret_token`. */
+export function telegramWebhookUrl(apiUrl: string, secret: string): string {
+  return `${apiUrl.replace(/\/+$/, '')}/v1/webhooks/telegram/${secret}`;
+}
+
+/**
+ * `setWebhook` (Bot API; grammY `@grammyjs/types` 5.0.0, python-telegram-bot 22.0
+ * `Bot.set_webhook`): Telegram then POSTs every update to `url` with header
+ * `X-Telegram-Bot-Api-Secret-Token: <secret>`.
+ */
+export async function telegramSetWebhook(
+  http: HttpClient,
+  botToken: string,
+  url: string,
+  secret: string,
+  apiUrl = TELEGRAM_API_URL,
+): Promise<HealthResult> {
+  try {
+    const res = await http.request({
+      method: 'POST',
+      url: `${apiUrl}/bot${botToken}/setWebhook`,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url,
+        secret_token: secret,
+        allowed_updates: TELEGRAM_ALLOWED_UPDATES,
+        max_connections: 20,
+      }),
+      // setWebhook is idempotent (same url + secret).
+      idempotent: true,
+    });
+    const body = JSON.parse(res.text) as { ok?: boolean; description?: string };
+    return res.status === 200 && body.ok
+      ? { ok: true, message: 'webhook set' }
+      : {
+          ok: false,
+          message: `setWebhook failed: HTTP ${res.status} ${body.description ?? ''}`.trim(),
+        };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `setWebhook failed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}

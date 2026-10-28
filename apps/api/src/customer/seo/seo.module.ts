@@ -4,84 +4,55 @@ import {
   Get,
   Header,
   HttpCode,
+  Inject,
   Injectable,
   Module,
+  Param,
   Post,
   Query,
+  type RawBodyRequest,
   Req,
+  Res,
 } from '@nestjs/common';
 import {
   DomainError,
+  type Locale,
   type RedirectDto,
-  type SitemapDataDto,
-  LOCALES,
-  isLocale,
+  type SeoMetaPublicDto,
+  type SeoPublicConfigDto,
   notFoundReportSchema,
   redirectQuerySchema,
+  seoMetaQuerySchema,
 } from '@forest/contracts';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import type { z } from 'zod';
 import { ZodPipe } from '../../common/http';
+import { ENV } from '../../config/config.module';
+import type { Env } from '../../config/env';
+import { FilesService } from '../../files/files.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SettingsService } from '../../settings/settings.service';
+import { SitemapService, siteBase } from '../../seo/sitemap.service';
+import { defaultRobots, normalizeRobots } from '../../seo/robots';
+import {
+  contextKey,
+  verifyWeb,
+  WEB_CONTEXTS,
+  WEB_SIGNATURE_HEADER,
+  webSharedSecret,
+} from '../../seo/web-signature';
 import { CustomerCommonModule } from '../common/customer-common.module';
 import { RateLimiter } from '../common/rate-limit';
 import { normalizePath, normalizeReferrer, redirectCandidates } from './seo-paths';
 
 @Injectable()
 export class SeoService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async sitemapData(): Promise<SitemapDataDto> {
-    const [products, categories, pages] = await Promise.all([
-      this.prisma.product.findMany({
-        where: { status: 'ACTIVE' },
-        select: { slug: true, updatedAt: true },
-        orderBy: { slug: 'asc' },
-      }),
-      this.prisma.category.findMany({
-        orderBy: { sort: 'asc' },
-        select: {
-          slug: true,
-          products: {
-            where: { product: { status: 'ACTIVE' } },
-            select: { product: { select: { updatedAt: true } } },
-          },
-        },
-      }),
-      this.prisma.page.findMany({
-        // Home blocks/FAQ are fragments of other pages, not URLs of their own.
-        where: { published: true, kind: { in: ['LEGAL', 'ARTICLE', 'VIDEO'] } },
-        select: { kind: true, slug: true, locale: true, updatedAt: true },
-        orderBy: [{ kind: 'asc' }, { slug: 'asc' }],
-      }),
-    ]);
-
-    const pageMap = new Map<string, SitemapDataDto['pages'][number]>();
-    for (const p of pages) {
-      const key = `${p.kind}/${p.slug}`;
-      const entry = pageMap.get(key) ?? { kind: p.kind, slug: p.slug, locales: [], updatedAt: '' };
-      if (isLocale(p.locale)) entry.locales.push(p.locale);
-      const at = p.updatedAt.toISOString();
-      if (at > entry.updatedAt) entry.updatedAt = at;
-      pageMap.set(key, entry);
-    }
-
-    return {
-      products: products.map((p) => ({ slug: p.slug, updatedAt: p.updatedAt.toISOString() })),
-      // A category changes when its products do (Category has no own timestamp).
-      categories: categories.map((c) => {
-        const latest = c.products.reduce<Date | null>(
-          (m, x) => (m === null || x.product.updatedAt > m ? x.product.updatedAt : m),
-          null,
-        );
-        return { slug: c.slug, updatedAt: latest?.toISOString() ?? null };
-      }),
-      pages: [...pageMap.values()].map((p) => ({
-        ...p,
-        locales: LOCALES.filter((l) => p.locales.includes(l)),
-      })),
-    };
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly files: FilesService,
+    private readonly settings: SettingsService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   async redirect(rawPath: string): Promise<RedirectDto> {
     const path = normalizePath(rawPath);
@@ -90,7 +61,10 @@ export class SeoService {
     const rows = await this.prisma.redirect.findMany({ where: { from: { in: candidates } } });
     const hit = candidates.map((c) => rows.find((r) => r.from === c)).find(Boolean);
     if (!hit) throw new DomainError('NOT_FOUND');
-    await this.prisma.redirect.update({ where: { id: hit.id }, data: { hits: { increment: 1 } } });
+    await this.prisma.redirect.update({
+      where: { id: hit.id },
+      data: { hits: { increment: 1 }, lastHitAt: new Date() },
+    });
     return { to: hit.to, code: hit.code };
   }
 
@@ -108,19 +82,60 @@ export class SeoService {
       },
     });
   }
+
+  /** Admin override for one page (A9 / product editor); null = the storefront's template. */
+  async meta(path: string, locale: Locale): Promise<SeoMetaPublicDto> {
+    const row = await this.prisma.seoMeta.findUnique({ where: { path_locale: { path, locale } } });
+    if (!row) return { meta: null };
+    const file = row.ogImageId
+      ? await this.prisma.file.findUnique({ where: { id: row.ogImageId } })
+      : null;
+    return {
+      meta: {
+        title: row.title.trim() || null,
+        description: row.description.trim() || null,
+        ogImage: file?.isPublic
+          ? { url: this.files.publicUrl(file.key), width: file.width, height: file.height }
+          : null,
+        noindex: row.noindex,
+        canonical: row.canonical,
+      },
+    };
+  }
+
+  async publicConfig(): Promise<SeoPublicConfigDto> {
+    return { schema: await this.settings.get('seo.schema') };
+  }
+
+  async robots(): Promise<string> {
+    const { custom } = await this.settings.get('seo.robots');
+    return custom?.trim() ? normalizeRobots(custom) : defaultRobots(siteBase(this.env));
+  }
+
+  /** IndexNow key file body, only for the current key. */
+  async indexNowKey(file: string): Promise<string | null> {
+    const { key } = await this.settings.get('seo.indexnow');
+    return file === key || file === `${key}.txt` ? key : null;
+  }
 }
 
+/**
+ * Public SEO endpoints. `/robots.txt`, `/sitemap.xml`, `/sitemaps/*` and `/<key>.txt` reach the
+ * `.txt`/`.xml` routes through the storefront's rewrites (next.config.ts).
+ */
 @Controller('seo')
 export class SeoController {
+  /** Key of the storefront server's signed 404 reports; null (production without secret) = refuse. */
+  private readonly notFoundKey: Buffer | null;
+
   constructor(
     private readonly seo: SeoService,
+    private readonly sitemaps: SitemapService,
     private readonly limiter: RateLimiter,
-  ) {}
-
-  @Get('sitemap-data')
-  @Header('Cache-Control', 'public, max-age=300, stale-while-revalidate=3600')
-  sitemapData(): Promise<SitemapDataDto> {
-    return this.seo.sitemapData();
+    @Inject(ENV) env: Env,
+  ) {
+    const secret = webSharedSecret(env);
+    this.notFoundKey = secret ? contextKey(secret, WEB_CONTEXTS.notFound) : null;
   }
 
   /** Not cacheable: every lookup counts a hit for the admin redirect manager. */
@@ -136,11 +151,69 @@ export class SeoController {
   @HttpCode(204)
   async notFound(
     @Body(new ZodPipe(notFoundReportSchema)) body: z.infer<typeof notFoundReportSchema>,
-    @Req() req: Request,
+    @Req() req: RawBodyRequest<Request>,
   ): Promise<void> {
+    // Only the storefront server reports 404s (signed): anyone else could plant fake "broken
+    // internal links" in the SEO health score.
+    const raw = req.rawBody?.toString('utf8') ?? '';
+    if (!verifyWeb(this.notFoundKey, req.headers[WEB_SIGNATURE_HEADER] as string | undefined, raw))
+      throw new DomainError('UNAUTHORIZED');
     // Generous: SSR reports come from the web server's IP, not the visitor's.
     await this.limiter.consume('seo:404', req.ip ?? 'unknown', 120, 60);
     await this.seo.notFound(body);
+  }
+
+  /** Storefront metadata (fetch-cached by the web app, refreshed on demand after admin saves). */
+  @Get('meta')
+  @Header('Cache-Control', 'public, max-age=60')
+  meta(
+    @Query(new ZodPipe(seoMetaQuerySchema)) q: z.infer<typeof seoMetaQuerySchema>,
+  ): Promise<SeoMetaPublicDto> {
+    return this.seo.meta(q.path, q.locale);
+  }
+
+  @Get('public')
+  @Header('Cache-Control', 'public, max-age=60')
+  publicConfig(): Promise<SeoPublicConfigDto> {
+    return this.seo.publicConfig();
+  }
+
+  @Get('robots.txt')
+  @Header('Content-Type', 'text/plain; charset=utf-8')
+  @Header('Cache-Control', 'public, max-age=300')
+  robots(): Promise<string> {
+    return this.seo.robots();
+  }
+
+  @Get('sitemap.xml')
+  sitemapIndex(@Res() res: Response): Promise<void> {
+    return this.sendSitemap('sitemap.xml', res);
+  }
+
+  @Get('sitemaps/:file')
+  sitemapFile(@Param('file') file: string, @Res() res: Response): Promise<void> {
+    return this.sendSitemap(file, res);
+  }
+
+  @Get('indexnow/:file')
+  async indexNowKey(@Param('file') file: string, @Res() res: Response): Promise<void> {
+    const key = await this.seo.indexNowKey(file);
+    if (!key) {
+      res.status(404).type('text/plain').send('Not found');
+      return;
+    }
+    res.type('text/plain; charset=utf-8').setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(key);
+  }
+
+  private async sendSitemap(name: string, res: Response): Promise<void> {
+    const xml = await this.sitemaps.file(name);
+    if (xml === null) {
+      res.status(404).type('text/plain').send('Not found');
+      return;
+    }
+    res.type('application/xml; charset=utf-8').setHeader('Cache-Control', 'public, max-age=300');
+    res.send(xml);
   }
 }
 

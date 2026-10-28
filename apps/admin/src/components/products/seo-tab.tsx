@@ -2,13 +2,15 @@
 
 import {
   type AdminProductDto,
+  type AiSeoDraftDto,
   productSeoTitle,
   SEO_DESCRIPTION_MAX,
   SEO_TITLE_MAX,
 } from '@forest/contracts/core';
 import { Button, cn, Field, Input, Textarea } from '@forest/ui';
+import Link from 'next/link';
 import { type FormEvent, useEffect, useState } from 'react';
-import { adminFetch } from '../../lib/client-api';
+import { adminFetch, errorText } from '../../lib/client-api';
 import { COPY } from './copy';
 import { compactInput } from './fields';
 import type { ProductAction } from './use-product-action';
@@ -57,6 +59,23 @@ export function SeoTab({
         }),
       COPY.saved,
     );
+  }
+
+  const [ai, setAi] = useState<{ busy: boolean; note: string | null }>({ busy: false, note: null });
+
+  /** AI SEO draft for both locales (CLAUDE.md §6): fills the fields, saving stays manual. */
+  async function aiSuggest() {
+    setAi({ busy: true, note: null });
+    try {
+      const r = await adminFetch<AiSeoDraftDto>('/admin/ai/seo', {
+        method: 'POST',
+        body: { path: `/p/${product.slug}` },
+      });
+      setD((x) => ({ ...x, seo: { uz: r.uz, ru: r.ru } }));
+      setAi({ busy: false, note: r.fake ? COPY.aiDraftFake : COPY.aiDraftReady });
+    } catch (e) {
+      setAi({ busy: false, note: errorText(e) });
+    }
   }
 
   const setSeo = (field: 'title' | 'description', value: string) =>
@@ -147,15 +166,35 @@ export function SeoTab({
         </span>
       </figure>
       <p className="text-xs text-muted">
-        {COPY.seoStorefrontNote} {COPY.seoCenterLater}.
+        {COPY.seoStorefrontNote}{' '}
+        <Link
+          href="/seo"
+          prefetch={false}
+          className="font-semibold underline-offset-2 hover:underline"
+        >
+          {COPY.seoCenter}
+        </Link>
+        .
       </p>
 
+      {ai.note ? (
+        <p role="status" className="text-xs text-muted">
+          {ai.note}
+        </p>
+      ) : null}
       {canEdit ? (
         <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={action.busy === 'seo'}>
             {COPY.save}
           </Button>
-          <Button type="button" variant="outline" disabled title={COPY.aiDraftHint}>
+          <Button
+            type="button"
+            variant="outline"
+            loading={ai.busy}
+            title={COPY.aiDraftHint}
+            onClick={() => void aiSuggest()}
+            data-testid="ai-seo"
+          >
             ✦ AI bilan taklif
           </Button>
         </div>

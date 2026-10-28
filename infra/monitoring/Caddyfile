@@ -1,0 +1,33 @@
+# Monitoring host edge (infra/monitoring/compose.yml).
+(common) {
+	encode zstd gzip
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+{$GLITCHTIP_DOMAIN} {
+	import common
+	# Event intake from the shop servers is small; a cap stops oversized junk.
+	request_body {
+		max_size 5MB
+	}
+	reverse_proxy glitchtip:8080
+}
+
+{$KUMA_DOMAIN} {
+	import common
+	# Push monitors (backup heartbeats from the shop VPS) must stay reachable; the UI is
+	# limited to KUMA_ALLOWLIST.
+	@ui {
+		not path /api/push/*
+		not client_ip {$KUMA_ALLOWLIST}
+	}
+	respond @ui 403
+	reverse_proxy uptime-kuma:3001
+}

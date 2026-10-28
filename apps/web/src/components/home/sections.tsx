@@ -14,6 +14,7 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { routes } from '@/config/site';
 import { expressZone, regionsZone } from '@/lib/delivery';
+import { TrackView } from '@/components/analytics/track-view';
 import { ProductCard } from '@/components/product/product-card';
 import { CheckIcon } from '@/components/layout/icons';
 import { formatRating } from './hero';
@@ -241,6 +242,10 @@ export async function Bestsellers({
         data-testid="bestsellers"
         className="grid grid-cols-2 gap-2 lg:grid-cols-[repeat(auto-fill,minmax(260px,1fr))] lg:gap-4"
       >
+        <TrackView
+          name="view_item_list"
+          props={{ list: 'home_bestsellers', items: products.slice(0, 4).map((p) => p.id) }}
+        />
         {products.slice(0, 4).map((p) => (
           <li key={p.id}>
             <ProductCard product={p} locale={locale} look="home" list="home_bestsellers" />

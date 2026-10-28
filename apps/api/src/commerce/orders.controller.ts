@@ -26,6 +26,7 @@ import { ReqLocale, ZodPipe } from '../common/http';
 import { SessionService } from '../common/session';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { trackerSessionId } from '../tracking/server-events';
 import { deviceHash } from './cart.controller';
 import { CheckoutService } from './checkout.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
@@ -73,6 +74,11 @@ export class OrdersController {
       locale,
       deviceHash(req),
       req.ip ?? null,
+      // Analytics (docs/07): the visitor + tracker session this order converts.
+      {
+        anonymousId: this.sessions.ensureVisitorId(req, res),
+        sessionId: trackerSessionId((req.cookies as Record<string, unknown> | undefined)?.fr_sid),
+      },
     );
     res.cookie(ORDER_COOKIE, result.publicId, {
       ...this.sessions.cookieOptions(24 * 3600),

@@ -25,6 +25,20 @@ export function parseKey(base64: string): Buffer {
   return key;
 }
 
+/**
+ * The keyring of every `SecretBox` in the API: APP_ENCRYPTION_KEY encrypts, it and
+ * APP_ENCRYPTION_KEY_PREVIOUS decrypt (the envelope's key id picks the key).
+ */
+export function keyringFromEnv(env: {
+  APP_ENCRYPTION_KEY: string;
+  APP_ENCRYPTION_KEY_PREVIOUS?: readonly string[];
+}): Keyring {
+  return {
+    current: parseKey(env.APP_ENCRYPTION_KEY),
+    previous: (env.APP_ENCRYPTION_KEY_PREVIOUS ?? []).map(parseKey),
+  };
+}
+
 export class SecretBox {
   private readonly keys: Map<string, Buffer>;
   private readonly current: Buffer;
@@ -82,6 +96,7 @@ export class SecretBox {
 
   /** True when the blob was written with an older key and should be re-encrypted. */
   needsRotation(blob: Uint8Array): boolean {
+    if (blob.length === 0) return false; // nothing sealed (e.g. migrated webhook rows)
     return (
       Buffer.from(blob)
         .subarray(1, 1 + KEY_ID_LEN)

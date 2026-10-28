@@ -23,6 +23,7 @@ import type {
   ProductListDto,
   ProductReviewsDto,
   SearchResultDto,
+  UnsubscribeResultDto,
 } from '@forest/contracts';
 import type { TelegramAuthPayload } from './telegram-widget';
 
@@ -173,6 +174,11 @@ export const clientApi = {
     /** Fake Payme/Click callback (PROVIDERS_MODE=fake only). */
     fakePay: (order: string, result: 'success' | 'fail') =>
       request<{ ok: true; publicId: string }>('POST', '/dev/fake-pay', { order, result }),
+  },
+  messaging: {
+    /** Marketing opt-out link from an SMS (`/obuna/<token>`). */
+    unsubscribe: (token: string) =>
+      request<UnsubscribeResultDto>('POST', '/messaging/unsubscribe', { token }),
   },
   leads: {
     /** `phone` in any format; the API normalizes to E.164. */

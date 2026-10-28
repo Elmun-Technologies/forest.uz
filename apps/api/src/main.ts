@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { configureApp } from './bootstrap';
+import { initErrorReporting } from './common/error-reporting';
 import { ENV } from './config/config.module';
 import type { Env } from './config/env';
 
@@ -14,6 +15,7 @@ async function main(): Promise<void> {
   });
   configureApp(app);
   const env = app.get<Env>(ENV);
+  initErrorReporting(env);
   await app.listen(env.PORT, '0.0.0.0');
 }
 

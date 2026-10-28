@@ -3,6 +3,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import { edgeProxyGate } from './common/edge-proxy';
 import { ApiExceptionFilter, jsonReplacer } from './common/http';
 import { ENV } from './config/config.module';
 import type { Env } from './config/env';
@@ -12,6 +13,7 @@ export function configureApp(app: NestExpressApplication): INestApplication {
   const env = app.get<Env>(ENV);
   app.useLogger(app.get(Logger));
   app.set('trust proxy', env.TRUST_PROXY_HOPS);
+  if (env.EDGE_PROXY_SECRET) app.use(edgeProxyGate(env.EDGE_PROXY_SECRET));
   app.set('json replacer', jsonReplacer);
   app.disable('x-powered-by');
   app.use(
