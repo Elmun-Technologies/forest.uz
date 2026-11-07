@@ -1,0 +1,119 @@
+# Forest backend-only stack for a Coolify-managed server (CLAUDE.md §6, docs/runbooks/deploy-hetzner-coolify.md).
+# Paste as a Coolify "Docker Compose" resource, in its own Project — never into a project that
+# already runs other apps (Gulf, Comfort, SOF, SPS…) on this shared server.
+#
+# Different from infra/compose.yml on purpose:
+#   - no `web`/`admin`/`caddy` (those run on Vercel; Coolify's own Traefik is the only proxy here)
+#   - no `ports:` on any service — Coolify's Traefik reaches `api` over this resource's private
+#     network by container name; publishing a host port risks colliding with another project's
+#     ports on the same shared server, which we must never do.
+#   - secrets come from Coolify's own "Environment Variables" tab on this resource (not a
+#     committed .env), referenced below as ${VAR} — Coolify substitutes them at deploy time.
+name: forest
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: forest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: forest
+    volumes: [forest_pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U forest -d forest']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: [forest_redisdata:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible storage for product images (private bucket too). CLAUDE.md §6 "Dev object
+  # storage = SeaweedFS S3"; swap for a real S3 provider later by changing S3_ENDPOINT only.
+  storage:
+    image: chrislusf/seaweedfs:4.50
+    # No committed credentials file (CLAUDE.md "never commit secrets"): write it from Coolify's
+    # own env vars at container start, same credentials deploy.sh generates on the Caddy path.
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        cat >/etc/seaweedfs/s3.json <<EOF
+        {"identities":[{"name":"forest","credentials":[{"accessKey":"$${S3_ACCESS_KEY}","secretKey":"$${S3_SECRET_KEY}"}],"actions":["Admin","Read","List","Tagging","Write"]},{"name":"anonymous","actions":["Read:forest-public"]}]}
+        EOF
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -volume.max=0
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    volumes:
+      - forest_storagedata:/data
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8333/status || exit 1']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build: { context: ../.., dockerfile: infra/docker/api.Dockerfile, target: migrate }
+    environment:
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD}@postgres:5432/forest
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  api:
+    build: { context: ../.., dockerfile: infra/docker/api.Dockerfile, target: runtime }
+    restart: unless-stopped
+    # Not `ports:` (no host publish — see the file header). `expose` just lets Coolify's UI
+    # offer 4000 under this resource's Domains tab; its own Traefik reaches it on the network
+    # regardless.
+    expose: ['4000']
+    environment:
+      DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD}@postgres:5432/forest
+      REDIS_URL: redis://redis:6379
+      S3_ENDPOINT: http://storage:8333
+      S3_REGION: us-east-1
+      S3_FORCE_PATH_STYLE: 'true'
+      S3_BUCKET_PUBLIC: forest-public
+      S3_BUCKET_PRIVATE: forest-private
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+      SESSION_SECRET: ${SESSION_SECRET}
+      WEB_REVALIDATE_SECRET: ${WEB_REVALIDATE_SECRET}
+      EDGE_PROXY_SECRET: ${EDGE_PROXY_SECRET}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
+      OWNER_EMAIL: ${OWNER_EMAIL}
+      OWNER_INITIAL_PASSWORD: ${OWNER_INITIAL_PASSWORD}
+      APP_URL: ${APP_URL}
+      WEB_INTERNAL_URL: ${WEB_INTERNAL_URL}
+      ADMIN_URL: ${ADMIN_URL}
+      API_URL: ${API_URL}
+      PROVIDERS_MODE: fake
+      ALLOW_FAKE_PROVIDERS: 'true'
+      DEV_ENDPOINTS: 'true'
+      # Only Coolify's own Traefik is between the browser/Vercel and this container (no Caddy
+      # here): trust its one hop, same reasoning as the Caddy runbook's EDGE_PROXY_SECRET note.
+      TRUST_PROXY_HOPS: '2'
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      storage: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:4000/health || exit 1']
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  forest_pgdata:
+  forest_redisdata:
+  forest_storagedata:
