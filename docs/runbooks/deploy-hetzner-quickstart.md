@@ -1,74 +1,65 @@
-# Runbook · Hetzner VPS quickstart (launch today)
+# Runbook · Hetzner (backend) + Vercel (web/admin) — launch today, build the rest slowly
 
-Full reference is `docs/runbooks/deploy-and-rollback.md` — this file is the condensed, in-order
-path from an empty Hetzner server to a live site today, using the same `infra/compose.yml` /
-`infra/deploy/deploy.sh` the project already ships (no new infra code needed).
+Owner decision (2026-11-07, CLAUDE.md §6): web + admin run on **Vercel** right away so the site is
+reachable today; everything server-side (API, Postgres, Redis, object storage, and later the
+backup/monitoring/bot pieces) is built up on the **Hetzner VPS**, one service at a time, instead of
+bringing up the full `infra/compose.yml` stack at once. This file covers that split. Once web and
+admin also move onto the same server, switch to the plain, already-documented full-stack flow in
+`docs/runbooks/deploy-and-rollback.md` — nothing here conflicts with it.
 
-> **One fact to decide on, not to skip.** CLAUDE.md §15 and the demo runbooks say production must
-> run on a server physically **in Uzbekistan** (personal-data localisation law, art. 27¹) because
-> it will hold real customers' phones/addresses. **Hetzner has no Uzbekistan region** — its
-> locations are Germany, Finland, the US and Singapore. Launching on Hetzner today is fine for
-> getting the site live, testing, and demoing — but putting *real* customer PII (real phone
-> numbers, real orders with real addresses) on it is the same legal exposure the project's own
-> docs were written to avoid. Two honest paths:
-> - **Launch today in `PROVIDERS_MODE=fake`** (`--allow-fake` below): a fully working site/admin on
->   your own domain, fake payments/SMS, synthetic or no real customer data. Move to UZ hosting
->   (or get legal sign-off on Hetzner) before taking real orders.
-> - **Launch today for real** (`PROVIDERS_MODE=sandbox`/`live`) knowing it is out of policy until
->   that's resolved.
->
-> This is your call, not mine to block — just make it knowingly. Record whichever you pick in
-> CLAUDE.md §6 (a line is already queued for this; see the end of this file).
+```
+Browser ──► Vercel: web  (Root Directory apps/web)   ──/api/* rewrite──┐
+        └─► Vercel: admin (Root Directory apps/admin) ─/api/* rewrite──┤
+                                                                       ▼
+                 Hetzner VPS: Caddy :80/:443 (api.<domain>, cdn.<domain>)
+                        └──► api (NestJS + BullMQ) ──► postgres, redis, storage (SeaweedFS)
+```
 
-## 0. What you give me
+> Same compliance note as before, still open: a VPS outside Uzbekistan doesn't satisfy the
+> personal-data localisation rule (§15) once real customer PII is stored. Launch today with
+> `PROVIDERS_MODE=fake` and no real customer data; resolve hosting location before real orders.
 
-- Server IP (and whether it's already provisioned, or I walk you through `hcloud`/the Hetzner
-  Cloud console creating it: **CPX21** or better — 3 vCPU / 4 GB is tight; 4 vCPU / 8 GB is the
-  documented minimum — Ubuntu 24.04, a region close to your users e.g. `fsn1`/`hel1`).
-- root SSH access (password or a key you've added in the Hetzner console).
-- Three DNS names pointed at that IP before step 3 (A records, no proxy/CDN in front yet):
-  `forest.example.com` (site), `admin.forest.example.com`, `api.forest.example.com`. Use your real
-  domain — Caddy needs these to get Let's Encrypt certificates.
+## 0. What I need from you
 
-## 1. First login, lock the door
+1. **Exact domain spelling.** You mentioned "forestgroup.uz" — please confirm the exact text
+   (no spaces, exact case) so the DNS and env values below are right the first time.
+2. Confirm the Hetzner server's **IP address** and that root SSH already works.
+3. Three DNS **A records** at your domain registrar/DNS panel, pointing at the server's IP:
+   - `api.<domain>` — the API, real traffic.
+   - `cdn.<domain>` — product images (the public object storage bucket).
+   - `admin.<domain>` — not used yet (Vercel serves admin for now), but worth creating now so it's
+     ready when you move admin onto the server later; harmless if it points here before that.
+   No record needed for the bare domain or `www` today — Vercel's own domains (or a future
+   `forest-demo-web`/`forest-demo-admin` custom domain) serve the site for now.
+
+I'll use `<domain>` as a placeholder below — swap in the real one.
+
+## 1. Server: lock it down, install Docker, clone the repo
 
 ```bash
 ssh root@<server-ip>
 apt-get update && apt-get -y upgrade
 ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable
-```
-
-## 2. Docker + the repo
-
-```bash
 curl -fsSL https://get.docker.com | sh
 mkdir -p /opt/forest && cd /opt/forest
 git clone https://github.com/Elmun-Technologies/forest.uz app && cd app
-git checkout main   # or the branch you want live
+git checkout main
 ```
+(Skip anything already done if this server was set up before.)
 
-## 3. `.env` (generate every secret on the server, never reuse a dev value)
+## 2. `.env` on the server
 
 ```bash
 cd /opt/forest/app
 cp .env.example .env
 chmod 600 .env
+cp infra/deploy/env.ops.example .env.ops && chmod 600 .env.ops   # backups/alerts — fill in later
 
-# Fill the three domains and URLs (edit, or run these seds with your real domain):
-sed -i \
-  -e 's#^APP_URL=.*#APP_URL=https://forest.example.com#' \
-  -e 's#^ADMIN_URL=.*#ADMIN_URL=https://admin.forest.example.com#' \
-  -e 's#^API_URL=.*#API_URL=https://api.forest.example.com#' \
-  -e 's#^SITE_DOMAIN=.*#SITE_DOMAIN=forest.example.com#' \
-  -e 's#^ADMIN_DOMAIN=.*#ADMIN_DOMAIN=admin.forest.example.com#' \
-  -e 's#^API_DOMAIN=.*#API_DOMAIN=api.forest.example.com#' \
-  .env
-
-# Generate every secret (prints them; they land straight in .env below — copy APP_ENCRYPTION_KEY
-# somewhere safe too, e.g. your password manager: losing it loses integration credentials + TOTP).
+# Generate every secret now, on the server.
 APP_ENCRYPTION_KEY=$(openssl rand -base64 32)
 SESSION_SECRET=$(openssl rand -hex 32)
 WEB_REVALIDATE_SECRET=$(openssl rand -hex 32)
+EDGE_PROXY_SECRET=$(openssl rand -hex 32)
 TELEGRAM_WEBHOOK_SECRET=$(openssl rand -hex 32)
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 FOREST_APP_DB_PASSWORD=$(openssl rand -hex 24)
@@ -80,6 +71,7 @@ sed -i \
   -e "s#^APP_ENCRYPTION_KEY=.*#APP_ENCRYPTION_KEY=$APP_ENCRYPTION_KEY#" \
   -e "s#^SESSION_SECRET=.*#SESSION_SECRET=$SESSION_SECRET#" \
   -e "s#^WEB_REVALIDATE_SECRET=.*#WEB_REVALIDATE_SECRET=$WEB_REVALIDATE_SECRET#" \
+  -e "s#^EDGE_PROXY_SECRET=.*#EDGE_PROXY_SECRET=$EDGE_PROXY_SECRET#" \
   -e "s#^TELEGRAM_WEBHOOK_SECRET=.*#TELEGRAM_WEBHOOK_SECRET=$TELEGRAM_WEBHOOK_SECRET#" \
   -e "s#^POSTGRES_PASSWORD=.*#POSTGRES_PASSWORD=$POSTGRES_PASSWORD#" \
   -e "s#^FOREST_APP_DB_PASSWORD=.*#FOREST_APP_DB_PASSWORD=$FOREST_APP_DB_PASSWORD#" \
@@ -87,79 +79,137 @@ sed -i \
   -e "s#^S3_SECRET_KEY=.*#S3_SECRET_KEY=$S3_SECRET_KEY#" \
   -e "s#^OWNER_INITIAL_PASSWORD=.*#OWNER_INITIAL_PASSWORD=$OWNER_INITIAL_PASSWORD#" \
   -e 's#^OWNER_EMAIL=.*#OWNER_EMAIL=you@yourdomain.com#' \
+  -e 's#^API_URL=.*#API_URL=https://api.<domain>#' \
+  -e 's#^SITE_DOMAIN=.*#SITE_DOMAIN=<domain>#' \
+  -e 's#^ADMIN_DOMAIN=.*#ADMIN_DOMAIN=admin.<domain>#' \
+  -e 's#^API_DOMAIN=.*#API_DOMAIN=api.<domain>#' \
+  -e 's#^CDN_DOMAIN=.*#CDN_DOMAIN=cdn.<domain>#' \
+  -e 's#^S3_PUBLIC_URL=.*#S3_PUBLIC_URL=https://cdn.<domain>/forest-public#' \
+  -e 's#^S3_FORCE_PATH_STYLE=.*#S3_FORCE_PATH_STYLE=true#' \
+  -e 's#^S3_ENDPOINT=.*#S3_ENDPOINT=http://storage:8333#' \
   -e 's#^DATABASE_URL=.*#DATABASE_URL=postgresql://forest:'"$POSTGRES_PASSWORD"'@postgres:5432/forest#' \
   -e 's#^REDIS_URL=.*#REDIS_URL=redis://redis:6379#' \
-  -e 's#^S3_ENDPOINT=.*#S3_ENDPOINT=http://storage:8333#' \
-  -e 's#^S3_PUBLIC_URL=.*#S3_PUBLIC_URL=https://forest.example.com/media#' \
-  -e 's#^S3_FORCE_PATH_STYLE=.*#S3_FORCE_PATH_STYLE=true#' \
-  -e 's#^DEV_ENDPOINTS=.*#DEV_ENDPOINTS=false#' \
+  -e 's#^PROVIDERS_MODE=.*#PROVIDERS_MODE=fake#' \
+  -e 's#^ALLOW_FAKE_PROVIDERS=.*#ALLOW_FAKE_PROVIDERS=true#' \
+  -e 's#^DEV_ENDPOINTS=.*#DEV_ENDPOINTS=true#' \
+  -e 's#^TRUST_PROXY_HOPS=.*#TRUST_PROXY_HOPS=2#' \
+  -e 's#^TRUSTED_PROXIES=.*#TRUSTED_PROXIES=0.0.0.0/0 ::/0#' \
   .env
 
-echo "owner password: $OWNER_INITIAL_PASSWORD"   # save this now, it is not shown again
+echo "owner password: $OWNER_INITIAL_PASSWORD"   # save it now, not shown again
 ```
 
-Two choices this leaves open, pick one:
+`APP_URL` and `WEB_INTERNAL_URL` still need the Vercel storefront URL, but you won't know it until
+after step 4 — edit `.env` then (one line each) and restart the API (step 6 shows how); nothing
+else below depends on them.
 
-- **Fake providers today** (the first bullet in the warning above):
-  ```bash
-  sed -i -e 's#^PROVIDERS_MODE=.*#PROVIDERS_MODE=sandbox#' -e 's#^ALLOW_FAKE_PROVIDERS=.*#ALLOW_FAKE_PROVIDERS=true#' .env
-  ```
-  then always pass `--allow-fake` to `deploy.sh` below (actually keep `PROVIDERS_MODE=fake`
-  instead of `sandbox` if you want *every* provider faked, not just the ones you haven't connected
-  yet — `fake` is simplest for today).
-  ```bash
-  sed -i -e 's#^PROVIDERS_MODE=.*#PROVIDERS_MODE=fake#' .env
-  ```
-- **Real providers from day one:** leave `PROVIDERS_MODE=sandbox` and connect Payme/Click/Eskiz/etc
-  in Admin → Integrations after login (never in `.env` — CLAUDE.md §13). Don't pass `--allow-fake`.
+**Why `TRUSTED_PROXIES=0.0.0.0/0 ::/0` here (not Cloudflare ranges, not the default):** Vercel's
+outbound IPs aren't a fixed, published range the way Cloudflare's are, so Caddy can't selectively
+trust "Vercel" by address. The real security boundary is `EDGE_PROXY_SECRET`: the API only trusts
+the forwarded client IP on requests carrying the matching header (which only the web/admin
+middleware can send); every other caller — including anyone hitting `api.<domain>` directly — gets
+reduced to Caddy's own honest view of who connected, never a header they supplied. **Caveat:**
+this Caddy instance isn't serving the admin domain yet (Vercel is), so this permissive setting
+costs nothing today. The moment admin also moves onto this server's Caddy, tighten
+`TRUSTED_PROXIES` back down (Cloudflare ranges, or drop it to `private_ranges` and accept
+shared-IP-from-Vercel rate limiting) so the admin IP allowlist can't be spoofed the same way.
 
-`CDN_DOMAIN` is optional (a separate domain serving the public bucket); leave it blank for today —
-`S3_PUBLIC_URL` above already serves images through the site domain via Caddy.
-
-Also copy the ops file (backups; can be filled in later, today's launch doesn't block on it):
+## 3. Bring up just the backend (not web/admin — Vercel serves those)
 
 ```bash
-cp infra/deploy/env.ops.example .env.ops && chmod 600 .env.ops
+cd /opt/forest/app
+infra/deploy/compose.sh build postgres migrate api
+infra/deploy/compose.sh up -d --wait postgres redis storage
+infra/deploy/compose.sh run --rm --no-deps migrate
+docker exec -i "$(infra/deploy/compose.sh ps -q postgres)" psql -X -q -U forest -d forest \
+  -v ON_ERROR_STOP=1 -v app_password="$FOREST_APP_DB_PASSWORD" -v ro_password="" \
+  -f - <infra/deploy/db-roles.sql
+infra/deploy/compose.sh up -d api
+infra/deploy/compose.sh up -d --no-deps caddy
 ```
+`--no-deps` on the last line matters: without it, Compose would also start `web`/`admin` because
+Caddy depends on them — we don't want those running here. Caddy will log (harmless) certificate
+errors for `SITE_DOMAIN`/`ADMIN_DOMAIN` since nothing serves them yet; ignore that for now.
 
-## 4. Preflight, build, deploy
-
+Check it worked:
 ```bash
-infra/deploy/deploy.sh preflight            # add --allow-fake if you set PROVIDERS_MODE=fake above
+curl -s https://api.<domain>/ready    # expect {"status":"ok", ...}
+infra/deploy/compose.sh ps
 ```
-Fix anything it lists (it tells you exactly which `.env` line is wrong), then:
-```bash
-infra/deploy/deploy.sh --allow-fake         # omit --allow-fake if PROVIDERS_MODE is sandbox/live
-```
-First run builds every image (~10 min). It migrates the database, starts everything, and waits for
-`https://<site>`, `https://<api>/ready`, `https://<admin>/login` to answer through Caddy — so this
-step alone proves DNS + Caddy + TLS worked. If it fails, it prints why; share that output with me.
+If `/ready` doesn't answer: `infra/deploy/compose.sh logs --tail 100 caddy` and `... api` — share
+the output.
 
-## 5. Seed (owner account, settings, sample catalog)
+## 4. Seed (owner account, settings, sample catalog)
 
 ```bash
 infra/deploy/compose.sh run --rm --no-deps -e S3_ENDPOINT=http://storage:8333 \
   -w /repo/packages/db migrate sh -c 'node_modules/.bin/tsx src/seed/index.ts --allow-production'
 ```
 
-## 6. Log in, lock the account down
+## 5. Vercel: web + admin
 
-1. Open `https://admin.forest.example.com`, log in with `OWNER_EMAIL` / the password printed in
-   step 3, enrol TOTP when it's forced, then change the password.
-2. Only after that: share the site/admin links.
+The `forest-demo-web` / `forest-demo-admin` Vercel projects already exist (created earlier, not
+yet deployed). For each:
 
-## 7. What's deliberately deferred (not blocking today's launch)
+1. Project → Settings → **Git**: connect `Elmun-Technologies/forest.uz`, Production Branch `main`.
+2. Settings → **Build and Deployment**: Framework **Next.js**, Root Directory `apps/web` (or
+   `apps/admin`), Node.js **22.x**.
+3. Settings → **Environment Variables** (Production):
 
-- Real Payme/Click/Eskiz/Telegram/Yandex/MoySklad credentials — connect them in Admin →
-  Integrations whenever ready; the site works with fakes until then.
-- Backups (`infra/backup/*`, systemd timers) and monitoring (GlitchTip/Uptime Kuma) — do these in
-  the next day or two (`docs/runbooks/restore-db.md`, `monitoring.md`); don't let them block go-live.
-- Cloudflare in front — optional, `deploy-and-rollback.md` §5 covers it; needs `TRUST_PROXY_HOPS=2`
-  + `TRUSTED_PROXIES`.
-- Replacing the seeded sample catalog with the real one (`docs/launch-checklist.md`).
-- The PII/hosting-location decision flagged at the top — resolve before real customer orders.
+| Variable | web | admin |
+|---|---|---|
+| `API_INTERNAL_URL`, `API_URL` | `https://api.<domain>` | `https://api.<domain>` |
+| `APP_URL` | this project's own Vercel URL | this project's own Vercel URL |
+| `S3_PUBLIC_URL` | `https://cdn.<domain>/forest-public` | same |
+| `EDGE_PROXY_SECRET` (Sensitive) | the value generated in step 2 | same |
+| `WEB_REVALIDATE_SECRET` (Sensitive) | the value generated in step 2 | — |
+| `WEB_INTERNAL_URL` | — | the **web** project's Vercel URL (heatmap backdrops) |
 
-## 8. Regular deploys after today
+4. Deploy (Deployments → trigger one, or just push to `main`).
+5. Note each project's production URL (Project → Domains).
 
-Same as `deploy-and-rollback.md` §2: `git pull && infra/deploy/deploy.sh` (drop `--allow-fake` once
-`PROVIDERS_MODE` is `sandbox`/`live`). Rollback: `infra/deploy/deploy.sh rollback`.
+## 6. Wire the two sides together
+
+Back on the server:
+```bash
+cd /opt/forest/app
+sed -i \
+  -e 's#^APP_URL=.*#APP_URL=https://<web-vercel-url>#' \
+  -e 's#^WEB_INTERNAL_URL=.*#WEB_INTERNAL_URL=https://<web-vercel-url>#' \
+  -e 's#^ADMIN_URL=.*#ADMIN_URL=https://<admin-vercel-url>#' \
+  .env
+infra/deploy/compose.sh up -d api   # picks up the new .env
+```
+
+## 7. Log in, lock the account down
+
+Open the **admin** Vercel URL, log in with `OWNER_EMAIL` / the password from step 2, enrol TOTP
+when forced, change the password. Only then share the **web** URL with anyone.
+
+## 8. Verify the client-IP setup actually works
+
+From Wi-Fi, request OTP codes on the storefront for six made-up numbers
+(`+998 90 000 00 01` … `06`) — `OTP_POLICY` allows 5 sends/hour per IP, so the sixth must be
+refused. From a phone on mobile data, request one for `+998 90 000 00 07`: it must succeed. If
+it's refused too, everyone is sharing one IP — check `EDGE_PROXY_SECRET` matches on both Vercel
+projects and the server's `.env`, and that `TRUST_PROXY_HOPS=2` on the server.
+
+Read a sent code (testing only, made-up numbers): `https://api.<domain>/v1/dev/outbox?to=%2B998900000001`.
+
+## 9. What's deliberately deferred
+
+- Real Payme/Click/Eskiz/Telegram/Yandex/MoySklad credentials (Admin → Integrations, whenever
+  ready — the site runs on fakes until then).
+- Backups, monitoring, the `forest_ro` read-only role, the sample catalog swap — same list as
+  `docs/launch-checklist.md`; none of them block today's launch.
+- Moving web/admin onto this same server (drop the Vercel split, use `deploy-and-rollback.md`
+  as-is) and tightening `TRUSTED_PROXIES` back down when you do.
+- The PII/hosting-location point from the top of this file.
+
+## 10. Redeploying the API after a code change
+
+```bash
+cd /opt/forest/app && git pull
+infra/deploy/compose.sh build api && infra/deploy/compose.sh up -d api
+```
+A new migration: re-run the `migrate` command from step 3 first.
