@@ -53,6 +53,7 @@ services:
 
   migrate:
     env_file: .env
+    restart: 'no'
     build: { context: ., dockerfile: infra/docker/api.Dockerfile, target: migrate }
     environment:
       DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
