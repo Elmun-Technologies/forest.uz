@@ -3,15 +3,20 @@
 Owner decision (2026-11-07, CLAUDE.md §6): web + admin run on **Vercel** right away so the site is
 reachable today; everything server-side (API, Postgres, Redis, object storage, and later the
 backup/monitoring/bot pieces) is built up on the **Hetzner VPS**, one service at a time, instead of
-bringing up the full `infra/compose.yml` stack at once. This file covers that split. Once web and
-admin also move onto the same server, switch to the plain, already-documented full-stack flow in
-`docs/runbooks/deploy-and-rollback.md` — nothing here conflicts with it.
+bringing up the full `infra/compose.yml` stack at once. No real domain is needed yet either — the
+API gets its HTTPS hostname from the server's own IP via **nip.io** (a free wildcard DNS service:
+`api.<ip-with-dashes>.nip.io` resolves straight to `<ip>`, no registration, no DNS panel). Caddy
+still gets a real Let's Encrypt certificate for it. Swapping in a real domain later is a 3-line env
+change (§2/§6 below) plus one A record — nothing else changes.
+
+Once web and admin also move onto the same server, switch to the plain, already-documented
+full-stack flow in `docs/runbooks/deploy-and-rollback.md` — nothing here conflicts with it.
 
 ```
 Browser ──► Vercel: web  (Root Directory apps/web)   ──/api/* rewrite──┐
         └─► Vercel: admin (Root Directory apps/admin) ─/api/* rewrite──┤
                                                                        ▼
-                 Hetzner VPS: Caddy :80/:443 (api.<domain>, cdn.<domain>)
+          Hetzner VPS: Caddy :80/:443 (api.<ip>.nip.io, cdn.<ip>.nip.io)
                         └──► api (NestJS + BullMQ) ──► postgres, redis, storage (SeaweedFS)
 ```
 
@@ -21,18 +26,11 @@ Browser ──► Vercel: web  (Root Directory apps/web)   ──/api/* rewrite�
 
 ## 0. What I need from you
 
-1. **Exact domain spelling.** You mentioned "forestgroup.uz" — please confirm the exact text
-   (no spaces, exact case) so the DNS and env values below are right the first time.
-2. Confirm the Hetzner server's **IP address** and that root SSH already works.
-3. Three DNS **A records** at your domain registrar/DNS panel, pointing at the server's IP:
-   - `api.<domain>` — the API, real traffic.
-   - `cdn.<domain>` — product images (the public object storage bucket).
-   - `admin.<domain>` — not used yet (Vercel serves admin for now), but worth creating now so it's
-     ready when you move admin onto the server later; harmless if it points here before that.
-   No record needed for the bare domain or `www` today — Vercel's own domains (or a future
-   `forest-demo-web`/`forest-demo-admin` custom domain) serve the site for now.
+1. The Hetzner server's **IP address**.
+2. Confirm root SSH already works (and how you log in — password or a key already added in the
+   Hetzner console).
 
-I'll use `<domain>` as a placeholder below — swap in the real one.
+That's it — no domain, no DNS panel.
 
 ## 1. Server: lock it down, install Docker, clone the repo
 
@@ -49,11 +47,16 @@ git checkout main
 
 ## 2. `.env` on the server
 
+Replace `<ip>` below with the server's real IP, dashes instead of dots (e.g. `5.6.7.8` →
+`5-6-7-8`) — only in the `sed` block, nowhere else needs it.
+
 ```bash
 cd /opt/forest/app
 cp .env.example .env
 chmod 600 .env
 cp infra/deploy/env.ops.example .env.ops && chmod 600 .env.ops   # backups/alerts — fill in later
+
+IP_DASHED=<ip-with-dashes>   # e.g. IP_DASHED=5-6-7-8 for server IP 5.6.7.8
 
 # Generate every secret now, on the server.
 APP_ENCRYPTION_KEY=$(openssl rand -base64 32)
@@ -79,12 +82,12 @@ sed -i \
   -e "s#^S3_SECRET_KEY=.*#S3_SECRET_KEY=$S3_SECRET_KEY#" \
   -e "s#^OWNER_INITIAL_PASSWORD=.*#OWNER_INITIAL_PASSWORD=$OWNER_INITIAL_PASSWORD#" \
   -e 's#^OWNER_EMAIL=.*#OWNER_EMAIL=you@yourdomain.com#' \
-  -e 's#^API_URL=.*#API_URL=https://api.<domain>#' \
-  -e 's#^SITE_DOMAIN=.*#SITE_DOMAIN=<domain>#' \
-  -e 's#^ADMIN_DOMAIN=.*#ADMIN_DOMAIN=admin.<domain>#' \
-  -e 's#^API_DOMAIN=.*#API_DOMAIN=api.<domain>#' \
-  -e 's#^CDN_DOMAIN=.*#CDN_DOMAIN=cdn.<domain>#' \
-  -e 's#^S3_PUBLIC_URL=.*#S3_PUBLIC_URL=https://cdn.<domain>/forest-public#' \
+  -e "s#^API_URL=.*#API_URL=https://api.$IP_DASHED.nip.io#" \
+  -e "s#^SITE_DOMAIN=.*#SITE_DOMAIN=site.$IP_DASHED.nip.io#" \
+  -e "s#^ADMIN_DOMAIN=.*#ADMIN_DOMAIN=admin.$IP_DASHED.nip.io#" \
+  -e "s#^API_DOMAIN=.*#API_DOMAIN=api.$IP_DASHED.nip.io#" \
+  -e "s#^CDN_DOMAIN=.*#CDN_DOMAIN=cdn.$IP_DASHED.nip.io#" \
+  -e "s#^S3_PUBLIC_URL=.*#S3_PUBLIC_URL=https://cdn.$IP_DASHED.nip.io/forest-public#" \
   -e 's#^S3_FORCE_PATH_STYLE=.*#S3_FORCE_PATH_STYLE=true#' \
   -e 's#^S3_ENDPOINT=.*#S3_ENDPOINT=http://storage:8333#' \
   -e 's#^DATABASE_URL=.*#DATABASE_URL=postgresql://forest:'"$POSTGRES_PASSWORD"'@postgres:5432/forest#' \
@@ -107,10 +110,10 @@ else below depends on them.
 outbound IPs aren't a fixed, published range the way Cloudflare's are, so Caddy can't selectively
 trust "Vercel" by address. The real security boundary is `EDGE_PROXY_SECRET`: the API only trusts
 the forwarded client IP on requests carrying the matching header (which only the web/admin
-middleware can send); every other caller — including anyone hitting `api.<domain>` directly — gets
-reduced to Caddy's own honest view of who connected, never a header they supplied. **Caveat:**
-this Caddy instance isn't serving the admin domain yet (Vercel is), so this permissive setting
-costs nothing today. The moment admin also moves onto this server's Caddy, tighten
+middleware can send); every other caller — including anyone hitting the API hostname directly —
+gets reduced to Caddy's own honest view of who connected, never a header they supplied.
+**Caveat:** this Caddy instance isn't serving the admin domain yet (Vercel is), so this permissive
+setting costs nothing today. The moment admin also moves onto this server's Caddy, tighten
 `TRUSTED_PROXIES` back down (Cloudflare ranges, or drop it to `private_ranges` and accept
 shared-IP-from-Vercel rate limiting) so the admin IP allowlist can't be spoofed the same way.
 
@@ -131,9 +134,9 @@ infra/deploy/compose.sh up -d --no-deps caddy
 Caddy depends on them — we don't want those running here. Caddy will log (harmless) certificate
 errors for `SITE_DOMAIN`/`ADMIN_DOMAIN` since nothing serves them yet; ignore that for now.
 
-Check it worked:
+Check it worked (use the same `$IP_DASHED` from step 2):
 ```bash
-curl -s https://api.<domain>/ready    # expect {"status":"ok", ...}
+curl -s https://api.$IP_DASHED.nip.io/ready    # expect {"status":"ok", ...}
 infra/deploy/compose.sh ps
 ```
 If `/ready` doesn't answer: `infra/deploy/compose.sh logs --tail 100 caddy` and `... api` — share
@@ -154,19 +157,20 @@ yet deployed). For each:
 1. Project → Settings → **Git**: connect `Elmun-Technologies/forest.uz`, Production Branch `main`.
 2. Settings → **Build and Deployment**: Framework **Next.js**, Root Directory `apps/web` (or
    `apps/admin`), Node.js **22.x**.
-3. Settings → **Environment Variables** (Production):
+3. Settings → **Environment Variables** (Production) — use the same `$IP_DASHED` value from step 2:
 
 | Variable | web | admin |
 |---|---|---|
-| `API_INTERNAL_URL`, `API_URL` | `https://api.<domain>` | `https://api.<domain>` |
+| `API_INTERNAL_URL`, `API_URL` | `https://api.<ip-dashed>.nip.io` | same |
 | `APP_URL` | this project's own Vercel URL | this project's own Vercel URL |
-| `S3_PUBLIC_URL` | `https://cdn.<domain>/forest-public` | same |
+| `S3_PUBLIC_URL` | `https://cdn.<ip-dashed>.nip.io/forest-public` | same |
 | `EDGE_PROXY_SECRET` (Sensitive) | the value generated in step 2 | same |
 | `WEB_REVALIDATE_SECRET` (Sensitive) | the value generated in step 2 | — |
 | `WEB_INTERNAL_URL` | — | the **web** project's Vercel URL (heatmap backdrops) |
 
 4. Deploy (Deployments → trigger one, or just push to `main`).
-5. Note each project's production URL (Project → Domains).
+5. Note each project's production URL (Project → Domains) — this is what you'll actually share
+   today; a custom domain for these is a separate, later step.
 
 ## 6. Wire the two sides together
 
@@ -194,10 +198,12 @@ refused. From a phone on mobile data, request one for `+998 90 000 00 07`: it mu
 it's refused too, everyone is sharing one IP — check `EDGE_PROXY_SECRET` matches on both Vercel
 projects and the server's `.env`, and that `TRUST_PROXY_HOPS=2` on the server.
 
-Read a sent code (testing only, made-up numbers): `https://api.<domain>/v1/dev/outbox?to=%2B998900000001`.
+Read a sent code (testing only, made-up numbers): `https://api.<ip-dashed>.nip.io/v1/dev/outbox?to=%2B998900000001`.
 
 ## 9. What's deliberately deferred
 
+- A real domain (swap `*.nip.io` for it later: three `sed` lines in step 2, one in each Vercel
+  project's env, redeploy `caddy` and `api` — no code change, no data migration).
 - Real Payme/Click/Eskiz/Telegram/Yandex/MoySklad credentials (Admin → Integrations, whenever
   ready — the site runs on fakes until then).
 - Backups, monitoring, the `forest_ro` read-only role, the sample catalog swap — same list as
