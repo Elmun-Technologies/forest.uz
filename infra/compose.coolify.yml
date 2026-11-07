@@ -4,7 +4,7 @@
 name: forest
 
 x-app-env: &app-env
-  env_file: ../.env
+  env_file: .env
   restart: unless-stopped
 
 services:
@@ -44,7 +44,7 @@ services:
       ]
     volumes:
       - storagedata:/data
-      - ./seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8333/status || exit 1']
       interval: 3s
@@ -52,8 +52,8 @@ services:
       retries: 30
 
   migrate:
-    env_file: ../.env
-    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: migrate }
+    env_file: .env
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile, target: migrate }
     environment:
       DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
     depends_on:
@@ -61,7 +61,7 @@ services:
 
   api:
     <<: *app-env
-    build: { context: .., dockerfile: infra/docker/api.Dockerfile, target: runtime }
+    build: { context: ., dockerfile: infra/docker/api.Dockerfile, target: runtime }
     environment:
       DATABASE_URL: postgresql://forest:${POSTGRES_PASSWORD:-forest}@postgres:5432/forest
       REDIS_URL: redis://redis:6379
@@ -76,7 +76,7 @@ services:
   web:
     <<: *app-env
     build:
-      context: ..
+      context: .
       dockerfile: infra/docker/next.Dockerfile
       args:
         APP: web
@@ -90,7 +90,7 @@ services:
   admin:
     <<: *app-env
     build:
-      context: ..
+      context: .
       dockerfile: infra/docker/next.Dockerfile
       args:
         APP: admin
