@@ -104,7 +104,7 @@ export function FilterPanel({
                   data-testid={`volume-${key}`}
                   onClick={() => apply({ volume: toggle(filters.volume, key) })}
                   className={cn(
-                    'rounded-pill px-3.5 py-2 text-sm transition-colors',
+                    'hit-44 rounded-pill px-3.5 py-2 text-sm transition-colors',
                     on ? 'bg-ink text-white' : 'border border-line hover:border-ink',
                   )}
                 >

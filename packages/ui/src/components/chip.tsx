@@ -18,7 +18,8 @@ export const Chip = forwardRef<HTMLButtonElement, ChipProps>(function Chip(
       type={type ?? 'button'}
       aria-pressed={selected}
       className={cn(
-        'inline-flex h-9 items-center gap-1.5 rounded-pill px-4 text-[13px] font-medium transition-colors',
+        // `hit-44`: drawn 36 px tall (design), tappable 44 px on phones.
+        'hit-44 inline-flex h-9 items-center gap-1.5 rounded-pill px-4 text-[13px] font-medium transition-colors',
         selected
           ? 'bg-ink text-white'
           : surface === 'panel'
