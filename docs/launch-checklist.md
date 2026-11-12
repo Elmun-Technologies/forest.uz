@@ -11,11 +11,18 @@ can't be ticked is a launch blocker unless the Owner writes an explicit waiver n
       (`https://<API_DOMAIN>/v1/webhooks/payme`, `…/click/prepare`, `…/click/complete`); Payme
       sandbox suite passed on staging; one real 1 000 so'm payment + refund per provider
       (docs/runbooks/payments.md "Before go-live").
-- [ ] **Fiscal receipts**: Payme `fiscalDetail` on, receipts show the right IKPU/package codes; COD
-      receipt process agreed with couriers (docs/13 q.6/q.34).
+- [ ] **Fiscal receipts**: Payme `fiscalDetail` on, receipts show the right IKPU/package codes;
+      Click `fiscalize` on with `merchantUserId`, delivery IKPU/package code/VAT entered, company
+      STIR filled (Admin → Sozlamalar → Do'kon) — a test Click payment gets a receipt link on its
+      payment; COD receipt process agreed with couriers (docs/13 q.6, q.104–107).
+- [ ] **Click service live**: Prepare/Complete URLs set in merchant.click.uz, service activated by
+      Click, server domain + static IP + port 443 whitelisted by Click (we are outside TAS-IX);
+      Click Up test payment of 1 000 so'm passed (docs/runbooks/payments.md "Click go-live").
 - [ ] **IKPU complete** — no active variant with an empty or placeholder IKPU (A11 KPI = 0;
       `infra/backup/sanity.sql` style check:
-      `SELECT count(*) FROM "Variant" v JOIN "Product" p ON p.id = v."productId" WHERE p.status='ACTIVE' AND v.active AND (v.ikpu IS NULL OR v.ikpu !~ '^[0-9]{17}$' OR v.ikpu = '00000000000000000')` → 0).
+      `SELECT count(*) FROM "Variant" v JOIN "Product" p ON p.id = v."productId" WHERE p.status='ACTIVE' AND v.active AND (v.ikpu IS NULL OR v.ikpu !~ '^[0-9]{17}$' OR v.ikpu = '00000000000000000')` → 0),
+      and **package codes** too (`… AND (v."packageCode" IS NULL OR v."packageCode" !~ '^[0-9]{1,20}$')` → 0) —
+      Payme and Click refuse receipt lines without them.
 - [ ] **Real photos, prices, texts** — sample/seed catalogue replaced (no design sample data,
       no `[placeholder]`), prices from MoySklad, delivery prices/thresholds confirmed in
       Admin → Sozlamalar → Yetkazish (free-delivery threshold `[confirm]` in CLAUDE.md §11).

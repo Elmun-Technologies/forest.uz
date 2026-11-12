@@ -5,9 +5,31 @@ Code: `apps/api/src/payments/*` (webhooks), `apps/api/src/integrations/providers
 `apps/api/src/commerce/order-lifecycle.service.ts`. Tests: `apps/api/test/payments.int.test.ts`,
 `apps/api/src/integrations/providers/{payme,click}.test.ts`.
 
-## Source of truth (2026-10-26)
-The official doc sites (`*.paycom.uz`, `docs.click.uz`) are blocked from the dev environment, so the
-protocol was implemented from the providers' **official GitHub repositories**, pinned to these commits:
+## Source of truth
+**Since 2026-11-12 the official documentation is reachable and was checked against the code:**
+- Payme — developer.help.paycom.uz: Merchant API methods (CheckPerformTransaction incl. the fiscal
+  `detail` object, CreateTransaction, PerformTransaction, CancelTransaction, CheckTransaction,
+  GetStatement) and "Отправка чека по методу GET/POST" (checkout link).
+- Click — docs.click.uz (Docusaurus site; the page text lives in its JS bundles): SHOP API requests
+  (Prepare/Complete), "Payment Button — With Redirection" (`my.click.uz/services/pay`), "Payment
+  by Card" (`checkout.js` / `createPaymentRequest`), Merchant API → Data Fiscalization
+  (`ofd_data/submit_items`, `submit_qrcode`, `GET ofd_data/:service_id/:payment_id`).
+- Owner's notes from the providers (2026-11-12): Payme fiscal fields (title, price per unit in
+  tiyin, count, code = MXIK, package_code, vat_percent; package code looked up at
+  `https://tasnif.soliq.uz/attribute/<MXIK>`); Click manager's go-live instructions (below).
+
+What the docs changed (commits `fix(payme): …`, `feat(click): …`):
+- Payme CheckPerformTransaction may only answer `-31001` or the account range `-31050…-31099`, so
+  order-state refusals moved from the template's `-31008` to `-31051` (already paid), `-31052`
+  (cancelled / payment time over) and `-31053` (another transaction in progress), each with
+  `data: "order_id"`. `-31008` stays for transaction-state errors (Create/Perform).
+- Payme `detail.items[].package_code` is **required**: a receipt line without a real IKPU or package
+  code means no `detail` (the order then needs a manual receipt) instead of a receipt Payme rejects.
+- Click: fiscalization of paid orders is mandatory for shops with more than one IKPU → automated
+  via the Merchant API (below). The hosted page link format is confirmed.
+
+Initial implementation (2026-10-26, doc sites blocked from dev at the time) followed the providers'
+**official GitHub repositories**, pinned to these commits:
 
 | Provider | Repository @ commit | Files used |
 |---|---|---|
@@ -29,7 +51,14 @@ Raw files: `https://raw.githubusercontent.com/<org>/<repo>/<commit>/<path>`.
 Credentials are entered by the Owner in admin → Integrations (encrypted at rest), never env vars:
 Payme `merchantId`, `key`, `testKey`, `mode` (test → `testKey` authenticates and checkout uses the
 test host), `fiscalDetail` (on/off, default on), `allowedIps` (optional). Click `serviceId`,
-`merchantId`, `merchantUserId`, `secretKey`, `mode`.
+`merchantId`, `merchantUserId` (needed for fiscalization), `secretKey`, `mode`, `fiscalize`
+(on/off, default on), `shippingIkpu` / `shippingPackageCode` / `shippingVatPercent` (the delivery
+service line on Click receipts; without them an order with paid delivery is not fiscalized by Click).
+
+Data every receipt needs (both providers): each sold variant's **IKPU (MXIK, 17 digits)** and
+**package code** (Admin → Mahsulotlar → variant; look the package code up on
+`https://tasnif.soliq.uz/attribute/<MXIK>`), its VAT % (12 for a VAT payer, 0 otherwise), and the
+company **STIR** (Admin → Sozlamalar → Do'kon → legal data; Click sends it as `CommissionInfo.TIN`).
 
 ## What is implemented (verified against the sources above)
 **Payme** — every method of the template: `CheckPerformTransaction`, `CreateTransaction`,
@@ -37,13 +66,14 @@ test host), `fiscalDetail` (on/off, default on), `allowedIps` (optional). Click 
 - Auth `Authorization: Basic base64("Paycom:<key>")`, constant-time compare → else `-32504`.
 - Errors: `-32504` privilege, `-32600` invalid request (missing `id`/`time`/`reason`), `-32601`
   method not found (`data` = method), `-32400` internal, `-31001` amount, `-31003` transaction not
-  found, `-31007` cannot cancel, `-31008` cannot perform, `-31050` account (`data: "order_id"`) —
-  messages `{ru, uz, en}` (English text from the template, translations ours).
-- Validation order = template `Order::validate`: amount numeric (`-31001`) → account (`-31050`) →
-  amount equal to order total in tiyin (`-31001`) → order waiting for payment, else `-31008`
-  (already paid / cancelled / reservation expired).
-- `CheckPerformTransaction` with another created/performed transaction → `-31008`;
-  `CreateTransaction` with another active transaction id → `-31050` (both as in the template).
+  found, `-31007` cannot cancel, `-31008` cannot perform (transaction state), `-31050` account
+  (`data: "order_id"`), `-31051` order already paid, `-31052` order cancelled / payment time over,
+  `-31053` another transaction in progress (all three with `data: "order_id"`) — messages
+  `{ru, uz, en}`.
+- Validation order: amount numeric (`-31001`) → account (`-31050`) → amount equal to order total in
+  tiyin (`-31001`) → order waiting for payment (`-31051` / `-31052`) → no other active transaction
+  (`-31053`). A repeated `CreateTransaction` for a known transaction answers from the transaction's
+  own state (stored result, or `-31008` once it is no longer created).
 - States 1/2/-1/-2, reasons 1–5, 10. Created transactions expire after 43 200 000 ms (12 h, from
   our create time): on Create/Perform the transaction is cancelled with reason 4, then `-31008`.
 - Repeated Create/Perform/Cancel return the stored result; concurrent calls are serialized by
@@ -76,7 +106,58 @@ behaviour) without side effects. Amount (so'm decimal string) → tiyin only in 
 - Orders are payable only by the method chosen at checkout (or switched via "pay again"); a COD order
   or a Payme order sent to Click answers "order not found" (`-31050` / `-5`).
 
+## Click fiscalization (Merchant API)
+Code: `apps/api/src/payments/click-fiscal.service.ts` (job `payments.click.fiscalize`, queue
+`payments`, every minute), pure helpers in `integrations/providers/click.ts`
+(`clickMerchantAuth`, `buildClickOfdPayload`), test `apps/api/test/click-fiscal.int.test.ts`
+against a local stub of the Merchant API.
+- For each Click payment PAID in the last 7 days without `fiscalReceiptUrl`:
+  1. `GET https://api.click.uz/v2/merchant/payment/ofd_data/<service_id>/<click_paydoc_id>` — if
+     Click already has a receipt (`qrCodeURL`), store it and stop (makes a crash after a submission
+     harmless: nothing is filed twice).
+  2. Otherwise `POST …/payment/ofd_data/submit_items` with `service_id`, `payment_id` =
+     `click_paydoc_id` (from Prepare/Complete), `received_card` = total (tiyin) and one item per
+     order line: `Name` (≤ 63 chars, Uzbek name + variant), `SPIC` (IKPU), `PackageCode`,
+     `GoodPrice` (unit), `Price` (unit × qty), `Amount` (qty), `Discount`, `VAT` (VAT inside the
+     discounted amount), `VATPercent`, `CommissionInfo {TIN: <store STIR>}` (or `PINFL`), plus a
+     delivery line when delivery is charged. Header
+     `Auth: merchant_user_id:sha1(timestamp + secret_key):timestamp`.
+  3. The receipt link from step 1 is polled for up to an hour and saved as
+     `Payment.fiscalReceiptUrl` → fiscal evidence (`payment_url`), so the order can be COMPLETED.
+- Click errors back off 1 min → 6 h, 8 attempts, then `failed`. Missing data (IKPU, package code,
+  seller STIR, delivery codes, totals mismatch) is recorded as the reason in
+  `Payment.providerData.ofd` and re-checked hourly (settings may be filled in later); after 7 days
+  the operator records the receipt manually (admin order page). Every terminal problem writes an
+  IntegrationLog failure row (`click`, `fiscal.submit_items`), which the bot's integration-error
+  alert picks up.
+- Off switch: Click integration field `fiscalize = off` (e.g. if the merchant fiscalizes another way).
+- Not used: `submit_qrcode` (for receipts printed by our own cash register — we have none online).
+
+## Click go-live (manager's instructions, 2026-11-12)
+1. Integration test with Click's test program (docs.click.uz → Merchant API → fiscalization tester).
+2. merchant.click.uz → **Сервисы** → **Действия** on our service → enter the Prepare and Complete
+   URLs (`https://<API_DOMAIN>/v1/webhooks/click/prepare|complete`), then ask Click to **activate**
+   the service (it is created disabled).
+3. Our server is not in the TAS-IX network → send Click the API **domain, IP address and port (443)**
+   for their firewall whitelist **before the first real payment**. The IP must be **static**; warn
+   Click before changing IP or domain (the Hetzner VPS IP 2.29.137.243 is static; a later move to a
+   UZ VPS needs a new whitelist request first).
+4. Test: install Click Up, open
+   `https://my.click.uz/services/pay?service_id=<SERVICE_ID>&merchant_id=<MERCHANT_ID>&amount=1000&transaction_param=<order number>`,
+   enter a phone or card, pay the invoice in Click Up. Our Prepare/Complete calls are in
+   IntegrationLog (`click`, `webhook.prepare|complete`) — send those to the Click group if it fails.
+5. Buttons: Click offers a redirect button (`my.click.uz/services/pay`, which itself accepts a Click
+   phone **or** any Uzcard/Humo card) and an on-page card widget (`my.click.uz/pay/checkout.js`).
+   The storefront uses the redirect link — it covers both payer types without third-party JS on our
+   pages (mobile performance, CSP). The widget can be added later if the owner wants payment
+   without leaving the site.
+
 ## NOT verified (open questions 28–36)
+Resolved on 2026-11-12 from the official docs: q.28 (Payme link format, test host from the POST
+form example), q.29 (detail field names, per-unit price, package code required), q.33 (Click link),
+q.34 (Click fiscalization), part of q.30 (`perform_time/cancel_time = 0`, CheckPerformTransaction
+codes). The list below keeps the history; still open: Payme `-32700`, the full Payme sandbox run,
+Payme IPs (q.31), Click reversal `payment_id` (q.35).
 1. Payme checkout link format `https://checkout.paycom.uz/<base64("m=…;ac.order_id=…;a=…;c=…;l=…")>`
    and the test host `https://test.paycom.uz` — from docs/06, not in any official repo.
 2. Payme fiscal `detail` field names (`receipt_type`, `items[].title/price/count/code/package_code/
@@ -101,7 +182,11 @@ behaviour) without side effects. Amount (so'm decimal string) → tiyin only in 
 - [ ] Payme test cashbox: endpoint + `order_id` field set; all sandbox scenarios green.
 - [ ] Payme live key entered, `mode=live`; one real 1 000 so'm payment + cabinet refund.
 - [ ] Click test service: Prepare/Complete URLs set; test payment + failure + repeat.
-- [ ] Fiscal receipts appear for both providers with the right IKPU/package codes (docs/13 q.6).
+- [ ] Fiscal receipts appear for both providers with the right IKPU/package codes (docs/13 q.6):
+      Payme — receipt in the Payme cabinet; Click — `fiscalReceiptUrl` filled on the payment
+      (admin order page shows the receipt link).
+- [ ] Click: Prepare/Complete URLs in merchant.click.uz, service activated, server IP/domain
+      whitelisted by Click, `merchantUserId` + shipping IKPU/package code entered.
 
 ## Incident notes
 - "Paid but order not confirmed": check `IntegrationLog` (`integrationKey` payme/click,
