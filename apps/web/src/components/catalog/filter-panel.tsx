@@ -46,7 +46,10 @@ export function FilterPanel({
       <fieldset className={group}>
         <legend className={cn(groupTitle, 'float-left mb-3 w-full')}>{t('surface')}</legend>
         {SURFACES.map((s) => (
-          <label key={s} className="flex min-h-7 cursor-pointer items-center gap-2.5 text-[15px]">
+          <label
+            key={s}
+            className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] lg:min-h-7"
+          >
             <input
               type="checkbox"
               checked={filters.surface.includes(s)}
@@ -75,7 +78,7 @@ export function FilterPanel({
                   data-testid={`color-${key}`}
                   onClick={() => apply({ color: toggle(filters.color, key) })}
                   className={cn(
-                    'size-9 rounded-pill',
+                    "relative size-9 rounded-pill before:absolute before:-inset-1 before:content-['']",
                     on ? 'border-2 border-ink shadow-[inset_0_0_0_3px_#fff]' : 'border border-line',
                   )}
                   style={{ backgroundColor: c.hex }}
@@ -121,7 +124,7 @@ export function FilterPanel({
           {facets.brands.map((b) => (
             <label
               key={b.slug}
-              className="flex min-h-7 cursor-pointer items-center gap-2.5 text-[15px]"
+              className="flex min-h-11 cursor-pointer items-center gap-2.5 text-[15px] lg:min-h-7"
             >
               <input
                 type="checkbox"
@@ -239,7 +242,7 @@ function PriceRange({
             onKeyDown={(e) => {
               if (e.key === 'Enter') commit();
             }}
-            className="tabular h-11 w-full min-w-0 flex-1 rounded-sm border border-line px-3 text-sm focus:border-ink focus:outline-none"
+            className="tabular h-11 w-full min-w-0 flex-1 rounded-sm border border-line px-3 text-base focus:border-ink focus:outline-none lg:text-sm"
           />
         ))}
       </div>

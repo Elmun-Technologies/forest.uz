@@ -660,7 +660,7 @@ export function CheckoutForm({ offerVersion, codEnabled, codMaxSoum, prefill }: 
       </div>
 
       {/* Mobile sticky submit bar */}
-      <div className="sticky bottom-0 z-30 flex flex-col gap-2.5 border-t border-line bg-panel px-3 pt-3 pb-4 lg:hidden">
+      <div className="sticky bottom-0 z-30 flex flex-col gap-2.5 border-t border-line bg-panel px-3 pt-3 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:hidden">
         <SubmitError error={formError} />
         <p className="text-[13px] text-muted">{summaryLine(cart)}</p>
         <Button

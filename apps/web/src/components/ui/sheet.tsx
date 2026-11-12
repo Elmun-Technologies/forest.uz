@@ -51,7 +51,11 @@ export function Sheet({
             <Dialog.Description className="sr-only">{title}</Dialog.Description>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer ? <div className="border-t border-line px-5 pt-3 pb-5">{footer}</div> : null}
+          {footer ? (
+            <div className="border-t border-line px-5 pt-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+              {footer}
+            </div>
+          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

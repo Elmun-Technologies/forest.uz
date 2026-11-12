@@ -31,14 +31,14 @@ export function MobileFilters({
         <button
           type="button"
           data-testid="open-filters"
-          className="inline-flex h-10 items-center gap-1.5 rounded-pill bg-panel px-3.5 text-[13px] font-semibold"
+          className="inline-flex h-11 items-center gap-1.5 rounded-pill bg-panel px-3.5 text-[13px] font-semibold"
         >
           <SlidersHorizontal size={14} strokeWidth={2} aria-hidden />
           {t('filter')}
         </button>
       }
       headerAction={
-        <button type="button" onClick={reset} className="text-sm text-muted underline">
+        <button type="button" onClick={reset} className="min-h-11 text-sm text-muted underline">
           {t('clear')}
         </button>
       }

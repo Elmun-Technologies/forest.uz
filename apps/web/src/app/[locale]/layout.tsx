@@ -46,7 +46,14 @@ export async function generateMetadata({
   };
 }
 
-export const viewport: Viewport = { themeColor: '#EEEFEA', width: 'device-width', initialScale: 1 };
+// `viewportFit: 'cover'` makes iOS report `env(safe-area-inset-*)`: the fixed/sticky bottom bars
+// (buy bar, cart/checkout CTA, sheets) pad themselves above the home indicator with it.
+export const viewport: Viewport = {
+  themeColor: '#EEEFEA',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 
 export default async function LocaleLayout({
   children,

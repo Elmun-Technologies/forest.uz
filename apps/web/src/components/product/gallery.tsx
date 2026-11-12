@@ -171,7 +171,8 @@ export function ProductGallery({
                 aria-label={t('image', { n: i + 1 })}
                 aria-current={i === active || undefined}
                 className={cn(
-                  'h-2 rounded-[4px] transition-all',
+                  // The visible dot stays 8 px; the pseudo-element gives a 44 px-tall touch target.
+                  "relative h-2 rounded-[4px] transition-all before:absolute before:-inset-x-[3px] before:-inset-y-[18px] before:content-['']",
                   i === active ? 'w-[22px] bg-white' : 'w-2 bg-white/55',
                 )}
               />

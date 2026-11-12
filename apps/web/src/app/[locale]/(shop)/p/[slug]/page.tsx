@@ -274,7 +274,7 @@ export default async function ProductPage({ params }: Props) {
           />
         ) : null}
 
-        <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pb-24 lg:gap-6 lg:px-6 lg:pt-2 lg:pb-16">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 pb-[calc(6rem+env(safe-area-inset-bottom))] lg:gap-6 lg:px-6 lg:pt-2 lg:pb-16">
           <nav
             aria-label={tc('breadcrumb')}
             className="hidden px-2 text-[13px] text-muted lg:block"
@@ -438,7 +438,7 @@ export default async function ProductPage({ params }: Props) {
                     open={i === 0}
                     className={i < arr.length - 1 ? 'border-b border-line py-3.5' : 'py-3.5'}
                   >
-                    <summary className="cursor-pointer text-[15px] font-semibold">
+                    <summary className="-my-3.5 cursor-pointer py-3.5 text-[15px] font-semibold">
                       {x.title}
                     </summary>
                     <div className="mt-2 text-sm">{x.body}</div>

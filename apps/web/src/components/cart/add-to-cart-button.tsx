@@ -52,7 +52,8 @@ export function AddToCartButton({
         'relative z-10 inline-flex shrink-0 items-center justify-center gap-2 rounded-pill text-white transition-colors disabled:opacity-60',
         state === 'done' ? 'bg-forest' : 'bg-ink hover:bg-dark-3',
         look === 'round' && 'size-12',
-        look === 'round-sm' && 'size-9',
+        // 36 px dot, 44 px touch target.
+        look === 'round-sm' && "size-9 before:absolute before:-inset-1 before:content-['']",
         look === 'pill' && 'h-[38px] px-4 text-[13px] font-semibold',
         className,
       )}

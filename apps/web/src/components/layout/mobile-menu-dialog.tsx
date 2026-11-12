@@ -41,7 +41,7 @@ export default function MobileMenuDialog({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-ink/45" />
-        <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-[min(340px,88vw)] flex-col gap-6 overflow-y-auto rounded-r-lg bg-canvas p-5 focus:outline-none">
+        <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-[min(340px,88vw)] flex-col gap-6 overflow-y-auto rounded-r-lg bg-canvas p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] focus:outline-none">
           <div className="flex items-center justify-between">
             <Dialog.Title className="text-lg font-semibold">{t('menu')}</Dialog.Title>
             <Dialog.Close

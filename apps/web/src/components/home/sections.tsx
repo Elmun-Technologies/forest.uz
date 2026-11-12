@@ -328,7 +328,7 @@ export async function HowToAndFaq({
                 i === items.length - 1 && 'lg:border-b',
               )}
             >
-              <summary className="cursor-pointer text-[15px] font-semibold marker:text-ink lg:text-[17px]">
+              <summary className="-my-3.5 cursor-pointer py-3.5 text-[15px] font-semibold marker:text-ink lg:-my-[18px] lg:py-[18px] lg:text-[17px]">
                 {f.q}
               </summary>
               <p className="mt-2 text-sm leading-[1.55] text-muted lg:mt-2.5 lg:text-base lg:leading-relaxed">

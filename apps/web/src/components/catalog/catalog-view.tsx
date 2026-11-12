@@ -199,7 +199,7 @@ export async function CatalogView({
             type="search"
             enterKeyHint="search"
             placeholder={t('searchPlaceholder')}
-            className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-subtle focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-base placeholder:text-subtle focus:outline-none lg:text-sm"
           />
         </form>
         <nav

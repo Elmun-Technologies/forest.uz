@@ -43,7 +43,7 @@ export function FloatingActions({ telegramBot }: { telegramBot: string | null })
       {mobileBarHidden ? null : (
         <nav
           aria-label={tc('quickActions')}
-          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-canvas from-70% to-canvas/0 px-3 pt-2.5 pb-3.5 lg:hidden"
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-30 bg-gradient-to-t from-canvas from-70% to-canvas/0 px-3 pt-2.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] lg:hidden"
         >
           <div className="flex justify-end gap-2">
             {tg ? (
