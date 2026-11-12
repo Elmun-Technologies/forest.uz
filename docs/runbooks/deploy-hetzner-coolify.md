@@ -15,6 +15,18 @@ Browser ──► Vercel: web  (Root Directory apps/web)   ──/api/* rewrite�
                                               └──► postgres, redis, storage (same project only)
 ```
 
+> **Which compose file is live (2026-11-12):** the Coolify resource on the server was set up from
+> `infra/compose.coolify.yml` (full stack — `web` and `admin` run on Coolify too, PRs #3–#5),
+> not from the backend-only `infra/coolify/compose.yml` this runbook describes. Both are valid;
+> keep using the live one unless the owner decides to move web/admin back to Vercel. Two points
+> to fix in the live file **after checking on the server** (they change running containers):
+> (1) its `storage` mounts the committed dev credentials `infra/seaweedfs/s3.json`
+> (`forest-dev` / `forest-dev-secret`) — switch to the env-generated config used in
+> `infra/coolify/compose.yml` (`S3_ACCESS_KEY`/`S3_SECRET_KEY`) and set the same values in the
+> API's `.env`; (2) `POSTGRES_PASSWORD` falls back to `forest` when unset — make sure Coolify's
+> env tab sets a generated one. Neither service publishes a host port, so neither is reachable
+> from the internet today, but both must be fixed before any real data.
+
 > Compliance note, unchanged: a VPS outside Uzbekistan doesn't satisfy the personal-data
 > localisation rule (§15) once real customer PII is stored. `PROVIDERS_MODE=fake`, no real
 > customer data, until that's resolved.

@@ -148,7 +148,33 @@ Tashrif buyuruvchilarning aksariyati telefondan kiradi — sayt "mobile-first" q
 (390 px dizayn, alohida mobil sarlavha va pastki tugmalar, Lighthouse mobil: Bosh sahifa 91,
 Katalog 91, Mahsulot 89 — maqsad 90).
 
-<!-- mobile-audit: to'ldiriladi -->
+**2026-11-12 mobil audit** (360 va 390 px, UZ + RU, 114 sahifa yuklanishi; to'liq hisobot —
+`docs/mobile-audit.md`):
+
+| Tekshiruv | Oldin | Hozir |
+|---|---|---|
+| Telefonda "kichrayib" ochiladigan sahifalar (sahifa ekrandan keng) | 4 (qidiruv) | 0 |
+| iPhone'da maydonga bosganda sahifa kattalashib ketishi (shrift < 16 px) | 120 joy (checkout, savat, filtrlar, kabinet…) | 0 |
+| 360 px telefonda mahsulot pastki "Savatga" paneli | narx sig'masdi | sig'adi |
+| iPhone pastki chizig'i / Android imo-ishora paneli ostida qolgan tugmalar | himoya yo'q | barcha pastki panellar chetdan surilgan |
+| Barmoq bilan bosiladigan kichik tugmalar (galereya nuqtalari, akkordeonlar, filtrlar, "+") | 8–36 px | 44 px (ko'rinishi o'zgarmadi) |
+| Joy siljishi (CLS) | 0–0,007 | o'zgarmadi (ideal) |
+
+Tezlik: birinchi yuklanadigan JS barcha sahifalarda 137–158 KB (chegara 170 KB). Lighthouse mobil
+(5 marta, mediana): Bosh 89, Katalog 89, Mahsulot 92 — bu kompyuterda ±5 ball tebranadi; yakuniy
+o'lchov serverda va CDN orqali qilinadi.
+
+**Tavsiyalar (qaror egada / marketingda, kod tayyor emas):**
+
+1. **Telefonda lead-popup** (40 soniyadan keyin to'liq ekran) — Google mobil qidiruvda bunday
+   oynalar uchun sahifani pastlatadi. Taklif: telefonda pastdan ingichka panel, mahsulot/savat/
+   checkout sahifalarida ko'rsatmaslik.
+2. **Cookie-banner** 360 px ekranning 35 % ini yopadi — matnni qisqartirish yoki ixcham panel.
+3. Mahsulot sahifasi: kalkulyator va sharhlarni kechiktirib yuklash (tezlik +).
+4. Kulrang yordamchi matn kontrasti past (3,1:1) — biroz to'qroq rang tavsiya qilinadi.
+
+**Hali tekshirilmagan:** haqiqiy iPhone/Android qurilmalarida, Telegram ichki brauzerida, sekin
+3G tarmoqda — taqdimotdan oldin 2–3 ta haqiqiy telefonda qisqa sinov qilish kerak.
 
 ## 6. Taqdimot ssenariysi (demo)
 
