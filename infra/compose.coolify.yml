@@ -33,18 +33,20 @@ services:
 
   storage:
     image: chrislusf/seaweedfs:4.50
+    # S3 credentials come from the same .env the api reads (S3_ACCESS_KEY / S3_SECRET_KEY), so the
+    # two always match and no key is committed (CLAUDE.md "never commit secrets"; the dev file
+    # infra/seaweedfs/s3.json is for local compose only). Missing values stop the container loudly.
+    entrypoint: ['/bin/sh', '-c']
     command:
-      [
-        'server',
-        '-dir=/data',
-        '-s3',
-        '-s3.port=8333',
-        '-s3.config=/etc/seaweedfs/s3.json',
-        '-volume.max=0',
-      ]
+      - |
+        : "$${S3_ACCESS_KEY:?S3_ACCESS_KEY missing in .env}" "$${S3_SECRET_KEY:?S3_SECRET_KEY missing in .env}"
+        printf '%s' '{"identities":[{"name":"forest","credentials":[{"accessKey":"'"$$S3_ACCESS_KEY"'","secretKey":"'"$$S3_SECRET_KEY"'"}],"actions":["Admin","Read","List","Tagging","Write"]},{"name":"anonymous","actions":["Read:forest-public"]}]}' > /tmp/s3.json
+        exec weed server -dir=/data -s3 -s3.port=8333 -s3.config=/tmp/s3.json -volume.max=0
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
     volumes:
       - storagedata:/data
-      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
     healthcheck:
       test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:8333/status || exit 1']
       interval: 3s
