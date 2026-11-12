@@ -1,6 +1,12 @@
 'use client';
 
-import type { AdminProductDto, AdminVariantDto, LocalizedText } from '@forest/contracts/core';
+import {
+  type AdminProductDto,
+  type AdminVariantDto,
+  isValidIkpu,
+  isValidPackageCode,
+  type LocalizedText,
+} from '@forest/contracts/core';
 import { Button, cn, Field, Input, Switch } from '@forest/ui';
 import { type FormEvent, useState } from 'react';
 import { adminFetch } from '../../lib/client-api';
@@ -124,6 +130,19 @@ export function VariantsTab({
                     )}
                   >
                     IKPU {v.ikpuMissing ? (v.ikpu ? `${v.ikpu} (namuna)` : "yo'q") : v.ikpu}
+                  </span>
+                  {/* Payme and Click refuse receipt lines without the IKPU's package code. */}
+                  <span
+                    className={cn(
+                      'block text-[11px]',
+                      isValidPackageCode(v.packageCode)
+                        ? 'text-muted'
+                        : 'font-semibold text-critical',
+                    )}
+                  >
+                    {isValidPackageCode(v.packageCode)
+                      ? `Qadoq kodi ${v.packageCode}`
+                      : COPY.packageCodeMissing}
                   </span>
                 </td>
                 <td className="tabular px-1 py-3 text-right font-semibold whitespace-nowrap">
@@ -368,7 +387,23 @@ function VariantForm({
             />
           )}
         </Field>
-        <Field label="Qadoq kodi">
+        <Field
+          label="Qadoq kodi"
+          hint={
+            isValidIkpu(d.ikpu.trim()) ? (
+              <a
+                href={`https://tasnif.soliq.uz/attribute/${d.ikpu.trim()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline"
+              >
+                {COPY.packageCodeLookup}
+              </a>
+            ) : (
+              COPY.packageCodeRequired
+            )
+          }
+        >
           {(p) => (
             <Input
               {...p}
