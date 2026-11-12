@@ -1,4 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import {
+  fiscalLinesProblem,
+  type ReceiptLineInput,
+  vatIncluded,
+} from '../../commerce/fiscal-lines';
 import type { CheckoutInput, PaymentProvider } from './types';
 
 /**
@@ -128,8 +133,10 @@ export function clickMerchantId(orderNumber: string): number {
 }
 
 /**
- * Hosted payment page (GET). UNVERIFIED: format from docs/06; the official Django module only
- * shows the legacy POST button form to https://my.click.uz/pay/ (MERCHANT_* fields).
+ * Hosted payment page (GET), docs.click.uz "Payment Button — With Redirection" (read 2026-11-12):
+ * `https://my.click.uz/services/pay?service_id&merchant_id&amount&transaction_param&return_url`
+ * (+ optional `card_type`, `merchant_user_id`). The page takes a Click phone (invoice to Click
+ * Up) or any Uzcard/Humo card, so one link covers both buttons Click offers.
  */
 export function clickCheckoutUrl(input: {
   serviceId: string;
@@ -163,4 +170,125 @@ export class ClickPaymentProvider implements PaymentProvider {
       returnUrl: input.returnUrl,
     });
   }
+}
+
+// ── Merchant API: fiscalization (docs.click.uz → Merchant API → Data Fiscalization) ──
+
+/** Default Merchant API root; tests point `CLICK_MERCHANT_API_URL` at a local stub. */
+export const CLICK_MERCHANT_API = 'https://api.click.uz/v2/merchant';
+
+/** `Auth: merchant_user_id:sha1(timestamp + secret_key):timestamp` (unix seconds). */
+export function clickMerchantAuth(
+  merchantUserId: string,
+  secretKey: string,
+  nowSec: number,
+): string {
+  const ts = String(Math.floor(nowSec));
+  const digest = createHash('sha1')
+    .update(ts + secretKey)
+    .digest('hex');
+  return `${merchantUserId}:${digest}:${ts}`;
+}
+
+/** One `items[]` entry of `ofd_data/submit_items`; amounts in tiyin. */
+export interface ClickOfdItem {
+  Name: string;
+  SPIC: string;
+  PackageCode: string;
+  GoodPrice: number;
+  /** Whole position (unit price × quantity), before `Discount`. */
+  Price: number;
+  Amount: number;
+  /** VAT included in the position after discount. */
+  VAT: number;
+  VATPercent: number;
+  Discount: number;
+  CommissionInfo: { TIN: string } | { PINFL: string };
+}
+
+export interface ClickOfdPayload {
+  service_id: number;
+  payment_id: number;
+  items: ClickOfdItem[];
+  received_ecash: number;
+  received_cash: number;
+  received_card: number;
+}
+
+/** Seller identification on the receipt: a 9-digit STIR (company) or 14-digit PINFL (person). */
+export function clickCommissionInfo(
+  taxId: string | null | undefined,
+): ClickOfdItem['CommissionInfo'] | null {
+  const id = (taxId ?? '').replace(/\s/g, '');
+  if (/^\d{9}$/.test(id)) return { TIN: id };
+  if (/^\d{14}$/.test(id)) return { PINFL: id };
+  return null;
+}
+
+/**
+ * The receipt Click registers with the tax OFD for a paid order: one item per order line (+ a
+ * delivery line when it is charged), paid by card. Returns a reason instead when it can't be built
+ * (missing IKPU/package code, seller TIN, delivery codes, or totals that don't match the payment) —
+ * the order is then closed with a manually recorded receipt.
+ */
+export function buildClickOfdPayload(input: {
+  serviceId: string;
+  paydocId: string;
+  lines: ReceiptLineInput[];
+  shipping:
+    | (Pick<ReceiptLineInput, 'title' | 'ikpu' | 'packageCode' | 'vatPercent'> & {
+        priceTiyin: bigint;
+      })
+    | null;
+  totalTiyin: bigint;
+  sellerTaxId: string | null | undefined;
+}): { payload: ClickOfdPayload } | { problem: string } {
+  const commission = clickCommissionInfo(input.sellerTaxId);
+  if (!commission) return { problem: 'seller TIN/PINFL missing (store legal data)' };
+  const shippingLine: ReceiptLineInput | null =
+    input.shipping && input.shipping.priceTiyin > 0n
+      ? {
+          title: input.shipping.title,
+          ikpu: input.shipping.ikpu,
+          packageCode: input.shipping.packageCode,
+          vatPercent: input.shipping.vatPercent,
+          qty: 1,
+          unitPriceTiyin: input.shipping.priceTiyin,
+          discountTiyin: 0n,
+        }
+      : null;
+  const lines = shippingLine ? [...input.lines, shippingLine] : input.lines;
+  const problem = fiscalLinesProblem(lines);
+  if (problem)
+    return {
+      problem: shippingLine && !fiscalLinesProblem(input.lines) ? `delivery: ${problem}` : problem,
+    };
+  const net = (l: ReceiptLineInput) => l.unitPriceTiyin * BigInt(l.qty) - l.discountTiyin;
+  const total = lines.reduce((sum, l) => sum + net(l), 0n);
+  if (total !== input.totalTiyin) return { problem: "receipt lines don't add up to the payment" };
+  const serviceId = Number(input.serviceId);
+  const paymentId = Number(input.paydocId);
+  if (!Number.isSafeInteger(serviceId) || !Number.isSafeInteger(paymentId) || paymentId <= 0)
+    return { problem: 'Click service id / payment id missing' };
+  return {
+    payload: {
+      service_id: serviceId,
+      payment_id: paymentId,
+      items: lines.map((l) => ({
+        Name: l.title.slice(0, 63),
+        SPIC: l.ikpu,
+        PackageCode: l.packageCode ?? '',
+        GoodPrice: Number(l.unitPriceTiyin),
+        Price: Number(l.unitPriceTiyin * BigInt(l.qty)),
+        Amount: l.qty,
+        VAT: Number(vatIncluded(net(l), l.vatPercent)),
+        VATPercent: l.vatPercent,
+        Discount: Number(l.discountTiyin),
+        CommissionInfo: commission,
+      })),
+      received_ecash: 0,
+      received_cash: 0,
+      received_card: Number(input.totalTiyin),
+    },
+  };
 }

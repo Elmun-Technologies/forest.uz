@@ -116,6 +116,8 @@ export const envSchema = z.object({
   YANDEX_DELIVERY_API_URL: z.url().default('https://b2b.taxi.yandex.net'),
   /** Eskiz SMS API root (same reason: only tests point it at a stub; the password goes there). */
   ESKIZ_API_URL: z.url().default('https://notify.eskiz.uz/api'),
+  /** Click Merchant API root (fiscalization; only tests point it at a stub — the signed Auth goes there). */
+  CLICK_MERCHANT_API_URL: z.url().default('https://api.click.uz/v2/merchant'),
   /** MoySklad JSON API root (only tests point it at a stub; the Bearer token goes there). */
   MOYSKLAD_API_URL: z.url().default('https://api.moysklad.ru/api/remap/1.2'),
 });

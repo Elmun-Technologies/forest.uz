@@ -66,9 +66,10 @@ function cleanNumber(v: string | null | undefined): string | null {
 }
 
 /**
- * Manual fiscal provider (docs/06): the operator issues the receipt on the cash register (COD,
- * or Click until it is known to fiscalize — docs/13 q.34) and records it here from the admin order
- * page (`orders.edit`).
+ * Manual fiscal provider (docs/06): the operator issues the receipt on the cash register (COD, or
+ * a Click/Payme payment the provider couldn't fiscalize — missing IKPU/package code/seller TIN) and
+ * records it here from the admin order page (`orders.edit`). Click payments are otherwise
+ * fiscalized by `ClickFiscalService`, Payme payments by the receipt `detail`.
  */
 @Injectable()
 export class FiscalService {

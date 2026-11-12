@@ -1,6 +1,10 @@
+import { createHash } from 'node:crypto';
 import {
+  buildClickOfdPayload,
   clickAmountToTiyin,
   clickCheckoutUrl,
+  clickCommissionInfo,
+  clickMerchantAuth,
   clickMerchantId,
   type ClickRequest,
   clickSignString,
@@ -92,5 +96,109 @@ describe('click helpers', () => {
       transaction_param: 'F-10001',
       return_url: 'https://forest.uz/uz/buyurtma/abc',
     });
+  });
+});
+
+describe('click fiscalization (Merchant API ofd_data)', () => {
+  const line = {
+    title: 'Forest Chalk Wax, 1 l',
+    ikpu: '03208001001000000',
+    packageCode: '1501498',
+    vatPercent: 12,
+    qty: 2,
+    unitPriceTiyin: 32_900_000n,
+    discountTiyin: 6_580_000n,
+  };
+  const shipping = {
+    title: 'Yetkazib berish xizmati',
+    ikpu: '10112001001000000',
+    packageCode: '1545437',
+    vatPercent: 12,
+    priceTiyin: 3_000_000n,
+  };
+  const base = {
+    serviceId: '2222',
+    paydocId: '3333',
+    lines: [line],
+    shipping,
+    totalTiyin: 65_800_000n - 6_580_000n + 3_000_000n,
+    sellerTaxId: '301234567',
+  };
+
+  it('signs Auth as merchant_user_id:sha1(timestamp + secret):timestamp', () => {
+    const digest = createHash('sha1').update('1700000000secret').digest('hex');
+    expect(clickMerchantAuth('42', 'secret', 1_700_000_000.9)).toBe(`42:${digest}:1700000000`);
+  });
+
+  it('identifies the seller by STIR (9 digits) or PINFL (14 digits)', () => {
+    expect(clickCommissionInfo('301 234 567')).toEqual({ TIN: '301234567' });
+    expect(clickCommissionInfo('12345678901234')).toEqual({ PINFL: '12345678901234' });
+    expect(clickCommissionInfo('12345')).toBeNull();
+    expect(clickCommissionInfo(null)).toBeNull();
+  });
+
+  it('builds one item per line plus delivery, with VAT inside the discounted amount', () => {
+    const built = buildClickOfdPayload(base);
+    expect(built).toEqual({
+      payload: {
+        service_id: 2222,
+        payment_id: 3333,
+        items: [
+          {
+            Name: 'Forest Chalk Wax, 1 l',
+            SPIC: '03208001001000000',
+            PackageCode: '1501498',
+            GoodPrice: 32_900_000,
+            Price: 65_800_000,
+            Amount: 2,
+            // 59 220 000 × 12 / 112 = 6 345 000 (rounded to the tiyin)
+            VAT: 6_345_000,
+            VATPercent: 12,
+            Discount: 6_580_000,
+            CommissionInfo: { TIN: '301234567' },
+          },
+          {
+            Name: 'Yetkazib berish xizmati',
+            SPIC: '10112001001000000',
+            PackageCode: '1545437',
+            GoodPrice: 3_000_000,
+            Price: 3_000_000,
+            Amount: 1,
+            VAT: 321_429,
+            VATPercent: 12,
+            Discount: 0,
+            CommissionInfo: { TIN: '301234567' },
+          },
+        ],
+        received_ecash: 0,
+        received_cash: 0,
+        received_card: 62_220_000,
+      },
+    });
+  });
+
+  it('explains instead of building an incomplete receipt', () => {
+    expect(buildClickOfdPayload({ ...base, sellerTaxId: '' })).toEqual({
+      problem: 'seller TIN/PINFL missing (store legal data)',
+    });
+    expect(buildClickOfdPayload({ ...base, lines: [{ ...line, packageCode: null }] })).toEqual({
+      problem: '1 line(s) without a package code',
+    });
+    expect(buildClickOfdPayload({ ...base, shipping: { ...shipping, ikpu: '' } })).toEqual({
+      problem: 'delivery: 1 line(s) without a valid IKPU',
+    });
+    expect(buildClickOfdPayload({ ...base, totalTiyin: 1n })).toEqual({
+      problem: "receipt lines don't add up to the payment",
+    });
+    expect(buildClickOfdPayload({ ...base, paydocId: '' })).toEqual({
+      problem: 'Click service id / payment id missing',
+    });
+    // Free delivery: no delivery line, delivery codes not needed.
+    const free = buildClickOfdPayload({
+      ...base,
+      shipping: { ...shipping, ikpu: '', priceTiyin: 0n },
+      totalTiyin: 59_220_000n,
+    });
+    expect('payload' in free && free.payload.items).toHaveLength(1);
   });
 });

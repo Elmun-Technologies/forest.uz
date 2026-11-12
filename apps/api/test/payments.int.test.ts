@@ -139,6 +139,8 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
         merchantUserId: '3333',
         secretKey: CLICK_SECRET,
         mode: 'test',
+        // Fiscalization calls Click's Merchant API from a job: covered by click-fiscal.int.test.ts.
+        fiscalize: 'off',
       },
       ownerId,
       null,
