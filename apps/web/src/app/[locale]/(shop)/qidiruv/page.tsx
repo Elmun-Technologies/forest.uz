@@ -56,7 +56,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
           <label htmlFor="search-q" className="sr-only">
             {t('placeholder')}
           </label>
-          <span className="flex h-[52px] flex-1 items-center gap-2 rounded-pill border border-line px-4 focus-within:border-ink">
+          <span className="flex h-[52px] min-w-0 flex-1 items-center gap-2 rounded-pill border border-line px-4 focus-within:border-ink">
             <Search size={18} className="text-muted" aria-hidden />
             <input
               id="search-q"
@@ -65,12 +65,12 @@ export default async function SearchPage({ params, searchParams }: Props) {
               defaultValue={q}
               enterKeyHint="search"
               placeholder={t('placeholder')}
-              className="min-w-0 flex-1 bg-transparent text-[15px] focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent text-base focus:outline-none lg:text-[15px]"
             />
           </span>
           <button
             type="submit"
-            className="h-[52px] rounded-pill bg-ink px-6 text-sm font-semibold text-white"
+            className="h-[52px] shrink-0 rounded-pill bg-ink px-5 text-sm font-semibold text-white lg:px-6"
           >
             {t('submit')}
           </button>
