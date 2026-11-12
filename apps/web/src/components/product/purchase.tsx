@@ -547,10 +547,14 @@ export function StickyBuyBar() {
         className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-2.5 border-t border-line bg-panel px-3 pt-2.5 pb-4 lg:hidden"
         data-testid="mobile-buy-bar"
       >
-        <span className="flex min-w-0 flex-col">
+        {/* The price column takes what the stepper and CTA leave (≈ 125 px on a 360 px phone) and
+            is a size container: the currency is dropped when the amount alone needs that space,
+            instead of the total running under the stepper. */}
+        <span className="@container flex min-w-0 flex-1 flex-col">
           <Price
             soum={variant.priceSoum * p.qty}
             locale={locale}
+            currencyClassName="hidden @[9.5rem]:inline"
             className="text-xl font-bold tracking-[-0.02em] whitespace-nowrap"
           />
           <span className="truncate text-[11px] text-muted">

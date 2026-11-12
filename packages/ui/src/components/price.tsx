@@ -8,6 +8,8 @@ export interface PriceProps {
   from?: boolean;
   locale: 'uz' | 'ru';
   withCurrency?: boolean;
+  /** Classes for the currency word, e.g. to drop it where the amount alone must fit. */
+  currencyClassName?: string;
   className?: string;
 }
 
@@ -20,6 +22,7 @@ export function Price({
   from,
   locale,
   withCurrency = true,
+  currencyClassName,
   className,
 }: PriceProps) {
   const amount = formatAmount(soumToTiyin(soum));
@@ -28,7 +31,11 @@ export function Price({
       <span>
         {from ? (locale === 'ru' ? 'от\u00A0' : 'dan\u00A0') : null}
         {amount}
-        {withCurrency ? `\u00A0${CURRENCY[locale]}` : null}
+        {!withCurrency ? null : currencyClassName ? (
+          <span className={currencyClassName}>{`\u00A0${CURRENCY[locale]}`}</span>
+        ) : (
+          `\u00A0${CURRENCY[locale]}`
+        )}
       </span>
       {compareAtSoum ? (
         <s
