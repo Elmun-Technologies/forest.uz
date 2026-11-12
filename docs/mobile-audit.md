@@ -81,6 +81,62 @@ Verified after the fixes: web typecheck, lint, unit tests, ui tests, prettier; P
 (mobile 390 project, prod build) `catalog-product`, `smoke` (storefront part), `checkout-flow`,
 `pages`, `phase2` — 25 passed (the admin smoke test needs the admin app, not run here).
 
+## Fixed in the second pass (owner-delegated decisions, same day)
+
+Same stack and method as above (prod build, real API, local Postgres/Redis, Playwright with an
+Android UA at 360/390/412 px, UZ + RU; Lighthouse 12.8 mobile, warm-up + 5 runs, median).
+
+- **Lead popup → slim bottom bar on phones** (was recommendation 1; decision in CLAUDE.md §6,
+  2026-11-12). Below `lg`: after 40 s a non-modal 52 px bar (`components/lead/lead-bar.tsx`,
+  "Birinchi buyurtmaga −10% promokod" · "Olish" · ×) sits 80 px above the bottom edge, i.e. above
+  the cart/Telegram bar (whose buttons end 70 px up), with the safe-area inset added. Never on
+  `/p/*` (buy bar), cart, checkout, order, tracking, login or cabinet; "Olish" opens the existing
+  form, × hides it for the session. The fast scroll-up trigger is gone; desktop keeps the
+  exit-intent popup. Measured at 360/390/412 × UZ/RU: bar 52 px tall, clear of the floating
+  buttons, no modal/overlay until "Olish", the page under it stays clickable; on a product page
+  nothing appears after 80 s. Rules: `lib/lead-prompt.ts` (unit tests) + a component test.
+- **Consent banner compact on phones** (was recommendation 2). Same text and choices (q.85 still
+  open): heading visually hidden (still the region's label), 12 px text, one row of two 44 px
+  buttons, "Sozlash" as a link next to the privacy link (still opens the settings panel).
+  Height at 360×740: **~260 px (35 %) → 126 px (17 %) UZ / 142 px (19 %) RU**; 390×844: 126 / 142;
+  412×915: 126 / 142. Desktop banner unchanged (440 px card, heading, three 36 px buttons).
+- **Contrast** (was recommendation 4): `subtle` **#8D9586 → #676E62** — 3.1 → **5.3:1** on white,
+  2.7 → **4.6:1** on canvas (`muted` #5E6459 stays darker: 6.1 / 5.3:1). Usages on dark surfaces
+  (admin sidebar search, admin tag input, 404 search, desktop cart promo field) moved to
+  `on-dark-subtle` (#A9B39E, 7.0:1 on `dark-2`), so none lost contrast. `packages/ui` test checks
+  tokens.ts = theme.css and ≥ 4.5:1 for every text token.
+- **Touch targets** (part of recommendation 5): new `hit-44` utility (invisible centred
+  ::before, ≥ 44 × 44 px below `lg`, no visual change) on `Chip`, search category/suggestion
+  chips, calculator presets and filter volume chips; consent buttons are now 44 px tall on phones.
+  Measured hit heights at 360 px: filter volume chips 38 → 44, search chips 36 → 44, consent
+  buttons 36 → 44, calculator presets 32 → 44 (lower row) / 38 (upper row: the 6 px row gap is
+  shared with the row below; 44 each would need a 12 px gap, a visual change).
+
+Lighthouse mobile after the second pass (median of 5): home **96** (LCP 2.61 s, TBT 102 ms),
+catalog **93** (2.92 s, 138 ms), product **91** (2.90 s, 238 ms); CLS ≤ 0.007;
+`observedFirstContentfulPaint` 99–330 ms (no paint-holding stall). Same machine noise as before:
+single product runs on the unchanged code ranged 85–96 over the evening. First-load JS unchanged
+(home 146, catalog 158, product 151, cart 155, checkout 146 KB — budget 170).
+
+**Tried and reverted — deferred hydration on the product page** (was recommendation 3). Below-the-
+fold islands (calculator, desktop tabs, "Birga olishadi" list, "more reviews") were wrapped so they
+render only when near the viewport. (a) A Suspense boundary that suspends during hydration does
+not work here: any context update above a dehydrated boundary (cart/purchase providers update
+after mount) makes React discard the server HTML and show the fallback — the islands vanished.
+(b) Keeping the server HTML with an empty `dangerouslySetInnerHTML` placeholder and rendering the
+island on `IntersectionObserver` worked, but interleaved A/B (same build otherwise, 14 runs each):
+score 93 → 94, **LCP 2.68 → 2.78 s**, TBT 220 → 125 ms — neither difference significant
+(Mann–Whitney z = −1.24 LCP, 0.92 TBT), LCP (the metric that matters) did not improve, and a tap
+that lands before the island renders is lost. Not kept. The observed (unthrottled) render delay is
+~130 ms; the simulated 1.4–1.9 s is Lantern scaling the framework/React startup scripts (chunks
+`7973` ≈ 300–440 ms, `7aab36c2` ≈ 220 ms simulated scripting), which no island-level change removes.
+Re-measure on the real VPS/CDN before going further.
+
+Verified after the second pass: web typecheck, lint, unit tests (36), ui tests (12), admin
+typecheck, prettier; web production build; Playwright e2e on the prod build, `catalog-product`,
+`checkout-flow`, `pages`, `phase2`, `smoke`: mobile 25 passed / 1 skipped, desktop 26 passed (the
+admin smoke test needs the admin app, not run here).
+
 ## Checked and fine
 
 Viewport meta + `theme-color`; OTP cells (`inputMode="numeric"`, `pattern`, `one-time-code` on
@@ -96,30 +152,20 @@ checkout bar behind the keyboard rather than over the fields.
 
 ## Recommendations (not done), by impact
 
-1. **Lead popup on mobile is an intrusive interstitial** (`components/lead/lead-popup.tsx`): a
-   full-screen blurred modal after 40 s or on a "fast scroll-up" (≥ 60 % of the viewport in
-   400 ms) — an ordinary flick back to the header triggers it, also mid-product page. Google
-   demotes pages with such popups on mobile. Suggest on phones: a slim non-modal bottom bar, never
-   on `/p/*`, cart or checkout, and drop the scroll-up trigger. Marketing decision → not changed.
-2. **Consent banner takes ~260 of 740 px (35 %) at 360 px** on first visit, covering the hero. A
-   shorter text and one button row (or a compact bar with "Sozlash" opening the panel) would halve
-   it. Copy/legal decision (open question 85) → not changed.
-3. **Product page perf**: LCP is dominated by render delay (hydration), not the image. Cheapest
-   next steps: lazy-hydrate below-the-fold islands (calculator, reviews, "complete the set"),
-   and measure on the real VPS/CDN before tuning further — this machine's noise (±5 points) is
-   larger than the remaining 89 → 90 gap reported earlier.
-4. **Contrast**: `text-subtle` (#8D9586) is 3.1:1 on white / 2.7:1 on canvas — used for the old
-   (struck) price in `Price`, the future steps of the tracking timeline and all placeholders.
-   WCAG AA needs 4.5:1 → use `text-muted` (#5E6459, 5.3–6.1:1). Design-token decision.
-5. **Remaining sub-44 px targets** (all ≥ 24 px, so WCAG 2.2 AA 2.5.8 passes; 44 px is
-   AAA/Apple HIG): `Chip` (36 px — cabinet order filters, search category chips), qty stepper
-   buttons 36×48 (as designed), calculator presets 32 px, filter volume chips 38 px, consent banner
-   buttons (`size="sm"`, 36 px), product-card title links, footer legal links.
-6. **Buy bar with a total ≥ 10 000 000 so'm at 360 px** would still crowd the stepper (needs qty ×
+1. **Product page perf**: deferring below-the-fold islands did not move LCP (see above). The
+   remaining simulated render delay is framework/React startup; measure on the real VPS/CDN first
+   (this machine's noise, ±5 points, is larger than the 89–91 → 90 gap).
+2. **Remaining sub-44 px targets** (all ≥ 24 px, so WCAG 2.2 AA 2.5.8 passes; 44 px is
+   AAA/Apple HIG): qty stepper buttons 36×48 (as designed), product-card title links, footer
+   legal links, the inline consent links ("Maxfiylik siyosati", "Sozlash": 17 px text, 38 px hit
+   area), calculator presets in the upper row (38 px, see above).
+3. **Lead form copy on phones**: the form the bar opens still says "Ketishdan oldin: −10% sizga"
+   ("before you leave") — fits the desktop exit intent, less so a tapped bar. Copy decision.
+4. **Buy bar with a total ≥ 10 000 000 so'm at 360 px** would still crowd the stepper (needs qty ×
    price that large; not realistic for current prices).
-7. Partner logos use `sizes="200px"` at 45–110 px rendered width; sources are ≤ 768 px and ≤ 7 KB,
+5. Partner logos use `sizes="200px"` at 45–110 px rendered width; sources are ≤ 768 px and ≤ 7 KB,
    so the waste is negligible — leave.
-8. Checkout delivery cards at 360 px: the Yandex logo chip takes ~135 px and wraps the carrier
+6. Checkout delivery cards at 360 px: the Yandex logo chip takes ~135 px and wraps the carrier
    name to 2–3 lines in RU; stacking the logo above the text below 375 px would read better.
 
 ## Not verified
