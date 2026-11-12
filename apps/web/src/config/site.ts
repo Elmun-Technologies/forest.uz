@@ -44,6 +44,9 @@ export const quietRoutes = [
   '/fake-pay',
 ];
 
+/** Routes with their own sticky bottom bar on phones (product buy bar): no other bottom bars. */
+export const ownBottomBarRoutes = ['/p/'];
+
 /**
  * Telegram button href. With a source label it goes through `/tg` (start link carrying the
  * source + this visit for the bot's lead attribution, CLAUDE.md §6 5A); `b` = fallback bot.

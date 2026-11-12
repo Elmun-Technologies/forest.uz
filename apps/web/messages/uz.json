@@ -136,7 +136,10 @@
     "badge": "−10% birinchi buyurtmaga",
     "imageAlt": "Oldin va keyin: divan rangi tiklangan",
     "doneTitle": "Promokod yuborildi",
-    "doneCta": "Buyumimga bo'yoq tanlash"
+    "doneCta": "Buyumimga bo'yoq tanlash",
+    "barLabel": "Promokod taklifi",
+    "barText": "Birinchi buyurtmaga −10% promokod",
+    "barCta": "Olish"
   },
   "card": {
     "add": "Savatga",
