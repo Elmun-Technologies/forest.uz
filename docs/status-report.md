@@ -43,7 +43,10 @@ tashlab ketilgan savat eslatmasi, admin guruhiga ogohlantirishlar.
 
 **Xavfsizlik va ishonchlilik**: admin uchun 2 bosqichli kirish (TOTP), ruxsatlar har bir amalda
 tekshiriladi, shaxsiy ma'lumotlar maskalangan, avtomatik zaxira nusxa va tiklash mashqi, xatolar
-monitoringi, deployda avtomatik orqaga qaytish.
+monitoringi, deployda avtomatik orqaga qaytish. OWASP ASVS L2 tekshiruvi: yuqori xavf yopilgan;
+12-noyabrda yana 3 ta past xavf yopildi (sessiya kalitini almashtirish, shaxsiy javoblarni
+keshlamaslik, Click uchun IP ro'yxati). 2 ta o'rta xavf egasining qarorida: SMS kodni 6 xonali
+qilish va 2FA'ni barcha xodimlarga majburiy qilish (`docs/security/asvs-l2.md`).
 
 ## 3. To'lov integratsiyalari
 
@@ -132,8 +135,9 @@ kiritiladi (COD fiskal yechimi — buxgalter qarori kutilmoqda).
 5. Domen nomi (hozircha sinov uchun bepul manzillar ishlatilmoqda).
 
 **Texnik (biz)**
-1. Serverga backend'ni Coolify orqali joylashtirish (runbook tayyor:
-   `docs/runbooks/deploy-hetzner-coolify.md`), sayt va admin — Vercel'da.
+1. Hetzner serverda Coolify orqali to'liq stek (`infra/compose.coolify.yml`: API, sayt, admin,
+   baza) ishlamoqda. Qolgan ish: Coolify'da yangi S3 kalitlari va generatsiya qilingan baza parolini
+   o'rnatish (runbook `docs/runbooks/deploy-hetzner-coolify.md`, tepadagi eslatma).
 2. Payme sinov to'plamini (sandbox) to'liq o'tkazish, Click test dasturi va 1 000 so'mlik sinovlar.
 3. Zaxira nusxa va monitoringni yoqish, birinchi tiklash mashqi.
 4. Ishga tushirish ro'yxati: `docs/launch-checklist.md`.
@@ -145,8 +149,8 @@ serverga ko'chish yoki yurist xulosasi kerak.
 ## 5. Mobil versiya
 
 Tashrif buyuruvchilarning aksariyati telefondan kiradi — sayt "mobile-first" qilib qurilgan
-(390 px dizayn, alohida mobil sarlavha va pastki tugmalar, Lighthouse mobil: Bosh sahifa 91,
-Katalog 91, Mahsulot 89 — maqsad 90).
+(390 px dizayn, alohida mobil sarlavha va pastki tugmalar). Lighthouse mobil (5 marta, mediana,
+ikkinchi audit): **Bosh sahifa 96, Katalog 93, Mahsulot 91** — maqsad 90.
 
 **2026-11-12 mobil audit** (360 va 390 px, UZ + RU, 114 sahifa yuklanishi; to'liq hisobot —
 `docs/mobile-audit.md`):
@@ -160,18 +164,20 @@ Katalog 91, Mahsulot 89 — maqsad 90).
 | Barmoq bilan bosiladigan kichik tugmalar (galereya nuqtalari, akkordeonlar, filtrlar, "+") | 8–36 px | 44 px (ko'rinishi o'zgarmadi) |
 | Joy siljishi (CLS) | 0–0,007 | o'zgarmadi (ideal) |
 
-Tezlik: birinchi yuklanadigan JS barcha sahifalarda 137–158 KB (chegara 170 KB). Lighthouse mobil
-(5 marta, mediana): Bosh 89, Katalog 89, Mahsulot 92 — bu kompyuterda ±5 ball tebranadi; yakuniy
-o'lchov serverda va CDN orqali qilinadi.
+Tezlik: birinchi yuklanadigan JS barcha sahifalarda 137–158 KB (chegara 170 KB).
 
-**Tavsiyalar (qaror egada / marketingda, kod tayyor emas):**
+**Ikkinchi bosqich (shu kuni, tavsiyalar bajarildi):**
 
-1. **Telefonda lead-popup** (40 soniyadan keyin to'liq ekran) — Google mobil qidiruvda bunday
-   oynalar uchun sahifani pastlatadi. Taklif: telefonda pastdan ingichka panel, mahsulot/savat/
-   checkout sahifalarida ko'rsatmaslik.
-2. **Cookie-banner** 360 px ekranning 35 % ini yopadi — matnni qisqartirish yoki ixcham panel.
-3. Mahsulot sahifasi: kalkulyator va sharhlarni kechiktirib yuklash (tezlik +).
-4. Kulrang yordamchi matn kontrasti past (3,1:1) — biroz to'qroq rang tavsiya qilinadi.
+1. **Telefonda lead-popup o'rniga pastdan ingichka panel** (52 px, ekranni yopmaydi): 40 soniyadan
+   keyin, mahsulot / savat / checkout / kabinet sahifalarida chiqmaydi; "Olish" formani ochadi.
+   Kompyuterda — avvalgidek, faqat chiqib ketayotganda.
+2. **Cookie-banner ixchamlashdi**: 360 px ekranda 35 % dan **17 %** ga (UZ 126 px, RU 142 px), matn
+   ma'nosi o'zgarmadi.
+3. **Kulrang yordamchi matn kontrasti** 3,1:1 dan **5,3:1** ga (WCAG AA talabi 4,5:1).
+4. Qolgan kichik tugmalar (chiplar, kalkulyator, hajm filtrlari, cookie tugmalari) — **44 px** bosish
+   maydoni.
+5. Mahsulot sahifasida pastki bloklarni kechiktirib yuklash sinab ko'rildi — o'lchovda foyda yo'q,
+   qaytarildi (`docs/mobile-audit.md`).
 
 **Hali tekshirilmagan:** haqiqiy iPhone/Android qurilmalarida, Telegram ichki brauzerida, sekin
 3G tarmoqda — taqdimotdan oldin 2–3 ta haqiqiy telefonda qisqa sinov qilish kerak.
