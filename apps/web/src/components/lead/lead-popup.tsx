@@ -59,6 +59,7 @@ export function LeadPopup({
   const pathname = usePathname();
   const [shown, setShown] = useState<LeadPromptMode | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [exitIntent, setExitIntent] = useState(false);
   // The triggers outlive client navigations inside the shop frame; they read the current path.
   const path = useRef(pathname);
   useEffect(() => {
@@ -93,7 +94,7 @@ export function LeadPopup({
 
     if (leadTrigger(isLg, window.matchMedia(FINE_POINTER_QUERY).matches) === 'exit-intent') {
       const onOut = (e: MouseEvent) => {
-        if (!e.relatedTarget && e.clientY <= 0) fire();
+        if (!e.relatedTarget && e.clientY <= 0 && fire()) setExitIntent(true);
       };
       document.addEventListener('mouseout', onOut);
       detach = () => document.removeEventListener('mouseout', onOut);
@@ -122,6 +123,7 @@ export function LeadPopup({
           before={before}
           after={after}
           fallback={fallback}
+          exitIntent={exitIntent}
         />
       ) : null}
     </>

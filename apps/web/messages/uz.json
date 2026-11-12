@@ -128,6 +128,7 @@
   },
   "popup": {
     "title": "Ketishdan oldin: −10% sizga",
+    "titleOffer": "Birinchi buyurtmaga −10%",
     "text": "Raqamingizni qoldiring. Promokod SMS'da keladi, 7 kun amal qiladi.",
     "submit": "Promokodni olish",
     "or": "yoki",

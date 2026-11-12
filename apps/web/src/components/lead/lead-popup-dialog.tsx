@@ -19,8 +19,11 @@ export default function LeadPopupDialog({
   before,
   after,
   fallback,
+  exitIntent = false,
 }: {
   fallback: ImageDto | null;
+  /** Opened because the visitor is leaving (desktop exit intent): the "before you leave" title. */
+  exitIntent?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   telegramBot: string | null;
@@ -119,7 +122,7 @@ export default function LeadPopupDialog({
                 className="flex flex-col gap-[22px]"
               >
                 <Dialog.Title className="pr-12 text-[32px] leading-[1.02] font-medium tracking-[-0.04em] md:text-[44px]">
-                  {t('title')}
+                  {exitIntent ? t('title') : t('titleOffer')}
                 </Dialog.Title>
                 <Dialog.Description className="text-base leading-relaxed text-muted">
                   {t('text')}
