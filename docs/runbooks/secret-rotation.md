@@ -65,13 +65,22 @@ dev/test fallback derived from `APP_ENCRYPTION_KEY` is not used in production).
 
 ## 2. `SESSION_SECRET`
 
-Changing it: OTP codes in flight (≤ 5 min) fail → customers request a new one; open order pages
-lose the "placed in this browser" signed cookie (`fr_ord`, 24 h) → owner view needs login; cart
-links (≤ 7 d) and bot deep links stop working; **unsubscribe links in marketing SMS already sent
-stop working** (finding F-07: the unsubscribe verifier accepts a legacy format but no previous
-secret). Customer and admin sessions are opaque Redis ids — not affected.
-Procedure: pick a quiet hour, set the new value, deploy. For a leak, also rotate the marketing
-opt-out promise by handling "STOP" replies manually for 30 days.
+Rotated in place with `SESSION_SECRET_PREVIOUS` (comma-separated, ≤ 5; ASVS F-07): new tokens are
+signed with `SESSION_SECRET`, tokens signed earlier still verify under a previous value — signed
+cookies (`fr_ord`, 24 h), cart-restore links (7 d), bot deep links and **unsubscribe links in
+marketing SMS already sent** (no expiry). Not carried over: OTP codes in flight (≤ 5 min, hashed with
+the secret) — those customers request a new code. Customer and admin sessions are opaque Redis ids —
+not affected.
+
+Procedure:
+1. Generate the new value (`openssl rand -hex 32`).
+2. In `.env`: move the current value to `SESSION_SECRET_PREVIOUS=<old>` and set
+   `SESSION_SECRET=<new>`; deploy.
+3. Keep the old value at least 90 days (unsubscribe links in sent SMS keep working that long; the
+   marketing consent rules assume opt-out always works). For a **leak**, drop it after 7 days
+   instead (cart links expire) and handle "STOP" replies to older SMS manually for 30 days: a leaked
+   secret lets anyone mint opt-out and cart links.
+4. Remove `SESSION_SECRET_PREVIOUS`, deploy.
 
 ## 3. `WEB_REVALIDATE_SECRET`
 

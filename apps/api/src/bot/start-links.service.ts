@@ -5,6 +5,7 @@ import type { Env } from '../config/env';
 import { signDeepLink, telegramDeepLink, verifyDeepLink } from '../customer/deeplink';
 import { RedisService } from '../redis/redis.module';
 import { TelegramGateway } from './telegram-gateway.service';
+import { verifyWithAny } from '../config/session-secrets';
 
 /** What a `/start` payload tells the bot. */
 export interface StartRef {
@@ -55,7 +56,7 @@ export class StartLinksService {
     const none: StartRef = { source: null, anonymousId: null, orderToken: null };
     const p = payload.trim();
     if (!p) return none;
-    const signed = verifyDeepLink(p, this.env.SESSION_SECRET);
+    const signed = verifyWithAny(this.env, (secret) => verifyDeepLink(p, secret));
     if (signed?.kind === 'lead') return { ...none, source: signed.src };
     if (signed?.kind === 'order') return { ...none, source: 'order', orderToken: signed.token };
     if (signed?.kind === 'ref') {

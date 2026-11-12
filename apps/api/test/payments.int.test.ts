@@ -779,6 +779,23 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       post('complete', signed({ ...b, action: '1', merchant_prepare_id: String(prepareId) }));
     const digits = (n: string) => Number(n.slice(2));
 
+    it('a source outside the optional IP allowlist gets -1 like a bad signature (F-14)', async () => {
+      const o = await placeOrder('CLICK');
+      await integrations.connect('click', { allowedIps: '10.9.9.9' }, ownerId, null);
+      try {
+        expect((await prepare(fields(o))).error).toBe(-1);
+      } finally {
+        await integrations.connect('click', { allowedIps: '' }, ownerId, null);
+      }
+      expect((await prepare(fields(o))).error).toBe(0);
+    });
+
+    it('webhook and other private responses default to Cache-Control no-store (F-09)', async () => {
+      const res = await request(app.getHttpServer()).get('/v1/me');
+      expect(res.status).toBe(401);
+      expect(res.headers['cache-control']).toBe('private, no-store');
+    });
+
     it('valid flow: prepare → complete → order paid; repeated complete answers -4 without effects', async () => {
       const o = await placeOrder('CLICK');
       const f = fields(o);

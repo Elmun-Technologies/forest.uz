@@ -4,6 +4,7 @@ import type { Locale } from '@forest/contracts';
 import { z } from 'zod';
 import { ENV } from '../config/config.module';
 import type { Env } from '../config/env';
+import { verifyWithAny } from '../config/session-secrets';
 
 /**
  * Cart restore links (docs/09 "Every button opens the right site page (cart restored)", Phase 5
@@ -121,7 +122,8 @@ export class CartLinkService {
   }
 
   verify(token: string, now = new Date()): CartLinkPayload | null {
-    return verifyCartLink(token, this.env.SESSION_SECRET, Math.floor(now.getTime() / 1000));
+    const nowSec = Math.floor(now.getTime() / 1000);
+    return verifyWithAny(this.env, (secret) => verifyCartLink(token, secret, nowSec));
   }
 
   private url(payload: CartLinkPayload): string {

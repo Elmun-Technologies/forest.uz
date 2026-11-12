@@ -15,6 +15,7 @@ import {
   parseClickRequest,
 } from '../integrations/providers/click';
 import { PrismaService } from '../prisma/prisma.service';
+import { ipAllowed } from './ip-allowlist';
 
 type Tx = Prisma.TransactionClient;
 
@@ -61,15 +62,15 @@ export class ClickShopService {
     private readonly integrations: IntegrationsService,
   ) {}
 
-  prepare(body: unknown): Promise<ClickResponse> {
-    return this.handle(body, ClickAction.PREPARE);
+  prepare(body: unknown, ip: string | null = null): Promise<ClickResponse> {
+    return this.handle(body, ClickAction.PREPARE, ip);
   }
 
-  complete(body: unknown): Promise<ClickResponse> {
-    return this.handle(body, ClickAction.COMPLETE);
+  complete(body: unknown, ip: string | null = null): Promise<ClickResponse> {
+    return this.handle(body, ClickAction.COMPLETE, ip);
   }
 
-  private async handle(body: unknown, action: 0 | 1): Promise<ClickResponse> {
+  private async handle(body: unknown, action: 0 | 1, ip: string | null): Promise<ClickResponse> {
     const req = parseClickRequest(body);
     const raw = (body && typeof body === 'object' ? body : {}) as Record<string, unknown>;
     const base = {
@@ -80,8 +81,13 @@ export class ClickShopService {
     };
     if (!req) return this.answer(base, ClickError.BAD_REQUEST, action, null);
     const credentials = await this.integrations.connectedCredentials('click');
-    // Not connected = no secret to verify with: answer like a bad signature.
-    if (!credentials?.secretKey || !isClickSignValid(req, credentials.secretKey))
+    // Not connected = no secret to verify with: answer like a bad signature. A source outside the
+    // optional allowlist gets the same answer (ASVS F-14).
+    if (
+      !credentials?.secretKey ||
+      !isClickSignValid(req, credentials.secretKey) ||
+      !ipAllowed(credentials.allowedIps, ip)
+    )
       return this.answer(base, ClickError.SIGN_CHECK_FAILED, action, null);
     if (req.action !== String(action))
       return this.answer(base, ClickError.ACTION_NOT_FOUND, action, req);

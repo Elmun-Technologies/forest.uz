@@ -84,6 +84,22 @@ export const envSchema = z.object({
    */
   APP_ENCRYPTION_KEY_PREVIOUS: base64KeyList,
   SESSION_SECRET: z.string().min(32),
+  /**
+   * Earlier SESSION_SECRET values, accepted only to verify tokens signed before a rotation
+   * (unsubscribe links in sent SMS, cart links, bot deep links, signed cookies). New tokens always
+   * use SESSION_SECRET. Comma-separated, ≤ 5; drop them once the longest-lived token class has
+   * expired (docs/runbooks/secret-rotation.md §2).
+   */
+  SESSION_SECRET_PREVIOUS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().min(32)).max(5)),
   ADMIN_COOKIE_DOMAIN: z.string().default('localhost'),
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional().default(''),

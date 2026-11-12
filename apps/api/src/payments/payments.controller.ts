@@ -25,14 +25,14 @@ export class PaymentWebhooksController {
   @Post('click/prepare')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  clickPrepare(@Body() body: unknown): Promise<ClickResponse> {
-    return this.click.prepare(body);
+  clickPrepare(@Req() req: Request, @Body() body: unknown): Promise<ClickResponse> {
+    return this.click.prepare(body, req.ip ?? null);
   }
 
   @Post('click/complete')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
-  clickComplete(@Body() body: unknown): Promise<ClickResponse> {
-    return this.click.complete(body);
+  clickComplete(@Req() req: Request, @Body() body: unknown): Promise<ClickResponse> {
+    return this.click.complete(body, req.ip ?? null);
   }
 }

@@ -21,6 +21,7 @@ import {
   PaymeState,
 } from '../integrations/providers/payme';
 import { PrismaService } from '../prisma/prisma.service';
+import { ipAllowed } from './ip-allowlist';
 
 type Tx = Prisma.TransactionClient;
 type RpcId = string | number | null;
@@ -598,15 +599,4 @@ function requireNumber(p: Params, field: string): number {
   if (typeof v !== 'number' || !Number.isFinite(v))
     throw new PaymeRpcError(PaymeError.INVALID_JSON_RPC_OBJECT, M.invalidRpc, field);
   return v;
-}
-
-/** Optional allowlist from the integration settings (Payme's IPs are not published in the repo). */
-export function ipAllowed(allowlist: string | undefined, ip: string | null): boolean {
-  const list = (allowlist ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!list.length) return true;
-  const normalized = ip?.replace(/^::ffff:/, '') ?? '';
-  return list.includes(normalized);
 }

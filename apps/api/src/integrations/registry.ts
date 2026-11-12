@@ -129,6 +129,12 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
       text('shippingIkpu', 'Yetkazib berish IKPU (17 raqam)', 'ИКПУ доставки (17 цифр)', false),
       text('shippingPackageCode', 'Yetkazib berish upakovka kodi', 'Код упаковки доставки', false),
       text('shippingVatPercent', 'Yetkazib berish QQS, %', 'НДС доставки, %', false),
+      text(
+        'allowedIps',
+        "Ruxsat etilgan Click IP'lari (vergul bilan)",
+        'Разрешённые IP Click (через запятую)',
+        false,
+      ),
     ],
     launchKit: true,
     availability: 'available',

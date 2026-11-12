@@ -15,6 +15,7 @@ import type { Env } from '../config/env';
 import { ConsentsService } from '../customer/common/consents';
 import { RateLimiter } from '../customer/common/rate-limit';
 import { PrismaService } from '../prisma/prisma.service';
+import { verifyWithAny } from '../config/session-secrets';
 
 /**
  * Marketing opt-out links (docs/09: every marketing message can be switched off). The SMS carries
@@ -100,7 +101,7 @@ export class UnsubscribeService {
   }
 
   async byToken(token: string): Promise<UnsubscribeResultDto> {
-    const parsed = verifyUnsubscribe(token, this.env.SESSION_SECRET);
+    const parsed = verifyWithAny(this.env, (secret) => verifyUnsubscribe(token, secret));
     if (!parsed) throw new DomainError('UNSUBSCRIBE_INVALID');
     const customer = await this.prisma.customer.findUnique({
       where: { publicId: parsed.publicId },
