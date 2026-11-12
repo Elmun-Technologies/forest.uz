@@ -50,6 +50,9 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
     };
   }
 
+  const FISCAL_IKPU = '03208001001000000';
+  const FISCAL_PACKAGE = '1501498';
+
   async function placeOrder(method: 'PAYME' | 'CLICK' | 'COD', sku = 'FR-RL-10') {
     const variantId = (await prisma.variant.findUniqueOrThrow({ where: { sku } })).id;
     const agent = shopper(app);
@@ -123,6 +126,11 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       ownerId,
       null,
     );
+    // Fiscal receipt lines need a real IKPU + package code (seed variants carry the placeholder).
+    await prisma.variant.update({
+      where: { sku: 'FR-RL-10' },
+      data: { ikpu: FISCAL_IKPU, packageCode: FISCAL_PACKAGE },
+    });
     await integrations.connect(
       'click',
       {
@@ -138,6 +146,10 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
   });
 
   afterAll(async () => {
+    await prisma.variant.update({
+      where: { sku: 'FR-RL-10' },
+      data: { ikpu: '00000000000000000', packageCode: null },
+    });
     // Leave no connected test integrations / audit rows behind for other suites.
     await prisma.integration.updateMany({
       where: { key: { in: ['payme', 'click'] } },
@@ -240,6 +252,20 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
         },
       });
       expect(o.shippingTiyin).toBeGreaterThan(0n);
+      expect(item).toMatchObject({ ikpu: FISCAL_IKPU, packageCode: FISCAL_PACKAGE });
+
+      // A line without a package code can't be fiscalized by Payme: allow, but no detail.
+      await prisma.variant.update({ where: { sku: 'FR-RL-10' }, data: { packageCode: null } });
+      const noPackage = await placeOrder('PAYME');
+      await prisma.variant.update({
+        where: { sku: 'FR-RL-10' },
+        data: { packageCode: FISCAL_PACKAGE },
+      });
+      const bare = await rpc('CheckPerformTransaction', {
+        amount: amount(noPackage),
+        account: account(noPackage),
+      });
+      expect(bare.result).toEqual({ allow: true });
 
       const wrong = await rpc('CheckPerformTransaction', {
         amount: amount(o) + 100,
@@ -299,14 +325,14 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
         amount: amount(o),
         account: account(o),
       });
-      expect(blocked.error).toMatchObject({ code: -31008 });
+      expect(blocked.error).toMatchObject({ code: -31053, data: 'order_id' });
       const other = await rpc('CreateTransaction', {
         id: txnId(),
         time: Date.now(),
         amount: amount(o),
         account: account(o),
       });
-      expect(other.error).toMatchObject({ code: -31050 });
+      expect(other.error).toMatchObject({ code: -31053, data: 'order_id' });
 
       const check1 = await rpc('CheckTransaction', { id });
       expect(check1.result).toEqual({
@@ -348,14 +374,14 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
         amount: amount(o),
         account: account(o),
       });
-      expect(paidCheck.error).toMatchObject({ code: -31008 });
+      expect(paidCheck.error).toMatchObject({ code: -31051, data: 'order_id' });
       const paidCreate = await rpc('CreateTransaction', {
         id: txnId(),
         time: Date.now(),
         amount: amount(o),
         account: account(o),
       });
-      expect(paidCreate.error).toMatchObject({ code: -31008 });
+      expect(paidCreate.error).toMatchObject({ code: -31051, data: 'order_id' });
       // Re-sending the original create for a performed transaction is not active any more.
       expect(
         (
@@ -537,14 +563,14 @@ describe('payments: Payme Merchant API + Click SHOP API (integration)', () => {
       expect(stale.error).toMatchObject({ code: -31050, data: 'time' });
     });
 
-    it('refuses orders whose payment window is over (-31008) and unknown transactions (-31003)', async () => {
+    it('refuses orders whose payment window is over (-31052) and unknown transactions (-31003)', async () => {
       const o = await placeOrder('PAYME');
       await prisma.reservation.updateMany({
         where: { orderId: o.id },
         data: { expiresAt: new Date(Date.now() - 1000) },
       });
       const r = await rpc('CheckPerformTransaction', { amount: amount(o), account: account(o) });
-      expect(r.error).toMatchObject({ code: -31008 });
+      expect(r.error).toMatchObject({ code: -31052, data: 'order_id' });
       for (const method of ['PerformTransaction', 'CheckTransaction']) {
         expect((await rpc(method, { id: 'no-such-txn' })).error).toMatchObject({ code: -31003 });
       }

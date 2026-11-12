@@ -45,6 +45,14 @@ export function isValidIkpu(value: string | null | undefined): boolean {
   return !!value && /^\d{17}$/.test(value) && value !== IKPU_PLACEHOLDER;
 }
 
+/**
+ * Package code ("upakovka kodi") of an IKPU, from its card on tasnif.soliq.uz — required on every
+ * fiscal receipt line by Payme (`package_code`) and Click (`PackageCode`, string(20)). Digits only.
+ */
+export function isValidPackageCode(value: string | null | undefined): boolean {
+  return !!value && /^\d{1,20}$/.test(value);
+}
+
 /** docs/10 SEO limits (SERP preview and validation). */
 export const SEO_TITLE_MAX = 60;
 export const SEO_DESCRIPTION_MAX = 160;

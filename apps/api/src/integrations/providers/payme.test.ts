@@ -76,7 +76,7 @@ describe('payme helpers', () => {
       {
         title: 'Cho‘tka',
         ikpu: '09603001001000000',
-        packageCode: null,
+        packageCode: '1500621',
         vatPercent: 12,
         qty: 1,
         unitPriceTiyin: 11_900_000n,
@@ -105,7 +105,7 @@ describe('payme helpers', () => {
           price: 11_900_000,
           count: 1,
           code: '09603001001000000',
-          package_code: null,
+          package_code: '1500621',
           vat_percent: 12,
           discount: 0,
         },
@@ -117,5 +117,25 @@ describe('payme helpers', () => {
       buildPaymeReceiptDetail(lines.slice(1), { title: 'x', priceTiyin: 0n }, 11_900_000n),
     ).not.toHaveProperty('shipping');
     expect(buildPaymeReceiptDetail(lines, null, 1n)).toBeNull();
+  });
+
+  it('omits the receipt detail when a line has no real IKPU or package code', () => {
+    const line = {
+      title: 'Cho‘tka',
+      ikpu: '09603001001000000',
+      packageCode: '1500621',
+      vatPercent: 12,
+      qty: 1,
+      unitPriceTiyin: 11_900_000n,
+      discountTiyin: 0n,
+    };
+    expect(buildPaymeReceiptDetail([line], null, 11_900_000n)).not.toBeNull();
+    expect(buildPaymeReceiptDetail([{ ...line, packageCode: null }], null, 11_900_000n)).toBeNull();
+    expect(
+      buildPaymeReceiptDetail([{ ...line, packageCode: '15A0' }], null, 11_900_000n),
+    ).toBeNull();
+    expect(
+      buildPaymeReceiptDetail([{ ...line, ikpu: '00000000000000000' }], null, 11_900_000n),
+    ).toBeNull();
   });
 });

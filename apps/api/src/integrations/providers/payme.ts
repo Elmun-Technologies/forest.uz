@@ -1,11 +1,12 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
+import { fiscalLinesProblem, type ReceiptLineInput } from '../../commerce/fiscal-lines';
 import type { CheckoutInput, PaymentProvider } from './types';
 
 /**
  * Payme Merchant API helpers (we are the JSON-RPC server, Payme is the client).
  * Source of truth: PaycomUZ/paycom-integration-php-template@889053c (see docs/runbooks/payments.md).
- * Anything not in that template (checkout URL format, receipt `detail`) is marked UNVERIFIED and
- * listed in docs/13-open-questions.md.
+ * The checkout URL format and the receipt `detail` were verified against developer.help.paycom.uz
+ * on 2026-11-12 (reachable since then); remaining unverified points are in docs/13-open-questions.md.
  */
 
 /** Template `Transaction::TIMEOUT`: a created (state 1) transaction expires after 12 h. */
@@ -41,6 +42,12 @@ export const PaymeError = {
   COULD_NOT_CANCEL: -31007,
   COULD_NOT_PERFORM: -31008,
   INVALID_ACCOUNT: -31050,
+  // Merchant-defined codes in the "account" range -31050…-31099: the official docs allow only
+  // -31001 and this range from CheckPerformTransaction (developer.help.paycom.uz), so order
+  // states the template reported as -31008 use these (with `data` = the account field).
+  ORDER_ALREADY_PAID: -31051,
+  ORDER_NOT_PAYABLE: -31052,
+  ORDER_BUSY: -31053,
 } as const;
 
 /** Payme shows `message` to the payer in their language (template `PaycomException::message`). */
@@ -166,18 +173,9 @@ export class PaymePaymentProvider implements PaymentProvider {
   }
 }
 
-// ── Fiscal receipt detail (UNVERIFIED field names) ──
+// ── Fiscal receipt detail ──
 
-export interface ReceiptLineInput {
-  title: string;
-  ikpu: string;
-  packageCode: string | null;
-  vatPercent: number;
-  qty: number;
-  unitPriceTiyin: bigint;
-  /** Discount for the whole line (all units), tiyin. */
-  discountTiyin: bigint;
-}
+export type { ReceiptLineInput } from '../../commerce/fiscal-lines';
 
 export interface PaymeReceiptDetail {
   receipt_type: 0;
@@ -186,7 +184,7 @@ export interface PaymeReceiptDetail {
     price: number;
     count: number;
     code: string;
-    package_code: string | null;
+    package_code: string;
     vat_percent: number;
     discount: number;
   }[];
@@ -194,25 +192,27 @@ export interface PaymeReceiptDetail {
 }
 
 /**
- * Fiscal data for Payme's receipt (`detail` in the CheckPerformTransaction result).
- * UNVERIFIED: the official template has no `detail`; field names follow docs/06
- * (`title, price, count, code, package_code, vat_percent` + shipping) plus `receipt_type` and
- * `discount` as published in Payme's fiscalization docs we could not reach. Kept in one function
- * so it can be corrected in one place; can be switched off per cashbox (`fiscalDetail=off`).
- * Returns null when the lines don't add up to the order total — sending an inconsistent receipt
- * would be worse than none (the payment itself still goes through).
+ * Fiscal data for Payme's receipt (`detail` in the CheckPerformTransaction result), as published
+ * on developer.help.paycom.uz (CheckPerformTransaction → "Добавление объекта detail", read
+ * 2026-11-12): `receipt_type` 0 = sale; per item `title`, `price` (per unit, tiyin), `count`,
+ * `code` (IKPU), `package_code`, `vat_percent` — all required — and optional `discount` (whole
+ * line, tiyin) and `units`; optional `shipping {title, price}`. Can be switched off per cashbox
+ * (`fiscalDetail=off`). Returns null — no detail, Payme then issues no receipt and the order needs
+ * a manual one — when a line lacks a real IKPU or package code, or the lines don't add up to the
+ * order total: an inconsistent receipt would be worse than none (the payment still goes through).
  */
 export function buildPaymeReceiptDetail(
   lines: ReceiptLineInput[],
   shipping: { title: string; priceTiyin: bigint } | null,
   totalTiyin: bigint,
 ): PaymeReceiptDetail | null {
+  if (fiscalLinesProblem(lines)) return null;
   const items = lines.map((l) => ({
     title: l.title.slice(0, 128),
     price: Number(l.unitPriceTiyin),
     count: l.qty,
     code: l.ikpu,
-    package_code: l.packageCode,
+    package_code: l.packageCode ?? '',
     vat_percent: l.vatPercent,
     discount: Number(l.discountTiyin),
   }));

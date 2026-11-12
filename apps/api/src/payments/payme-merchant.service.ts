@@ -3,6 +3,7 @@ import { DomainError, t } from '@forest/contracts';
 import type { Prisma } from '@forest/db';
 import { maskPhonesInText } from '../common/redact';
 import { OrderLifecycleService, orderAllowsRefund } from '../commerce/order-lifecycle.service';
+import { fiscalLinesProblem } from '../commerce/fiscal-lines';
 import { IntegrationsService } from '../integrations/integrations.service';
 import {
   buildPaymeReceiptDetail,
@@ -15,6 +16,7 @@ import {
   paymeKeyField,
   type PaymeMessage,
   type PaymeReceiptDetail,
+  type ReceiptLineInput,
   PaymeReason,
   PaymeState,
 } from '../integrations/providers/payme';
@@ -231,7 +233,7 @@ export class PaymeMerchantService {
     this.validateOrder(order, amount);
     // Template: another created/performed transaction for this order blocks a new payment.
     if (order.payments.some((x) => isPaymeActive(x)))
-      throw new PaymeRpcError(PaymeError.COULD_NOT_PERFORM, M.otherTxn);
+      throw new PaymeRpcError(PaymeError.ORDER_BUSY, M.otherTxn, PAYME_ACCOUNT_FIELD);
     const detail = credentials.fiscalDetail === 'off' ? null : this.receiptDetail(order);
     return detail ? { allow: true, detail } : { allow: true };
   }
@@ -248,11 +250,16 @@ export class PaymeMerchantService {
       // Re-checked under the lock: "pay again" may have switched the order to Click meanwhile.
       if (order.paymentMethod !== 'PAYME')
         throw new PaymeRpcError(PaymeError.INVALID_ACCOUNT, M.orderCode, PAYME_ACCOUNT_FIELD);
-      this.validateOrder(order, amount);
-      if (order.payments.some((x) => isPaymeActive(x) && x.providerTxnId !== txnId))
-        throw new PaymeRpcError(PaymeError.INVALID_ACCOUNT, M.otherTxn);
-
+      // A repeated Create answers from the transaction's own state (stored result, or -31008
+      // once it is no longer created) — the order state only matters for a new transaction.
       const found = await findTxn(tx, txnId);
+      if (!found) {
+        this.validateOrder(order, amount);
+        if (order.payments.some((x) => isPaymeActive(x)))
+          throw new PaymeRpcError(PaymeError.ORDER_BUSY, M.otherTxn, PAYME_ACCOUNT_FIELD);
+      } else if (amount !== order.totalTiyin) {
+        throw new PaymeRpcError(PaymeError.INVALID_AMOUNT, M.amount);
+      }
       if (found) {
         if (found.providerState !== PaymeState.CREATED)
           throw new PaymeRpcError(PaymeError.COULD_NOT_PERFORM, M.txnNotActive);
@@ -460,13 +467,13 @@ export class PaymeMerchantService {
   private validateOrder(order: OrderRow, amount: bigint): void {
     if (amount !== order.totalTiyin) throw new PaymeRpcError(PaymeError.INVALID_AMOUNT, M.amount);
     if (order.payments.some((x) => x.status === 'PAID' || x.status === 'PARTIALLY_REFUNDED'))
-      throw new PaymeRpcError(PaymeError.COULD_NOT_PERFORM, M.alreadyPaid);
+      throw new PaymeRpcError(PaymeError.ORDER_ALREADY_PAID, M.alreadyPaid, PAYME_ACCOUNT_FIELD);
     const now = this.now();
     const reservationAlive = order.reservations.some(
       (r) => r.expiresAt && r.expiresAt.getTime() > now,
     );
     if (order.status !== 'NEW' || !reservationAlive)
-      throw new PaymeRpcError(PaymeError.COULD_NOT_PERFORM, M.notPayable);
+      throw new PaymeRpcError(PaymeError.ORDER_NOT_PAYABLE, M.notPayable, PAYME_ACCOUNT_FIELD);
   }
 
   private async lockTxn(tx: Tx, txnId: string): Promise<PaymentRow> {
@@ -493,24 +500,28 @@ export class PaymeMerchantService {
   }
 
   private receiptDetail(order: OrderRow): PaymeReceiptDetail | null {
+    const lines: ReceiptLineInput[] = order.items.map((i) => {
+      const snap = i.nameSnapshot as { product?: unknown; variant?: unknown };
+      return {
+        // Fiscal titles in Uzbek (state language), with the variant (volume/colour).
+        title: [t(snap.product, 'uz'), t(snap.variant, 'uz')].filter(Boolean).join(', '),
+        ikpu: i.ikpu,
+        packageCode: i.packageCode,
+        vatPercent: i.vatPercent,
+        qty: i.qty,
+        unitPriceTiyin: i.priceTiyin,
+        discountTiyin: i.discountTiyin,
+      };
+    });
     const detail = buildPaymeReceiptDetail(
-      order.items.map((i) => {
-        const snap = i.nameSnapshot as { product?: unknown; variant?: unknown };
-        return {
-          // Fiscal titles in Uzbek (state language), with the variant (volume/colour).
-          title: [t(snap.product, 'uz'), t(snap.variant, 'uz')].filter(Boolean).join(', '),
-          ikpu: i.ikpu,
-          packageCode: i.packageCode,
-          vatPercent: i.vatPercent,
-          qty: i.qty,
-          unitPriceTiyin: i.priceTiyin,
-          discountTiyin: i.discountTiyin,
-        };
-      }),
+      lines,
       { title: 'Yetkazib berish', priceTiyin: order.shippingTiyin },
       order.totalTiyin,
     );
-    if (!detail) this.logger.warn(`receipt lines don't add up for ${order.number}; detail omitted`);
+    if (!detail)
+      this.logger.warn(
+        `receipt detail omitted for ${order.number}: ${fiscalLinesProblem(lines) ?? "lines don't add up"}`,
+      );
     return detail;
   }
 
