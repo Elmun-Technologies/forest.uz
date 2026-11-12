@@ -3,12 +3,9 @@
 import { Price } from '@forest/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
-import { quietRoutes, routes, telegramUrl } from '@/config/site';
+import { ownBottomBarRoutes, quietRoutes, routes, telegramUrl } from '@/config/site';
 import { useCart } from '@/components/cart/cart-provider';
 import { TelegramIcon } from './icons';
-
-/** Product pages render their own sticky buy bar on mobile. */
-const ownBottomBar = ['/p/'];
 
 /**
  * Desktop: floating "Savol bormi?" Telegram button.
@@ -22,7 +19,7 @@ export function FloatingActions({ telegramBot }: { telegramBot: string | null })
   const pathname = usePathname();
   const { count, totalSoum } = useCart();
   if (quietRoutes.some((r) => pathname.startsWith(r))) return null;
-  const mobileBarHidden = ownBottomBar.some((r) => pathname.startsWith(r));
+  const mobileBarHidden = ownBottomBarRoutes.some((r) => pathname.startsWith(r));
   const tg = telegramBot ? telegramUrl(telegramBot, 'site') : null;
 
   return (

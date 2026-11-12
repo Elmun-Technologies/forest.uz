@@ -119,7 +119,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
                   <Link
                     key={s}
                     href={`${routes.search}?q=${encodeURIComponent(s)}`}
-                    className="rounded-pill bg-canvas px-4 py-2 text-[13px] font-medium hover:bg-sage"
+                    className="hit-44 rounded-pill bg-canvas px-4 py-2 text-[13px] font-medium hover:bg-sage"
                   >
                     {s}
                   </Link>
@@ -140,7 +140,7 @@ export default async function SearchPage({ params, searchParams }: Props) {
               <Link
                 key={c.slug}
                 href={routes.category(c.slug)}
-                className="rounded-pill bg-canvas px-4 py-2 text-[13px] font-semibold hover:bg-sage"
+                className="hit-44 rounded-pill bg-canvas px-4 py-2 text-[13px] font-semibold hover:bg-sage"
               >
                 {c.name}
               </Link>

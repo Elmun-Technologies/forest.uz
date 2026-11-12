@@ -170,7 +170,7 @@ export function TagsEditor({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder="divan, vip"
-            className="h-8 w-36 rounded-pill bg-dark-2 px-3 text-xs text-white placeholder:text-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-sage"
+            className="h-8 w-36 rounded-pill bg-dark-2 px-3 text-xs text-white placeholder:text-on-dark-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-sage"
           />
           <Button size="sm" variant="inverse" type="submit" loading={busy}>
             Saqlash

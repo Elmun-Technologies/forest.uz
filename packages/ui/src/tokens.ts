@@ -6,7 +6,7 @@ export const colors = {
   canvas: '#EEEFEA',
   panel: '#FFFFFF',
   muted: '#5E6459',
-  subtle: '#8D9586',
+  subtle: '#676E62',
   line: '#DADDD3',
   sage: '#D5DDC8',
   sage50: '#F1F5EC',

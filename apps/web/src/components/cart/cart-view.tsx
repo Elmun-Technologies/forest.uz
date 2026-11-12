@@ -640,7 +640,7 @@ function PromoForm({ cart, onCart }: { cart: CartDto; onCart: (c: CartDto) => vo
             aria-invalid={message ? true : undefined}
             aria-describedby={message ? `${id}-msg` : undefined}
             data-testid="promo-input"
-            className="h-12 min-w-0 flex-1 rounded-sm border border-line px-3.5 text-sm uppercase placeholder:normal-case aria-[invalid=true]:border-[#9A6700] focus:border-ink focus:outline-none max-lg:text-base lg:h-auto lg:border-0 lg:bg-transparent lg:px-0 lg:text-white lg:placeholder:text-subtle"
+            className="h-12 min-w-0 flex-1 rounded-sm border border-line px-3.5 text-sm uppercase placeholder:normal-case aria-[invalid=true]:border-[#9A6700] focus:border-ink focus:outline-none max-lg:text-base lg:h-auto lg:border-0 lg:bg-transparent lg:px-0 lg:text-white lg:placeholder:text-on-dark-subtle"
           />
           <button
             type="submit"

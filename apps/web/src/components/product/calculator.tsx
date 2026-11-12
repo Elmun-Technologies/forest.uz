@@ -126,7 +126,7 @@ export function PaintCalculator({
               onClick={() => setArea(num(p.area))}
               data-track="calculator_used"
               className={cn(
-                'rounded-xs px-2.5 py-2 text-left text-xs lg:rounded-2xl lg:px-3.5 lg:py-2.5 lg:text-[13px]',
+                'hit-44 rounded-xs px-2.5 py-2 text-left text-xs lg:rounded-2xl lg:px-3.5 lg:py-2.5 lg:text-[13px]',
                 on ? 'bg-ink text-white' : 'bg-white',
               )}
             >

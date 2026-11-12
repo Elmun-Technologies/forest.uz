@@ -2,34 +2,47 @@
 
 import type { ImageDto } from '@forest/contracts';
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from '@/i18n/navigation';
-import { quietRoutes } from '@/config/site';
 import { readConsent, readCookie } from '@/lib/consent';
+import {
+  FINE_POINTER_QUERY,
+  LEAD_TIMER_MS,
+  LG_QUERY,
+  type LeadPromptMode,
+  type LeadPromptVisitor,
+  leadPromptAllowed,
+  leadPromptDecision,
+  leadPromptMode,
+  leadTrigger,
+} from '@/lib/lead-prompt';
 import { LEAD_FLAG } from './use-lead';
 
 const LeadPopupDialog = dynamic(() => import('./lead-popup-dialog'), { ssr: false });
+const LeadBar = dynamic(() => import('./lead-bar'), { ssr: false });
 
 const SHOWN_KEY = 'fr_popup_shown';
-const MOBILE_DELAY_MS = 40_000;
 
-function suppressed(): boolean {
+/** Storage/cookie reads happen only here, when a trigger fires — never at mount (§6 onIdle). */
+function visitor(): LeadPromptVisitor | null {
   try {
-    return (
-      readCookie('fr_ident') !== null ||
-      localStorage.getItem(LEAD_FLAG) !== null ||
-      sessionStorage.getItem(SHOWN_KEY) !== null
-    );
+    return {
+      identified: readCookie('fr_ident') !== null,
+      leadCaptured: localStorage.getItem(LEAD_FLAG) !== null,
+      shownThisSession: sessionStorage.getItem(SHOWN_KEY) !== null,
+      consentAnswered: readConsent() !== null,
+    };
   } catch {
-    return true;
+    return null; // storage disabled: stay quiet
   }
 }
 
 /**
- * Exit-intent lead popup trigger (Popup board). Desktop: pointer leaves through the top edge.
- * Mobile: after 40 s, or on a fast scroll-up. Once per session; never for identified visitors
- * (`fr_ident`, mirrored by middleware) or ones who already left a phone. Waits until the cookie
- * banner is answered so two overlays never stack. The dialog code loads only when it opens.
+ * Lead capture prompt (Popup board), rules in `lib/lead-prompt.ts`. Desktop (`lg`+, fine
+ * pointer): the modal popup on exit intent. Below `lg`: after 40 s a slim non-modal bottom bar
+ * (above the cart/Telegram bar, never on product pages, cart or checkout); its CTA opens the same
+ * form. Once per session; never for identified visitors or ones who already left a phone; waits
+ * until the cookie banner is answered. The dialog and bar code load only when needed.
  */
 export function LeadPopup({
   telegramBot,
@@ -44,74 +57,73 @@ export function LeadPopup({
   fallback: ImageDto | null;
 }) {
   const pathname = usePathname();
-  const [open, setOpen] = useState(false);
-  const quiet = quietRoutes.some((r) => pathname.startsWith(r));
+  const [shown, setShown] = useState<LeadPromptMode | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  // The triggers outlive client navigations inside the shop frame; they read the current path.
+  const path = useRef(pathname);
+  useEffect(() => {
+    path.current = pathname;
+  }, [pathname]);
+  const quiet = !leadPromptAllowed(pathname, 'dialog');
 
   useEffect(() => {
-    // No cookie/storage reads at mount (the first storage access of a page is a synchronous
-    // round-trip to the browser and would land in hydration): `show()` checks before opening and
-    // detaches the triggers for suppressed visitors.
     if (quiet) return;
+    const isLg = window.matchMedia(LG_QUERY).matches;
+    const mode = leadPromptMode(isLg);
     let detach = () => {};
-    const show = () => {
-      if (suppressed()) {
+    /** true = done with triggers (shown, or never for this visitor). */
+    const fire = (): boolean => {
+      const v = visitor();
+      const decision = v ? leadPromptDecision(path.current, mode, v) : 'never';
+      if (decision === 'wait') return false;
+      if (decision === 'never') {
         detach();
-        return false;
+        return true;
       }
-      if (!readConsent()) return false;
       try {
         sessionStorage.setItem(SHOWN_KEY, '1');
       } catch {
         /* ignore */
       }
-      setOpen(true);
+      setShown(mode);
+      if (mode === 'dialog') setDialogOpen(true);
+      detach();
       return true;
     };
 
-    const desktop = window.matchMedia('(min-width: 1024px) and (pointer: fine)').matches;
-    if (desktop) {
+    if (leadTrigger(isLg, window.matchMedia(FINE_POINTER_QUERY).matches) === 'exit-intent') {
       const onOut = (e: MouseEvent) => {
-        if (!e.relatedTarget && e.clientY <= 0 && show()) {
-          document.removeEventListener('mouseout', onOut);
-        }
+        if (!e.relatedTarget && e.clientY <= 0) fire();
       };
       document.addEventListener('mouseout', onOut);
       detach = () => document.removeEventListener('mouseout', onOut);
       return detach;
     }
-
-    let lastY = window.scrollY;
-    let lastT = performance.now();
-    const onScroll = () => {
-      const y = window.scrollY;
-      const now = performance.now();
-      // Fast scroll-up: ≥ 60 % of the viewport upwards within 400 ms (an "I'm leaving" gesture).
-      if (lastY - y > window.innerHeight * 0.6 && now - lastT < 400) show();
-      if (now - lastT > 400 || y > lastY) {
-        lastY = y;
-        lastT = now;
-      }
-    };
-    const timer = window.setInterval(() => {
-      if (show()) window.clearInterval(timer);
-    }, MOBILE_DELAY_MS);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    detach = () => {
-      window.clearInterval(timer);
-      window.removeEventListener('scroll', onScroll);
-    };
+    const timer = window.setInterval(fire, LEAD_TIMER_MS);
+    detach = () => window.clearInterval(timer);
     return detach;
   }, [quiet]);
 
-  if (!open) return null;
+  if (!shown) return null;
   return (
-    <LeadPopupDialog
-      open={open}
-      onOpenChange={setOpen}
-      telegramBot={telegramBot}
-      before={before}
-      after={after}
-      fallback={fallback}
-    />
+    <>
+      {shown === 'bar' && !dialogOpen && leadPromptAllowed(pathname, 'bar') ? (
+        <LeadBar onOpen={() => setDialogOpen(true)} onDismiss={() => setShown(null)} />
+      ) : null}
+      {dialogOpen ? (
+        <LeadPopupDialog
+          open
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            // The bar's job ends once its form was opened; it doesn't come back after closing.
+            if (!open) setShown(null);
+          }}
+          telegramBot={telegramBot}
+          before={before}
+          after={after}
+          fallback={fallback}
+        />
+      ) : null}
+    </>
   );
 }

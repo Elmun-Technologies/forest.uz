@@ -15,7 +15,7 @@
   --color-panel: #ffffff;
   --color-off: #f7f7f4;
   --color-muted: #5e6459;
-  --color-subtle: #8d9586;
+  --color-subtle: #676e62;
   --color-line: #daddd3;
   --color-line-soft: #eeefea;
   --color-sage: #d5ddc8;
@@ -95,6 +95,29 @@
 
 @utility tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 44 × 44 px minimum hit area below `lg` without changing the look: an invisible ::before,
+ * centred on the control, at least 44 px each way. Desktop (pointer, `lg`+) keeps the drawn size.
+ * The control becomes `position: relative`; don't use on elements that already use ::before.
+ */
+@utility hit-44 {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+  @media (width >= 64rem) {
+    &::before {
+      content: none;
+    }
+  }
 }
 
 /* Before/after slider: the native range thumb is invisible; the visual handle is a sibling. */
