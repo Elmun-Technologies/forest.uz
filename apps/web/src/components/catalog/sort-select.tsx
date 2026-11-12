@@ -19,7 +19,7 @@ export function SortSelect({ filters, compact }: { filters: CatalogFilters; comp
     <div
       className={cn(
         'relative inline-flex items-center rounded-pill bg-panel font-medium focus-within:outline-3 focus-within:outline-forest',
-        compact ? 'h-10 px-3.5 text-[13px] font-semibold' : 'h-12 px-5 text-sm',
+        compact ? 'h-11 px-3.5 text-[13px] font-semibold' : 'h-12 px-5 text-sm',
       )}
     >
       <label htmlFor={id} className="sr-only">
@@ -34,7 +34,8 @@ export function SortSelect({ filters, compact }: { filters: CatalogFilters; comp
         value={filters.sort}
         data-track="catalog_sort"
         onChange={(e) => apply({ sort: e.target.value as ProductSort })}
-        className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+        // Invisible, but iOS zooms into a focused select whose text is < 16 px.
+        className="absolute inset-0 cursor-pointer appearance-none text-base opacity-0"
       >
         {PRODUCT_SORTS.map((s) => (
           <option key={s} value={s}>

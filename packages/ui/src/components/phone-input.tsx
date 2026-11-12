@@ -40,7 +40,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(function
       <span
         aria-hidden
         className={cn(
-          'pointer-events-none absolute left-4 text-[15px] font-medium text-muted',
+          'pointer-events-none absolute left-4 text-base font-medium text-muted lg:text-[15px]',
           prefixClassName,
         )}
       >

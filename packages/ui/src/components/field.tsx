@@ -50,8 +50,9 @@ export function Field({ label, hint, error, className, children }: FieldProps) {
   );
 }
 
+// 16 px below `lg`: iOS Safari zooms the page into any focused field whose text is < 16 px.
 export const inputClasses = cn(
-  'h-[52px] w-full rounded-sm border border-line bg-panel px-4 text-[15px] text-ink placeholder:text-subtle',
+  'h-[52px] w-full rounded-sm border border-line bg-panel px-4 text-base text-ink placeholder:text-subtle lg:text-[15px]',
   'transition-colors focus:border-ink focus:outline-none aria-[invalid=true]:border-danger',
 );
 

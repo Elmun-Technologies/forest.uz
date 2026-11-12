@@ -41,7 +41,7 @@ export default function LeadPopupDialog({
         <Dialog.Overlay className="fixed inset-0 z-[70] bg-ink/55 backdrop-blur-[6px]" />
         <Dialog.Content
           data-testid="lead-popup"
-          className="fixed inset-x-3 bottom-3 z-[70] flex max-h-[calc(100dvh-24px)] overflow-hidden rounded-lg bg-panel focus:outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:h-[560px] md:w-[min(960px,calc(100vw-48px))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl"
+          className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-[70] flex max-h-[calc(100dvh-24px-env(safe-area-inset-bottom))] overflow-hidden rounded-lg bg-panel focus:outline-none md:inset-x-auto md:top-1/2 md:bottom-auto md:left-1/2 md:h-[560px] md:w-[min(960px,calc(100vw-48px))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl"
         >
           <div className="relative hidden flex-1 bg-forest md:block">
             {before && after ? (

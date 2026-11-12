@@ -223,7 +223,7 @@ export function LoginForm({ next, telegramBot }: { next: string; telegramBot: st
               setSentTo(null);
               setError(null);
             }}
-            className="-mt-3 self-start text-[13px] text-muted underline"
+            className="-mt-3 min-h-11 self-start text-[13px] text-muted underline"
           >
             {t('changePhone')}
           </button>

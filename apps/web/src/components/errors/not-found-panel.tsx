@@ -38,7 +38,7 @@ export async function NotFoundPanel() {
             name="q"
             type="search"
             placeholder={t('search')}
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-white placeholder:text-subtle focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-subtle focus:outline-none lg:text-[15px]"
           />
         </form>
         <div className="flex flex-wrap gap-2">

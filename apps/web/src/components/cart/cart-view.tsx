@@ -382,7 +382,7 @@ export function CartView({ locale, returnDays, cod, tiles }: CartViewProps) {
       {/* Mobile sticky checkout bar. */}
       <nav
         aria-label={t('checkout')}
-        className="sticky bottom-0 z-30 -mx-3 mt-4 bg-gradient-to-t from-canvas from-70% to-canvas/0 px-3 pt-2.5 pb-3.5 lg:hidden"
+        className="sticky bottom-0 z-30 -mx-3 mt-4 bg-gradient-to-t from-canvas from-70% to-canvas/0 px-3 pt-2.5 pb-[calc(0.875rem+env(safe-area-inset-bottom))] lg:hidden"
       >
         <Link
           href={routes.checkout}
@@ -486,7 +486,7 @@ function CartLine({
             type="button"
             onClick={onRemove}
             aria-label={t('removeLabel', { name: l.name })}
-            className="self-start text-xs text-muted underline lg:hidden"
+            className="-my-3.5 self-start py-3.5 text-xs text-muted underline lg:hidden"
           >
             {t('remove')}
           </button>
@@ -640,7 +640,7 @@ function PromoForm({ cart, onCart }: { cart: CartDto; onCart: (c: CartDto) => vo
             aria-invalid={message ? true : undefined}
             aria-describedby={message ? `${id}-msg` : undefined}
             data-testid="promo-input"
-            className="h-12 min-w-0 flex-1 rounded-sm border border-line px-3.5 text-sm uppercase placeholder:normal-case aria-[invalid=true]:border-[#9A6700] focus:border-ink focus:outline-none lg:h-auto lg:border-0 lg:bg-transparent lg:px-0 lg:text-white lg:placeholder:text-subtle"
+            className="h-12 min-w-0 flex-1 rounded-sm border border-line px-3.5 text-sm uppercase placeholder:normal-case aria-[invalid=true]:border-[#9A6700] focus:border-ink focus:outline-none max-lg:text-base lg:h-auto lg:border-0 lg:bg-transparent lg:px-0 lg:text-white lg:placeholder:text-subtle"
           />
           <button
             type="submit"
@@ -685,7 +685,7 @@ function RegionSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 min-w-0 max-w-[60%] rounded-sm border border-line bg-panel px-3 text-sm text-ink focus:border-ink focus:outline-none lg:border-dark-3 lg:bg-dark-2 lg:text-white"
+        className="h-11 min-w-0 max-w-[60%] rounded-sm border border-line bg-panel px-3 text-base text-ink focus:border-ink lg:text-sm focus:outline-none lg:border-dark-3 lg:bg-dark-2 lg:text-white"
       >
         {UZ_REGIONS.map((r) => (
           <option key={r.code} value={r.code}>

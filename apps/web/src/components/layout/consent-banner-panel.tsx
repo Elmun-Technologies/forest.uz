@@ -34,7 +34,7 @@ export default function ConsentBanner() {
     <section
       aria-labelledby={titleId}
       data-testid="consent-banner"
-      className="fixed inset-x-3 bottom-3 z-50 flex flex-col gap-4 rounded-md bg-panel p-5 text-sm shadow-float sm:right-auto sm:left-6 sm:bottom-6 sm:max-w-[440px]"
+      className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 flex flex-col gap-4 rounded-md bg-panel p-5 text-sm shadow-float sm:right-auto sm:left-6 sm:bottom-6 sm:max-w-[440px]"
     >
       <h2 id={titleId} className="text-base font-semibold">
         {t('title')}

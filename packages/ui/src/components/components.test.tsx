@@ -38,6 +38,14 @@ describe('ui components', () => {
     expect(container.textContent).toBe("dan\u00A0549\u00A0000\u00A0so'm607\u00A0000");
   });
 
+  it('Price can style the currency word separately (same text)', () => {
+    const { container } = render(
+      <Price soum={189000} locale="ru" currencyClassName="hidden @[9.5rem]:inline" />,
+    );
+    expect(container.textContent).toBe('189\u00A0000\u00A0\u0441\u0443\u043C');
+    expect(container.querySelector('.hidden')?.textContent).toBe('\u00A0\u0441\u0443\u043C');
+  });
+
   it('Field links errors to the control', () => {
     render(
       <Field label="Ism" error="Ismni kiriting">

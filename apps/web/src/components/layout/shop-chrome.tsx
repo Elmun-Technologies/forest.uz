@@ -42,7 +42,7 @@ export async function ShopChrome({
       {inFlowFrame ? <div>{children}</div> : <main id="main">{children}</main>}
       <div data-chrome-mobile>
         <Footer settings={settings} categories={categories} locale={locale} />
-        <div aria-hidden className="h-20 lg:hidden" />
+        <div aria-hidden className="h-[calc(5rem+env(safe-area-inset-bottom))] lg:hidden" />
       </div>
       <FloatingActions telegramBot={settings?.store.telegramBot ?? null} />
       <LeadPopup
