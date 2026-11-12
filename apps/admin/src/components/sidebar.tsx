@@ -29,12 +29,12 @@ export function Sidebar({ me, siteUrl }: { me: AdminMeDto; siteUrl: string }) {
         className="flex h-[42px] cursor-not-allowed items-center gap-2 rounded-sm bg-dark-2 px-3 opacity-70"
         title="Qidiruv tez orada"
       >
-        <Icon d={ICONS.search} size={16} className="text-subtle" />
+        <Icon d={ICONS.search} size={16} className="text-on-dark-subtle" />
         <span className="sr-only">Qidiruv</span>
         <input
           disabled
           placeholder="Buyurtma, mijoz, telefon"
-          className="min-w-0 flex-1 bg-transparent text-[13px] text-white placeholder:text-subtle disabled:cursor-not-allowed"
+          className="min-w-0 flex-1 bg-transparent text-[13px] text-white placeholder:text-on-dark-subtle disabled:cursor-not-allowed"
         />
       </label>
 

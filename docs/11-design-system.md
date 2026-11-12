@@ -14,7 +14,7 @@ If the brandbook PDF is added at `design/brandbook/`, its logo rules and colors 
 | `canvas` | `#EEEFEA` | page background, input fill, chips |
 | `panel` | `#FFFFFF` | cards/panels |
 | `muted` | `#5E6459` | secondary text |
-| `subtle` | `#8D9586` | tertiary text, placeholders, icons |
+| `subtle` | `#676E62` | tertiary text, placeholders, icons on light surfaces (≥ 4.5:1: 5.3 on white, 4.6 on canvas; was `#8D9586`, 2.7–3.1:1, darkened 2026-11-12). On dark surfaces use `on-dark-subtle` |
 | `line` | `#DADDD3` | borders, table header rule |
 | `line-soft` | `#EEEFEA` | row dividers |
 | `sage` | `#D5DDC8` | avatars, soft highlight, badges on dark |
@@ -22,7 +22,7 @@ If the brandbook PDF is added at `design/brandbook/`, its logo rules and colors 
 | `off` | `#F7F7F4` | quiet surfaces |
 | `ink-2` | `#3F453B` | body text on light (long copy) |
 | `dark-2` | `#23271F` / `#2E332A` | surfaces on dark (admin nav input, progress track) |
-| `on-dark-muted` | `#C9CFC2` / `#A9B39E` | text on dark |
+| `on-dark-muted` | `#C9CFC2` / `#A9B39E` | text on dark (`#A9B39E` = `on-dark-subtle`: placeholders/icons on dark) |
 | status good | text `#1F6B35` on `#E8F2EA` (alt text `#1F5A30`) |
 | status warn | text `#6B4E00` on `#FFF4D6` |
 | status critical | text `#8A1C12` on `#FBEAE8`; strong red `#B42318` |
